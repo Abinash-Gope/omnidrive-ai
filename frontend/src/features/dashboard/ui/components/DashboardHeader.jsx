@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { Cloud, Search, LayoutGrid, List, LogOut, X, Bell, ShieldCheck } from "lucide-react";
+import { Cloud, Search, LayoutGrid, List, LogOut, X, Bell } from "lucide-react";
 import useAuth from "../../../auth/hooks/useAuth.jsx";
 
 const DashboardHeader = ({
@@ -10,22 +10,30 @@ const DashboardHeader = ({
   onToggleViewMode,
   onResetFilter,
 }) => {
-  const { user, handleLogout } = useAuth();
+  const { user, plan, planDetails, handleLogout } = useAuth();
 
   return (
     <header className="h-16 px-4 sm:px-6 flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a] sticky top-0 z-30 transition-colors">
       {/* Left: Brand Identity */}
-      <div className="flex items-center gap-3 w-60 shrink-0 cursor-pointer" onClick={onResetFilter}>
+      <div className="flex items-center gap-3 shrink-0 cursor-pointer" onClick={onResetFilter}>
         <div className="w-9 h-9 rounded-full bg-[#d8e2ff] dark:bg-blue-950 text-[#005bbf] dark:text-blue-300 flex items-center justify-center shadow-xs">
           <Cloud className="w-5 h-5 fill-current" />
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           <span className="font-bold text-lg tracking-tight text-slate-900 dark:text-white">
             OmniDrive<span className="text-[#1a73e8]">AI</span>
           </span>
           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-[#1a73e8] border border-blue-200 dark:border-blue-800">
             DASHBOARD
           </span>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${planDetails?.badgeClass || "bg-slate-100 text-slate-700 border-slate-200"}`}>
+            {planDetails?.badge || "FREE TIER"}
+          </span>
+          {plan === "enterprise" && (
+            <span className="hidden xl:inline-flex items-center gap-1 text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+              VPC: vpc-0a89d71c
+            </span>
+          )}
         </div>
       </div>
 
@@ -62,12 +70,6 @@ const DashboardHeader = ({
           {viewMode === "grid" ? <List className="w-5 h-5" /> : <LayoutGrid className="w-5 h-5" />}
         </button>
 
-        {/* AWS Region Badge */}
-        <div className="hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 text-xs font-semibold border border-emerald-200 dark:border-emerald-800">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span>us-east-1 Active</span>
-        </div>
-
         {/* Notification Bell */}
         <button
           title="Notifications"
@@ -87,12 +89,13 @@ const DashboardHeader = ({
         </button>
 
         {/* User Profile Avatar */}
-        <div
-          className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#1a73e8] to-indigo-600 text-white font-bold flex items-center justify-center text-sm shadow-xs border-2 border-white dark:border-slate-800 ring-1 ring-slate-200 dark:ring-slate-700 cursor-default"
-          title={user ? `${user.name} (${user.email})` : "Alex Gope"}
+        <Link
+          to="/profile"
+          className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#1a73e8] to-indigo-600 text-white font-bold flex items-center justify-center text-sm shadow-xs border-2 border-white dark:border-slate-800 ring-1 ring-slate-200 dark:ring-slate-700 hover:ring-2 hover:ring-[#1a73e8] transition-all cursor-pointer"
+          title={user ? `Profile: ${user.name} (${user.email})` : "Profile: Alex Gope"}
         >
           {user?.avatar || "AG"}
-        </div>
+        </Link>
       </div>
     </header>
   );

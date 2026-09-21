@@ -7,24 +7,29 @@ import {
   Star,
   Users,
   Trash2,
-  PlayCircle,
-  FileText,
-  Image as ImageIcon,
   Cloud,
   ArrowRight,
-  ShieldAlert,
-  Zap,
+  Lock,
+  ShieldCheck,
 } from "lucide-react";
+import useAuth from "../../../auth/hooks/useAuth.jsx";
 
 const DashboardSidebar = ({
   activeTab,
   onSelectTab,
   onUploadFile,
-  onSimulateUpload,
   totalFilesCount = 3,
-  storage = { usedGB: 1.2, totalGB: 15.0, usedPercentage: 8 },
+  storage: propStorage,
 }) => {
   const fileInputRef = useRef(null);
+  const { plan, planDetails, handleOpenEnterpriseContact } = useAuth();
+
+  const effectiveStorage = {
+    usedGB: planDetails?.storageUsedGB ?? propStorage?.usedGB ?? 1.2,
+    totalGB: planDetails?.storageTotalGB ?? propStorage?.totalGB ?? 15.0,
+    usedPercentage: planDetails?.storageUsedPercentage ?? propStorage?.usedPercentage ?? 8,
+    isUnlimited: planDetails?.isUnlimitedStorage ?? false,
+  };
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
@@ -42,14 +47,8 @@ const DashboardSidebar = ({
     { id: "trash", label: "Trash", icon: Trash2 },
   ];
 
-  const smartViews = [
-    { id: "videos", label: "Videos (Instant Watch)", icon: PlayCircle, color: "text-[#1a73e8]" },
-    { id: "documents", label: "Documents & Summaries", icon: FileText, color: "text-purple-600" },
-    { id: "photos", label: "Photos & Scans", icon: ImageIcon, color: "text-emerald-600" },
-  ];
-
   return (
-    <aside className="w-64 shrink-0 bg-[#faf8ff] dark:bg-[#0b1329] border-r border-slate-200 dark:border-slate-800 p-4 flex flex-col justify-between h-[calc(100vh-4rem)] overflow-y-auto select-none">
+    <aside className="w-64 shrink-0 bg-[#faf8ff] dark:bg-[#0b1329] border-r border-slate-200 dark:border-slate-800 p-4 flex flex-col justify-between h-[calc(100vh-4rem)] overflow-hidden select-none sticky top-16">
       <div className="space-y-6">
         {/* + New Upload Elevated Button */}
         <div>
@@ -65,7 +64,7 @@ const DashboardSidebar = ({
             className="w-full h-12 bg-[#1a73e8] hover:bg-[#1557bf] text-white rounded-full px-5 flex items-center justify-center gap-2.5 shadow-md hover:shadow-lg transition-all active:scale-95 text-sm font-semibold group"
           >
             <Plus className="w-5 h-5 transition-transform group-hover:rotate-90 duration-200" />
-            <span>+ New Upload</span>
+            <span>New Upload</span>
           </button>
         </div>
 
@@ -97,70 +96,6 @@ const DashboardSidebar = ({
             );
           })}
         </nav>
-
-        {/* Smart Views Section */}
-        <div className="pt-3 border-t border-slate-200 dark:border-slate-800">
-          <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-3 mb-2">
-            Smart Views
-          </div>
-          <nav className="space-y-1">
-            {smartViews.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => onSelectTab(item.id)}
-                  className={`w-full flex items-center px-3.5 py-2 rounded-full text-xs font-medium transition-colors ${
-                    isActive
-                      ? "bg-[#eaedff] text-[#005bbf] dark:bg-blue-950 dark:text-blue-300 font-semibold"
-                      : "text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100"
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <Icon className={`w-4 h-4 ${item.color}`} />
-                    <span>{item.label}</span>
-                  </div>
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-
-        {/* Quick Test Simulators */}
-        <div className="pt-3 border-t border-slate-200 dark:border-slate-800">
-          <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-3 mb-2 flex items-center justify-between">
-            <span>Pipeline Triggers</span>
-            <Zap className="w-3 h-3 text-amber-500" />
-          </div>
-          <div className="grid grid-cols-2 gap-1.5 px-1">
-            <button
-              onClick={() => onSimulateUpload("video")}
-              className="py-1 px-2 text-[11px] font-medium rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 transition-colors text-left"
-            >
-              + Video 1080p
-            </button>
-            <button
-              onClick={() => onSimulateUpload("image")}
-              className="py-1 px-2 text-[11px] font-medium rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 transition-colors text-left"
-            >
-              + Vision Photo
-            </button>
-            <button
-              onClick={() => onSimulateUpload("pdf")}
-              className="py-1 px-2 text-[11px] font-medium rounded-lg bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 hover:bg-purple-100 transition-colors text-left"
-            >
-              + GenAI PDF
-            </button>
-            <button
-              onClick={() => onSimulateUpload("explicit")}
-              className="py-1 px-2 text-[11px] font-medium rounded-lg bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 hover:bg-red-100 transition-colors text-left flex items-center gap-1"
-            >
-              <ShieldAlert className="w-3 h-3 text-red-500" />
-              <span>Quarantine</span>
-            </button>
-          </div>
-        </div>
       </div>
 
       {/* Bottom AWS Storage Meter Card */}
@@ -168,35 +103,67 @@ const DashboardSidebar = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Cloud className="w-4 h-4 text-[#1a73e8]" />
-            <span className="text-xs font-semibold text-slate-900 dark:text-white">Cloud Storage</span>
+            <span className="text-xs font-semibold text-slate-900 dark:text-white">
+              {plan === "enterprise"
+                ? "VPC Dedicated S3"
+                : plan === "pro"
+                ? "Pro Cloud S3"
+                : "Cloud Storage"}
+            </span>
           </div>
           <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-            {storage.usedPercentage}% used
+            {effectiveStorage.usedPercentage}% {effectiveStorage.isUnlimited ? "alloc" : "used"}
           </span>
         </div>
 
         <div>
           <div className="flex justify-between items-baseline mb-1.5">
             <span className="text-base font-bold text-slate-900 dark:text-white">
-              {storage.usedGB} GB
+              {plan === "enterprise"
+                ? `${effectiveStorage.usedGB.toLocaleString()} GB (1.84 TB)`
+                : `${effectiveStorage.usedGB} GB`}
             </span>
-            <span className="text-xs text-slate-500">of {storage.totalGB} GB free</span>
+            <span className="text-xs text-slate-500">
+              {effectiveStorage.isUnlimited
+                ? "of Unlimited VPC"
+                : `of ${effectiveStorage.totalGB.toLocaleString()} GB`}
+            </span>
           </div>
           <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden flex">
             <div
-              className="h-full bg-[#1a73e8] rounded-full transition-all duration-300"
-              style={{ width: `${storage.usedPercentage}%` }}
+              className={`h-full rounded-full transition-all duration-300 ${
+                plan === "enterprise" ? "bg-purple-600" : "bg-[#1a73e8]"
+              }`}
+              style={{ width: `${effectiveStorage.usedPercentage}%` }}
             />
           </div>
         </div>
 
-        <Link
-          to="/pricing"
-          className="w-full pt-1 text-xs font-semibold text-[#1a73e8] hover:text-[#1557bf] flex items-center justify-center gap-1 transition-colors"
-        >
-          <span>Upgrade storage</span>
-          <ArrowRight className="w-3 h-3" />
-        </Link>
+        {plan === "enterprise" ? (
+          <button
+            onClick={handleOpenEnterpriseContact}
+            className="w-full pt-1 text-xs font-semibold text-purple-600 dark:text-purple-400 hover:underline flex items-center justify-center gap-1 transition-colors"
+          >
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>Dedicated VPC Active</span>
+          </button>
+        ) : plan === "pro" ? (
+          <button
+            onClick={handleOpenEnterpriseContact}
+            className="w-full pt-1 text-xs font-semibold text-[#1a73e8] hover:text-[#1557bf] flex items-center justify-center gap-1 transition-colors"
+          >
+            <Lock className="w-3 h-3 text-purple-600" />
+            <span>Contact for Enterprise VPC</span>
+          </button>
+        ) : (
+          <Link
+            to="/pricing"
+            className="w-full pt-1 text-xs font-semibold text-[#1a73e8] hover:text-[#1557bf] flex items-center justify-center gap-1 transition-colors"
+          >
+            <span>Upgrade to Pro Cloud</span>
+            <ArrowRight className="w-3 h-3" />
+          </Link>
+        )}
       </div>
     </aside>
   );

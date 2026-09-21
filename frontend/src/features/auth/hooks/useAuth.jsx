@@ -1,9 +1,10 @@
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
-import { setLoading, loginSuccess, loginFailure, logout } from "../state/authSlice.jsx";
-import { closeModal, setToast } from "../../../shared/state/uiSlice.jsx";
+import { setLoading, loginSuccess, loginFailure, logout, updatePlan } from "../state/authSlice.jsx";
+import { closeModal, openModal, setToast } from "../../../shared/state/uiSlice.jsx";
 import { loginApi, logoutApi, googleOAuthApi, registerApi } from "../api/authApi.jsx";
+import { getPlanDetails } from "../../../shared/config/plans.jsx";
 
 /**
  * Layer 2: Orchestrator custom hook for authentication
@@ -30,7 +31,6 @@ export const useAuth = () => {
       fullName: "Alex Chen",
       email: "alex@company.com",
       password: "Enterprise#2026!",
-      deploymentModel: "Dedicated AWS VPC",
       termsAccepted: true,
     },
   });
@@ -88,8 +88,32 @@ export const useAuth = () => {
     navigate("/");
   };
 
+  const handleUpdatePlan = (newPlan) => {
+    if (newPlan === "enterprise") {
+      // Enterprise requires contacting first
+      dispatch(openModal("enterpriseContact"));
+      return;
+    }
+    dispatch(updatePlan(newPlan));
+    const details = getPlanDetails(newPlan);
+    dispatch(
+      setToast({
+        type: "success",
+        message: `Active subscription updated to ${details.name}!`,
+      })
+    );
+  };
+
+  const handleOpenEnterpriseContact = () => {
+    dispatch(openModal("enterpriseContact"));
+  };
+
+  const activePlanDetails = getPlanDetails(user?.plan || "free");
+
   return {
     user,
+    plan: user?.plan || "free",
+    planDetails: activePlanDetails,
     token,
     isAuthenticated,
     isLoading,
@@ -102,6 +126,8 @@ export const useAuth = () => {
     handleRegister,
     handleDemoLogin,
     handleLogout,
+    handleUpdatePlan,
+    handleOpenEnterpriseContact,
   };
 };
 

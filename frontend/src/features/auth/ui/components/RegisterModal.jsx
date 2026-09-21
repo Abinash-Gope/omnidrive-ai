@@ -1,13 +1,16 @@
 import React, { useState } from "react";
 import { useDispatch } from "react-redux";
-import { Cloud, Lock, Mail, User, Eye, EyeOff, ShieldCheck, ArrowRight, Loader2, Check } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Cloud, Lock, Mail, User, Eye, EyeOff, ShieldCheck, ArrowRight, Loader2 } from "lucide-react";
 import ModalWrapper from "../../../../shared/ui/components/ModalWrapper.jsx";
 import { openModal, closeModal } from "../../../../shared/state/uiSlice.jsx";
 import useAuth from "../../hooks/useAuth.jsx";
 
 const RegisterModal = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const {
+    isAuthenticated,
     activeModal,
     isLoading,
     error,
@@ -16,7 +19,6 @@ const RegisterModal = () => {
     handleGoogleSSO,
   } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
-  const [deploymentTier, setDeploymentTier] = useState("Dedicated AWS VPC");
 
   const {
     register,
@@ -25,10 +27,13 @@ const RegisterModal = () => {
     formState: { errors },
   } = registerForm;
 
-  const isOpen = activeModal === "register";
+  const isOpen = activeModal === "register" && !isAuthenticated;
 
   const handleClose = () => {
     dispatch(closeModal());
+    if (window.location.pathname === "/login" || window.location.pathname === "/register") {
+      navigate("/");
+    }
   };
 
   const handleSwitchToLogin = () => {
@@ -36,20 +41,22 @@ const RegisterModal = () => {
   };
 
   const onFormSubmit = (data) => {
-    handleRegister({ ...data, deploymentModel: deploymentTier });
+    handleRegister(data);
   };
 
   return (
-    <ModalWrapper isOpen={isOpen} onClose={handleClose} maxWidth="max-w-md">
+    <ModalWrapper isOpen={isOpen} onClose={handleClose} maxWidth="max-w-md" padding="p-4 sm:p-5">
       {/* Brand Header */}
-      <div className="text-center mb-6">
-        <div className="w-12 h-12 rounded-2xl bg-[#d8e2ff] dark:bg-blue-950 text-[#005bbf] dark:text-blue-300 flex items-center justify-center mx-auto mb-3 shadow-xs">
-          <Cloud className="w-6 h-6 fill-current" />
+      <div className="text-center mb-3">
+        <div className="inline-flex items-center gap-2 mb-1">
+          <div className="w-8 h-8 rounded-xl bg-[#d8e2ff] dark:bg-blue-950 text-[#005bbf] dark:text-blue-300 flex items-center justify-center shadow-xs">
+            <Cloud className="w-4 h-4 fill-current" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+            Create Enterprise Workspace
+          </h2>
         </div>
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
-          Create your Enterprise Workspace
-        </h2>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+        <p className="text-[11px] text-slate-500 dark:text-slate-400">
           14-day enterprise trial • Zero credit card required
         </p>
       </div>
@@ -59,7 +66,7 @@ const RegisterModal = () => {
         type="button"
         onClick={handleGoogleSSO}
         disabled={isLoading}
-        className="w-full py-3 px-4 rounded-full border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-200 text-sm font-semibold flex items-center justify-center gap-3 shadow-xs hover:shadow transition-all active:scale-95 mb-4"
+        className="w-full py-2 px-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center justify-center gap-2.5 shadow-xs hover:shadow transition-all active:scale-95 mb-2"
       >
         <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
           <path
@@ -83,129 +90,104 @@ const RegisterModal = () => {
       </button>
 
       {/* Divider */}
-      <div className="flex items-center my-4">
+      <div className="flex items-center my-2">
         <div className="flex-1 border-t border-slate-200 dark:border-slate-700" />
-        <span className="px-3 text-[11px] uppercase tracking-wider text-slate-400 font-medium">
+        <span className="px-2.5 text-[10px] uppercase tracking-wider text-slate-400 font-medium">
           or register with work email
         </span>
         <div className="flex-1 border-t border-slate-200 dark:border-slate-700" />
       </div>
 
       {error && (
-        <div className="mb-4 p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 text-xs">
+        <div className="mb-2 p-2 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 text-xs">
           {error}
         </div>
       )}
 
       {/* Registration Form */}
-      <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-3.5">
-        <div>
-          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-            Full Name
-          </label>
-          <div className="relative">
-            <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              {...register("fullName", { required: "Full Name is required" })}
-              className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a73e8]"
-              placeholder="Alex Chen"
-            />
+      <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-2.5">
+        {/* Full Name & Work Email in 2 Columns */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-0.5">
+              Full Name
+            </label>
+            <div className="relative">
+              <User className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                {...register("fullName", { required: "Full Name is required" })}
+                className="w-full pl-9 pr-2.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-[#1a73e8]"
+                placeholder="Alex Chen"
+              />
+            </div>
+            {errors.fullName && (
+              <p className="text-red-500 text-[10px] mt-0.5">{errors.fullName.message}</p>
+            )}
           </div>
-          {errors.fullName && (
-            <p className="text-red-500 text-[11px] mt-1">{errors.fullName.message}</p>
-          )}
+
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-0.5">
+              Work Email
+            </label>
+            <div className="relative">
+              <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="email"
+                {...register("email", { required: "Work Email is required" })}
+                className="w-full pl-9 pr-2.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-[#1a73e8]"
+                placeholder="alex@company.com"
+              />
+            </div>
+            {errors.email && (
+              <p className="text-red-500 text-[10px] mt-0.5">{errors.email.message}</p>
+            )}
+          </div>
         </div>
 
+        {/* Password */}
         <div>
-          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-            Work Email
-          </label>
-          <div className="relative">
-            <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="email"
-              {...register("email", { required: "Work Email is required" })}
-              className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a73e8]"
-              placeholder="alex@company.com"
-            />
+          <div className="flex items-center justify-between mb-0.5">
+            <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+              Password
+            </label>
+            <div className="flex items-center gap-1 text-[10px] text-emerald-600 font-medium">
+              <div className="flex gap-0.5">
+                <span className="w-3 h-1 rounded-full bg-emerald-500" />
+                <span className="w-3 h-1 rounded-full bg-emerald-500" />
+                <span className="w-3 h-1 rounded-full bg-emerald-500" />
+                <span className="w-3 h-1 rounded-full bg-emerald-500" />
+              </div>
+              <span>Strong</span>
+            </div>
           </div>
-          {errors.email && (
-            <p className="text-red-500 text-[11px] mt-1">{errors.email.message}</p>
-          )}
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-            Password
-          </label>
           <div className="relative">
-            <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type={showPassword ? "text" : "password"}
               {...register("password", { required: "Password is required" })}
-              className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a73e8]"
+              className="w-full pl-9 pr-9 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-[#1a73e8]"
               placeholder="••••••••"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
             >
-              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
             </button>
           </div>
-          {/* Strength meter */}
-          <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-emerald-600 font-medium">
-            <div className="flex gap-1 flex-1">
-              <span className="h-1 flex-1 rounded-full bg-emerald-500" />
-              <span className="h-1 flex-1 rounded-full bg-emerald-500" />
-              <span className="h-1 flex-1 rounded-full bg-emerald-500" />
-              <span className="h-1 flex-1 rounded-full bg-emerald-500" />
-            </div>
-            <span>Strong 4/4</span>
-          </div>
-        </div>
-
-        {/* Deployment Model Pill Switcher */}
-        <div>
-          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-            Deployment Architecture
-          </label>
-          <div className="p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex gap-1 text-xs font-semibold">
-            <button
-              type="button"
-              onClick={() => setDeploymentTier("Dedicated AWS VPC")}
-              className={`flex-1 py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1.5 ${
-                deploymentTier === "Dedicated AWS VPC"
-                  ? "bg-white dark:bg-slate-700 text-[#1a73e8] shadow-xs"
-                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
-              }`}
-            >
-              {deploymentTier === "Dedicated AWS VPC" && <Check className="w-3.5 h-3.5" />}
-              <span>Dedicated AWS VPC</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setDeploymentTier("Enterprise Cloud")}
-              className={`flex-1 py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1.5 ${
-                deploymentTier === "Enterprise Cloud"
-                  ? "bg-white dark:bg-slate-700 text-[#1a73e8] shadow-xs"
-                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
-              }`}
-            >
-              {deploymentTier === "Enterprise Cloud" && <Check className="w-3.5 h-3.5" />}
-              <span>Enterprise Cloud</span>
-            </button>
-          </div>
+          {errors.password && (
+            <p className="text-red-500 text-[10px] mt-0.5">{errors.password.message}</p>
+          )}
         </div>
 
         {/* Terms Checkbox */}
-        <label className="flex items-start gap-2 cursor-pointer text-xs text-slate-600 dark:text-slate-400 pt-1">
+        <label className="flex items-start gap-2 cursor-pointer text-[11px] text-slate-600 dark:text-slate-400 pt-0.5">
           <input
             type="checkbox"
             {...register("termsAccepted", { required: true })}
-            className="w-4 h-4 rounded text-[#1a73e8] focus:ring-[#1a73e8] mt-0.5"
+            className="w-3.5 h-3.5 rounded text-[#1a73e8] focus:ring-[#1a73e8] mt-0.5 shrink-0"
           />
           <span>I agree to the Enterprise Service Agreement & Data Security Policy</span>
         </label>
@@ -214,21 +196,21 @@ const RegisterModal = () => {
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full mt-2 py-3 rounded-full bg-[#1a73e8] hover:bg-[#1557bf] text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-sm hover:shadow transition-all active:scale-95"
+          className="w-full py-2.5 rounded-xl bg-[#1a73e8] hover:bg-[#1557bf] text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-sm hover:shadow transition-all active:scale-95"
         >
           {isLoading ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
           ) : (
             <>
               <span>Launch Workspace</span>
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-3.5 h-3.5" />
             </>
           )}
         </button>
       </form>
 
       {/* Security & Trust Footer */}
-      <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400 flex flex-wrap items-center justify-around gap-2 font-mono">
+      <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800 text-[10px] text-slate-400 flex items-center justify-around gap-1 font-mono">
         <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
           AWS Cognito Verified
@@ -243,7 +225,7 @@ const RegisterModal = () => {
       </div>
 
       {/* Switch to Login */}
-      <div className="mt-4 text-center text-xs text-slate-500">
+      <div className="mt-2 text-center text-[11px] text-slate-500">
         <span>Already have an account? </span>
         <button
           onClick={handleSwitchToLogin}

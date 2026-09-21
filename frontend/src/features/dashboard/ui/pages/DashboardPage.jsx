@@ -61,7 +61,6 @@ const DashboardPage = () => {
           activeTab={activeTab}
           onSelectTab={handleSelectTab}
           onUploadFile={handleUploadFile}
-          onSimulateUpload={simulateUpload}
           totalFilesCount={totalFilesCount}
           storage={storage}
         />

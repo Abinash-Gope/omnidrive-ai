@@ -14,7 +14,7 @@ import {
 import usePublicPages from "../../hooks/usePublicPages.jsx";
 
 const FeaturesPage = () => {
-  const { handleOpenRegister } = usePublicPages();
+  const { isAuthenticated, handleOpenRegister } = usePublicPages();
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -197,12 +197,22 @@ const FeaturesPage = () => {
 
       {/* CTA Footer */}
       <div className="text-center py-8">
-        <button
-          onClick={handleOpenRegister}
-          className="px-8 py-3.5 rounded-full bg-[#1a73e8] hover:bg-[#1557bf] text-white font-semibold shadow-md hover:shadow-lg transition-all"
-        >
-          Try All AI Features on 15GB Free Tier
-        </button>
+        {isAuthenticated ? (
+          <Link
+            to="/dashboard"
+            className="inline-flex items-center gap-2 px-8 py-3.5 rounded-full bg-[#1a73e8] hover:bg-[#1557bf] text-white font-semibold shadow-md hover:shadow-lg transition-all"
+          >
+            <span>Open Dashboard & Files</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        ) : (
+          <button
+            onClick={handleOpenRegister}
+            className="px-8 py-3.5 rounded-full bg-[#1a73e8] hover:bg-[#1557bf] text-white font-semibold shadow-md hover:shadow-lg transition-all"
+          >
+            Try All AI Features on 15GB Free Tier
+          </button>
+        )}
       </div>
     </div>
   );

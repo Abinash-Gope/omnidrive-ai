@@ -57,7 +57,7 @@ const steps = [
 ];
 
 const HowItWorksPage = () => {
-  const { handleOpenRegister } = usePublicPages();
+  const { isAuthenticated, handleOpenRegister } = usePublicPages();
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -139,12 +139,14 @@ const HowItWorksPage = () => {
           >
             Launch Interactive Dashboard
           </Link>
-          <button
-            onClick={handleOpenRegister}
-            className="px-8 py-3.5 rounded-full bg-slate-800 hover:bg-slate-700 text-white font-semibold border border-slate-700 transition-colors"
-          >
-            Create Free Account
-          </button>
+          {!isAuthenticated && (
+            <button
+              onClick={handleOpenRegister}
+              className="px-8 py-3.5 rounded-full bg-slate-800 hover:bg-slate-700 text-white font-semibold border border-slate-700 transition-colors"
+            >
+              Create Free Account
+            </button>
+          )}
         </div>
       </div>
     </div>

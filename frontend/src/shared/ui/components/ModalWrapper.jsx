@@ -11,6 +11,8 @@ const ModalWrapper = ({
   children,
   maxWidth = "max-w-lg",
   showCloseButton = true,
+  padding = "p-5 sm:p-6",
+  className = "",
 }) => {
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -34,7 +36,7 @@ const ModalWrapper = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fadeIn"
       aria-modal="true"
       role="dialog"
     >
@@ -47,16 +49,16 @@ const ModalWrapper = ({
 
       {/* Centered Modal Surface */}
       <div
-        className={`relative w-full ${maxWidth} bg-white dark:bg-[#1f293d] rounded-3xl shadow-2xl border border-slate-200/80 dark:border-slate-700/60 p-6 sm:p-8 z-10 transform transition-all duration-200 scale-100 max-h-[92vh] overflow-y-auto`}
+        className={`relative w-full ${maxWidth} bg-white dark:bg-[#1f293d] rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200/80 dark:border-slate-700/60 ${padding} z-10 transform transition-all duration-200 scale-100 max-h-[96vh] overflow-y-auto ${className}`}
         onClick={(e) => e.stopPropagation()}
       >
         {showCloseButton && (
           <button
             onClick={onClose}
             aria-label="Close modal"
-            className="absolute top-5 right-5 w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="absolute top-3.5 right-3.5 sm:top-4 sm:right-4 w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         )}
         {children}

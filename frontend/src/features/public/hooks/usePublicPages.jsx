@@ -31,6 +31,10 @@ export const usePublicPages = () => {
     dispatch(openModal("register"));
   };
 
+  const handleOpenEnterpriseContact = () => {
+    dispatch(openModal("enterpriseContact"));
+  };
+
   const handleSelectTier = (tierId) => {
     dispatch(setActivePricingTier(tierId));
   };
@@ -46,6 +50,7 @@ export const usePublicPages = () => {
     isAuthenticated,
     handleOpenLogin,
     handleOpenRegister,
+    handleOpenEnterpriseContact,
     handleSelectTier,
     handleToggleFaq,
   };

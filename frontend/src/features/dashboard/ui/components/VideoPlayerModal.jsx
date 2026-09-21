@@ -11,9 +11,15 @@ import {
   Tv,
   Film,
   Check,
+  Lock,
 } from "lucide-react";
+import useAuth from "../../../auth/hooks/useAuth.jsx";
+import { setToast } from "../../../../shared/state/uiSlice.jsx";
+import { useDispatch } from "react-redux";
 
 const VideoPlayerModal = ({ file, isOpen, onClose, onChangeQuality }) => {
+  const dispatch = useDispatch();
+  const { plan, planDetails, handleOpenEnterpriseContact } = useAuth();
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
   const [progress, setProgress] = useState(35);
@@ -21,11 +27,30 @@ const VideoPlayerModal = ({ file, isOpen, onClose, onChangeQuality }) => {
 
   if (!isOpen || !file || file.type !== "video") return null;
 
-  const currentQuality = file.activeQuality || "1080p";
+  // Free plan defaults to 720p max
+  const currentQuality = file.activeQuality || (plan === "free" ? "720p" : "1080p");
   const qualities = [
-    { label: "1080p Full HD", value: "1080p", bitrate: "5.2 Mbps", resolution: "1920x1080" },
-    { label: "720p HD", value: "720p", bitrate: "2.8 Mbps", resolution: "1280x720" },
-    { label: "480p SD", value: "480p", bitrate: "1.2 Mbps", resolution: "854x480" },
+    {
+      label: "1080p Full HD",
+      value: "1080p",
+      bitrate: "5.2 Mbps",
+      resolution: "1920x1080",
+      isLocked: plan === "free",
+    },
+    {
+      label: "720p HD",
+      value: "720p",
+      bitrate: "2.8 Mbps",
+      resolution: "1280x720",
+      isLocked: false,
+    },
+    {
+      label: "480p SD",
+      value: "480p",
+      bitrate: "1.2 Mbps",
+      resolution: "854x480",
+      isLocked: false,
+    },
   ];
 
   return (
@@ -136,16 +161,35 @@ const VideoPlayerModal = ({ file, isOpen, onClose, onChangeQuality }) => {
                         <button
                           key={q.value}
                           onClick={() => {
+                            if (q.isLocked) {
+                              dispatch(
+                                setToast({
+                                  type: "info",
+                                  message: "1080p Full HD & 4K streaming requires Pro Cloud or Enterprise tier.",
+                                })
+                              );
+                              setShowQualityMenu(false);
+                              return;
+                            }
                             onChangeQuality(file.id, q.value);
                             setShowQualityMenu(false);
                           }}
                           className={`w-full px-3 py-2 text-left flex items-center justify-between hover:bg-slate-700 transition-colors ${
-                            currentQuality === q.value ? "text-[#1a73e8] font-bold" : "text-white"
+                            currentQuality === q.value
+                              ? "text-[#1a73e8] font-bold"
+                              : q.isLocked
+                              ? "text-slate-500 hover:text-slate-400"
+                              : "text-white"
                           }`}
                         >
                           <div>
-                            <div>{q.label}</div>
-                            <div className="text-[10px] text-slate-400 font-mono">{q.bitrate}</div>
+                            <div className="flex items-center gap-1.5">
+                              <span>{q.label}</span>
+                              {q.isLocked && <Lock className="w-3 h-3 text-amber-400 shrink-0" />}
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-mono">
+                              {q.isLocked ? "Pro Tier Required" : q.bitrate}
+                            </div>
                           </div>
                           {currentQuality === q.value && <Check className="w-4 h-4 text-[#1a73e8]" />}
                         </button>
@@ -169,8 +213,16 @@ const VideoPlayerModal = ({ file, isOpen, onClose, onChangeQuality }) => {
               <Cpu className="w-3.5 h-3.5 text-[#1a73e8]" />
               <span>Transcoding Engine</span>
             </span>
-            <p className="font-mono text-white text-[11px]">AWS ECS Fargate ARM64</p>
-            <p className="text-[10px] text-slate-500 mt-0.5">FFmpeg 6.1 static binary</p>
+            <p className="font-mono text-white text-[11px]">
+              {plan === "enterprise"
+                ? "Dedicated ARM64 Fargate Cluster"
+                : plan === "pro"
+                ? "AWS Graviton3 Priority Worker"
+                : "AWS ECS Fargate ARM64 Spot"}
+            </p>
+            <p className="text-[10px] text-slate-500 mt-0.5">
+              {plan === "enterprise" ? "Private VPC execution" : "FFmpeg 6.1 static binary"}
+            </p>
           </div>
 
           <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800">
@@ -178,7 +230,9 @@ const VideoPlayerModal = ({ file, isOpen, onClose, onChangeQuality }) => {
               <Tv className="w-3.5 h-3.5 text-emerald-400" />
               <span>Streaming Format</span>
             </span>
-            <p className="font-mono text-white text-[11px]">HLS .m3u8 Master Playlist</p>
+            <p className="font-mono text-white text-[11px]">
+              {plan === "enterprise" ? "HLS .m3u8 (BYOK KMS Encrypted)" : "HLS .m3u8 Master Playlist"}
+            </p>
             <p className="text-[10px] text-slate-500 mt-0.5">6s TS segments with AAC audio</p>
           </div>
 
@@ -187,8 +241,16 @@ const VideoPlayerModal = ({ file, isOpen, onClose, onChangeQuality }) => {
               <Film className="w-3.5 h-3.5 text-purple-400" />
               <span>Adaptive Renditions</span>
             </span>
-            <p className="font-mono text-white text-[11px]">1080p • 720p • 480p</p>
-            <p className="text-[10px] text-slate-500 mt-0.5">Automated S3 distribution</p>
+            <p className="font-mono text-white text-[11px]">
+              {plan === "enterprise"
+                ? "4K Cinema • 1080p • 720p"
+                : plan === "pro"
+                ? "1080p • 720p • 480p"
+                : "720p • 480p (Pro: 1080p)"}
+            </p>
+            <p className="text-[10px] text-slate-500 mt-0.5">
+              {plan === "enterprise" ? "Customer S3 VPC endpoint" : "Automated S3 distribution"}
+            </p>
           </div>
         </div>
       </div>

@@ -16,8 +16,9 @@ import PricingPage from "../features/public/ui/pages/PricingPage.jsx";
 import LoginPage from "../features/auth/ui/pages/LoginPage.jsx";
 import RegisterPage from "../features/auth/ui/pages/RegisterPage.jsx";
 
-// Authenticated Dashboard Page
+// Authenticated Dashboard & Profile Pages
 import DashboardPage from "../features/dashboard/ui/pages/DashboardPage.jsx";
+import ProfilePage from "../features/dashboard/ui/pages/ProfilePage.jsx";
 
 // Fallback Page
 import NotFoundPage from "../shared/ui/pages/NotFoundPage.jsx";
@@ -44,6 +45,7 @@ const AppRoutes = () => {
         {/* Authenticated Cloud Workspace */}
         <Route element={<MainProtected />}>
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
           {/* Legacy redirect for any bookmarks */}
           <Route path="/drive" element={<Navigate to="/dashboard" replace />} />
         </Route>

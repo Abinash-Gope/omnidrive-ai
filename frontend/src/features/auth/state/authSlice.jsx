@@ -2,8 +2,18 @@ import { createSlice } from "@reduxjs/toolkit";
 
 const token = localStorage.getItem("authToken");
 
+const storedPlan = localStorage.getItem("userPlan") || "free";
+
 const initialState = {
-  user: token ? { name: "Alex Gope", email: "alex.gope@omnidrive.ai", avatar: "AG" } : null,
+  user: token
+    ? {
+        name: "Alex Gope",
+        email: "alex.gope@omnidrive.ai",
+        avatar: "AG",
+        role: storedPlan === "enterprise" ? "Enterprise VPC Admin" : storedPlan === "pro" ? "Pro Cloud Creator" : "Sandbox Developer",
+        plan: storedPlan,
+      }
+    : null,
   token: token || null,
   isAuthenticated: !!token,
   isLoading: false,
@@ -18,12 +28,26 @@ export const authSlice = createSlice({
       state.isLoading = action.payload;
     },
     loginSuccess: (state, action) => {
-      state.user = action.payload.user;
+      const activePlan = action.payload.user?.plan || localStorage.getItem("userPlan") || "free";
+      state.user = {
+        ...action.payload.user,
+        plan: activePlan,
+        role: activePlan === "enterprise" ? "Enterprise VPC Admin" : activePlan === "pro" ? "Pro Cloud Creator" : "Sandbox Developer",
+      };
       state.token = action.payload.token;
       state.isAuthenticated = true;
       state.isLoading = false;
       state.error = null;
       localStorage.setItem("authToken", action.payload.token);
+      localStorage.setItem("userPlan", activePlan);
+    },
+    updatePlan: (state, action) => {
+      const newPlan = action.payload;
+      if (state.user) {
+        state.user.plan = newPlan;
+        state.user.role = newPlan === "enterprise" ? "Enterprise VPC Admin" : newPlan === "pro" ? "Pro Cloud Creator" : "Sandbox Developer";
+      }
+      localStorage.setItem("userPlan", newPlan);
     },
     loginFailure: (state, action) => {
       state.isLoading = false;
@@ -40,6 +64,6 @@ export const authSlice = createSlice({
   },
 });
 
-export const { setLoading, loginSuccess, loginFailure, logout } = authSlice.actions;
+export const { setLoading, loginSuccess, loginFailure, logout, updatePlan } = authSlice.actions;
 
 export default authSlice.reducer;

@@ -13,9 +13,11 @@ import {
   CloudUpload,
   Cpu,
 } from "lucide-react";
+import useAuth from "../../../auth/hooks/useAuth.jsx";
 
 const PipelineDrawer = ({ pipeline, onClose }) => {
   const [isMinimized, setIsMinimized] = useState(false);
+  const { plan } = useAuth();
 
   if (!pipeline || !pipeline.isOpen) return null;
 
@@ -24,26 +26,46 @@ const PipelineDrawer = ({ pipeline, onClose }) => {
   const stepsConfig = [
     {
       step: 1,
-      title: "Direct S3 Upload",
-      subtitle: "Presigned URL bypasses web server bottleneck",
+      title: plan === "enterprise" ? "Private S3 VPC Upload" : "Direct S3 Upload",
+      subtitle: plan === "enterprise" ? "Encrypted via customer BYOK KMS" : "Presigned URL bypasses web server bottleneck",
       icon: CloudUpload,
     },
     {
       step: 2,
       title: "Rekognition Moderation Gate",
-      subtitle: "Automated content moderation & quarantine",
+      subtitle: plan === "enterprise" ? "Zero-retention private scanning" : "Automated content moderation & quarantine",
       icon: isViolation ? ShieldAlert : ShieldCheck,
     },
     {
       step: 3,
-      title: file?.type === "video" ? "ECS Fargate FFmpeg Transcode" : file?.type === "pdf" ? "Bedrock Claude 3 Summarizer" : "Rekognition Vision AI Tagging",
-      subtitle: file?.type === "video" ? "ARM64 Spot worker generating HLS .m3u8" : file?.type === "pdf" ? "Textract OCR + Bedrock Claude 3 inference" : "Deep learning label & EXIF extraction",
+      title:
+        file?.type === "video"
+          ? plan === "enterprise"
+            ? "Dedicated ARM64 Fargate Transcode"
+            : plan === "pro"
+            ? "Priority Graviton3 Transcode (1080p/4K)"
+            : "ECS Fargate FFmpeg Transcode"
+          : file?.type === "pdf"
+          ? plan === "enterprise"
+            ? "Bedrock Claude 3 (Zero-Retention VPC)"
+            : "Bedrock Claude 3 Summarizer"
+          : "Rekognition Vision AI Tagging",
+      subtitle:
+        file?.type === "video"
+          ? plan === "enterprise"
+            ? "Dedicated Graviton3 task generating 4K/1080p HLS"
+            : plan === "pro"
+            ? "Priority Graviton3 worker generating HLS renditions"
+            : "ARM64 Spot worker generating 720p HLS .m3u8"
+          : file?.type === "pdf"
+          ? "Textract OCR + Bedrock Claude 3 inference"
+          : "Deep learning label & EXIF extraction",
       icon: Cpu,
     },
     {
       step: 4,
       title: "DynamoDB & EventBridge Sync",
-      subtitle: "Real-time state broadcast and metadata indexation",
+      subtitle: plan === "enterprise" ? "Dedicated DAX cache + private event bus" : "Real-time state broadcast and metadata indexation",
       icon: Database,
     },
   ];
