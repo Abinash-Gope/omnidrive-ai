@@ -1,109 +1,111 @@
+import axios from "axios";
 import axiosInstance from "../../../shared/api/axiosClient.jsx";
 
 /**
- * Layer 1: Dashboard API service
- * Pure async functions. Zero React hooks, zero Redux dispatch.
+ * Layer 1: Dashboard API Service
+ * Pure async functions connecting directly to AWS API Gateway HTTP v2, S3, and DynamoDB.
  */
 
-// Initial mock data simulating DynamoDB records matching Stitch Screen c92855904475481fbd5bf45fb7c28a0b
-const MOCK_FILES = [
-  {
-    id: "file-1",
-    name: "product_launch_4k.mp4",
-    type: "video",
-    size: "64.8 MB",
-    duration: "04:15",
-    date: "10 mins ago",
-    status: "COMPLETED",
-    moderationPassed: true,
-    hlsQualities: ["1080p", "720p", "480p"],
-    activeQuality: "1080p",
-    transcoderInfo: "AWS ECS Fargate ARM64 • FFmpeg HLS",
-    thumbnail: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=600&q=80",
-    previewSnippet: "Multi-bitrate HLS (.m3u8) ready for adaptive streaming.",
-  },
-  {
-    id: "file-2",
-    name: "tokyo_skyline.jpg",
-    type: "image",
-    size: "4.2 MB",
-    date: "1 hour ago",
-    status: "COMPLETED",
-    moderationPassed: true,
-    labels: [
-      { name: "Urban", confidence: 99.4 },
-      { name: "Architecture", confidence: 98.1 },
-      { name: "Night Skyline", confidence: 95.7 },
-      { name: "Metropolis", confidence: 92.0 },
-      { name: "Skyscraper", confidence: 89.3 },
-    ],
-    exif: {
-      camera: "Sony Alpha 7 IV",
-      lens: "24-70mm F2.8 GM II",
-      iso: "100",
-      aperture: "f/2.8",
-      shutter: "1/1200s",
-    },
-    thumbnail: "https://images.unsplash.com/photo-1503899036084-c55cdd92da26?auto=format&fit=crop&w=600&q=80",
-    previewSnippet: "Detected 5 labels with 99.4% peak confidence.",
-  },
-  {
-    id: "file-3",
-    name: "AI_Strategy_2026.pdf",
-    type: "pdf",
-    size: "2.1 MB",
-    pages: 14,
-    date: "Yesterday",
-    status: "COMPLETED",
-    moderationPassed: true,
-    summary: {
-      executive: "Key takeaways: 3-tier hybrid cloud architecture reduces latency by 42%. Decoupled S3 direct uploads and ARM64 Fargate workers eliminate web server memory bloat while Amazon Bedrock Claude 3 indexes documents in sub-second intervals.",
-      takeaways: [
-        "Zero web-tier memory bottlenecks via direct presigned S3 uploads.",
-        "Rekognition automated safety gate intercepts toxic content in <80ms.",
-        "Fargate ARM64 Graviton3 workers transcode 1080p HLS multi-bitrate streams.",
-        "Amazon Bedrock Claude 3 operates statelessly with zero customer data retention.",
-      ],
-      model: "Amazon Bedrock (Anthropic Claude 3 Haiku)",
-      pages: 14,
-    },
-    previewSnippet: "Key takeaways: 3-tier hybrid cloud architecture reduces latency by 42%...",
-  },
-];
-
+/**
+ * Fetch authenticated user's files from DynamoDB via API Gateway GET /files
+ * Multi-tenant isolation is enforced by Cognito JWT authorizer on API Gateway.
+ * @returns {Promise<Array>} List of user files or empty array
+ */
 export const getFilesApi = async () => {
-  await new Promise((r) => setTimeout(r, 200));
-  return [...MOCK_FILES];
+  try {
+    const token = localStorage.getItem("idToken") || localStorage.getItem("authToken");
+    if (!token) {
+      return [];
+    }
+
+    const response = await axiosInstance.get("/files");
+    const rawFiles = response.data?.files || (Array.isArray(response.data) ? response.data : []);
+
+    return rawFiles.map((item) => ({
+      id: item.file_id || item.SK?.replace("FILE#", "") || `file-${Date.now()}`,
+      name: item.file_name || "Uploaded File",
+      type: item.content_type?.startsWith("video/")
+        ? "video"
+        : item.content_type?.startsWith("image/")
+        ? "image"
+        : item.content_type?.includes("pdf")
+        ? "pdf"
+        : "other",
+      size: item.file_size ? `${(item.file_size / (1024 * 1024)).toFixed(1)} MB` : "Unknown",
+      date: item.created_at ? new Date(item.created_at).toLocaleDateString() : "Recently",
+      status: item.status || "PROCESSING",
+      moderationPassed: item.status !== "REJECTED_SAFETY_VIOLATION",
+      labels: item.labels || [],
+      summary: typeof item.summary === "string"
+        ? {
+            executive: item.summary,
+            takeaways: item.key_takeaways || [],
+            pages: item.page_count || 1,
+            model: "Amazon Bedrock (Claude 3 Haiku)",
+          }
+        : item.summary || null,
+      thumbnail: item.thumbnail_url || null,
+      previewSnippet: item.preview_snippet || item.status,
+      s3Key: item.s3_key || null,
+      duration: item.duration || null,
+      hlsQualities: item.hls_qualities || (item.hls_url ? ["1080p", "720p", "480p"] : []),
+      activeQuality: "1080p",
+      transcoderInfo: item.transcoder_info || null,
+    }));
+  } catch (err) {
+    if (err.response && err.response.status === 404) {
+      return [];
+    }
+    console.error("Failed to query AWS DynamoDB file registry:", err.message);
+    return [];
+  }
 };
 
+/**
+ * Request S3 Presigned PUT URL via API Gateway POST /upload-url
+ * @param {object} fileMetadata - { name, contentType, fileSize }
+ * @returns {Promise<{ file_id: string, upload_url: string, s3_key: string, expires_in: number }>}
+ */
 export const getPresignedUrlApi = async (fileMetadata) => {
-  await new Promise((r) => setTimeout(r, 250));
-  return {
-    file_id: `file-${Date.now()}`,
-    upload_url: `https://mock-s3-upload.aws.com/uploads/${encodeURIComponent(fileMetadata.name)}`,
-    expires_in: 900,
-  };
+  const response = await axiosInstance.post("/upload-url", {
+    file_name: fileMetadata.name,
+    content_type: fileMetadata.contentType || "application/octet-stream",
+    file_size: fileMetadata.fileSize || 1024,
+  });
+  return response.data;
 };
 
+/**
+ * Binary streaming directly to S3 Presigned PUT URL (Zero web-tier memory consumption)
+ * Raw axios is used without Authorization header so AWS S3 SigV4 signature is not invalidated.
+ * @param {string} uploadUrl - Pre-authenticated S3 PUT URL
+ * @param {File|Blob} file - Binary file stream
+ * @param {function} onProgress - Progress callback (0-100)
+ */
 export const uploadToS3Api = async (uploadUrl, file, onProgress) => {
-  return new Promise((resolve) => {
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += 25;
-      if (onProgress) onProgress(progress);
-      if (progress >= 100) {
-        clearInterval(interval);
-        resolve({ status: 200, message: "Uploaded to S3 successfully" });
+  if (!uploadUrl) {
+    throw new Error("Missing S3 presigned upload URL.");
+  }
+
+  return await axios.put(uploadUrl, file, {
+    headers: {
+      "Content-Type": file?.type || "application/octet-stream",
+    },
+    onUploadProgress: (progressEvent) => {
+      if (onProgress && progressEvent.total) {
+        const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+        onProgress(percent);
       }
-    }, 120);
+    },
   });
 };
 
+/**
+ * Poll file processing status from DynamoDB via API Gateway GET /files/{fileId}
+ * @param {string} fileId - The unique file UUID
+ * @returns {Promise<object>} Current processing status and AI extracted metadata
+ */
 export const pollJobStatusApi = async (fileId) => {
-  await new Promise((r) => setTimeout(r, 300));
-  return {
-    file_id: fileId,
-    status: "COMPLETED",
-    pipeline_step: "All AI processing finished",
-  };
+  const response = await axiosInstance.get(`/files/${fileId}`);
+  return response.data?.file || response.data;
 };

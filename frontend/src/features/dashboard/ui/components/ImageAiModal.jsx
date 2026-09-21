@@ -13,21 +13,8 @@ import {
 const ImageAiModal = ({ file, isOpen, onClose }) => {
   if (!isOpen || !file || file.type !== "image") return null;
 
-  const labels = file.labels || [
-    { name: "Urban", confidence: 99.2 },
-    { name: "Architecture", confidence: 98.5 },
-    { name: "Metropolis", confidence: 94.1 },
-    { name: "Skyscraper", confidence: 91.8 },
-  ];
-
-  const exif = file.exif || {
-    camera: "Sony Alpha 7 IV",
-    lens: "FE 24-70mm F2.8 GM II",
-    iso: "100",
-    aperture: "f/5.6",
-    shutter: "1/500s",
-    focalLength: "35mm",
-  };
+  const labels = file.labels || [];
+  const exif = file.exif || null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
@@ -90,30 +77,36 @@ const ImageAiModal = ({ file, isOpen, onClose }) => {
               </div>
 
               <div className="space-y-2">
-                {labels.map((lbl, idx) => (
-                  <div
-                    key={idx}
-                    className="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 shadow-xs flex items-center justify-between"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Tag className="w-3.5 h-3.5 text-emerald-500" />
-                      <span className="text-xs font-medium text-slate-800 dark:text-slate-200">
-                        {lbl.name}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-16 h-1.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
-                        <div
-                          className="h-full bg-emerald-500 rounded-full"
-                          style={{ width: `${lbl.confidence}%` }}
-                        />
-                      </div>
-                      <span className="text-[11px] font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                        {lbl.confidence.toFixed(1)}%
-                      </span>
-                    </div>
+                {labels.length === 0 ? (
+                  <div className="p-4 text-center rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs text-slate-500">
+                    Rekognition Vision AI labels will appear here once processed.
                   </div>
-                ))}
+                ) : (
+                  labels.map((lbl, idx) => (
+                    <div
+                      key={idx}
+                      className="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 shadow-xs flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Tag className="w-3.5 h-3.5 text-emerald-500" />
+                        <span className="text-xs font-medium text-slate-800 dark:text-slate-200">
+                          {lbl.name}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-16 h-1.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                          <div
+                            className="h-full bg-emerald-500 rounded-full"
+                            style={{ width: `${lbl.confidence}%` }}
+                          />
+                        </div>
+                        <span className="text-[11px] font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                          {lbl.confidence ? `${Number(lbl.confidence).toFixed(1)}%` : ""}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 
@@ -124,40 +117,46 @@ const ImageAiModal = ({ file, isOpen, onClose }) => {
                 <span>Extracted Hardware EXIF</span>
               </h4>
 
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80">
-                  <span className="text-[10px] text-slate-400 block uppercase font-medium">
-                    Camera Body
-                  </span>
-                  <span className="font-semibold text-slate-800 dark:text-white">
-                    {exif.camera}
-                  </span>
+              {exif ? (
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80">
+                    <span className="text-[10px] text-slate-400 block uppercase font-medium">
+                      Camera Body
+                    </span>
+                    <span className="font-semibold text-slate-800 dark:text-white">
+                      {exif.camera || "Unknown"}
+                    </span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80">
+                    <span className="text-[10px] text-slate-400 block uppercase font-medium">
+                      Optics
+                    </span>
+                    <span className="font-semibold text-slate-800 dark:text-white truncate block">
+                      {exif.lens || "Standard"}
+                    </span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80">
+                    <span className="text-[10px] text-slate-400 block uppercase font-medium">
+                      Exposure / ISO
+                    </span>
+                    <span className="font-semibold text-slate-800 dark:text-white font-mono">
+                      {exif.shutter || "Auto"} • ISO {exif.iso || "Auto"}
+                    </span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80">
+                    <span className="text-[10px] text-slate-400 block uppercase font-medium">
+                      Focal Length
+                    </span>
+                    <span className="font-semibold text-slate-800 dark:text-white font-mono">
+                      {exif.focalLength || "Native"}
+                    </span>
+                  </div>
                 </div>
-                <div className="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80">
-                  <span className="text-[10px] text-slate-400 block uppercase font-medium">
-                    Optics
-                  </span>
-                  <span className="font-semibold text-slate-800 dark:text-white truncate block">
-                    {exif.lens}
-                  </span>
+              ) : (
+                <div className="p-4 text-center rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs text-slate-500">
+                  No hardware EXIF metadata found in uploaded image.
                 </div>
-                <div className="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80">
-                  <span className="text-[10px] text-slate-400 block uppercase font-medium">
-                    Exposure / ISO
-                  </span>
-                  <span className="font-semibold text-slate-800 dark:text-white font-mono">
-                    {exif.shutter} • ISO {exif.iso}
-                  </span>
-                </div>
-                <div className="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80">
-                  <span className="text-[10px] text-slate-400 block uppercase font-medium">
-                    Aperture
-                  </span>
-                  <span className="font-semibold text-slate-800 dark:text-white font-mono">
-                    {exif.aperture}
-                  </span>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>

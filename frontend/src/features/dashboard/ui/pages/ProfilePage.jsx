@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import OmniDriveLogo from "../../../../shared/ui/components/OmniDriveLogo.jsx";
 import {
   Cloud,
   ArrowLeft,
@@ -91,9 +92,7 @@ const ProfilePage = () => {
         {/* Left: Brand & Return Navigation */}
         <div className="flex items-center gap-4">
           <Link to="/dashboard" className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-full bg-[#d8e2ff] dark:bg-blue-950 text-[#005bbf] dark:text-blue-300 flex items-center justify-center">
-              <Cloud className="w-5 h-5 fill-current" />
-            </div>
+            <OmniDriveLogo size="sm" animate={true} />
             <div className="flex items-center gap-1.5">
               <span className="font-bold text-lg tracking-tight text-slate-900 dark:text-white">
                 OmniDrive<span className="text-[#1a73e8]">AI</span>

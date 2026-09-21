@@ -64,9 +64,11 @@ module "ecs_fargate" {
 
 # Module 5: Amazon Cognito (User Pool, Public SPA Client, Hosted UI)
 module "cognito" {
-  source       = "./modules/cognito"
-  project_name = var.project_name
-  environment  = var.environment
+  source               = "./modules/cognito"
+  project_name         = var.project_name
+  environment          = var.environment
+  google_client_id     = var.google_client_id
+  google_client_secret = var.google_client_secret
 }
 
 # Module 6: Lambda Microservices (Presigned URL, Files API, Moderation Gate, Vision AI, PDF Summarizer)

@@ -5,6 +5,7 @@ import { getGoogleOAuthUrl } from "../config/cognitoConfig.jsx";
 import { parseJwt, isTokenExpired, formatUserFromClaims } from "../utils/jwtHelper.jsx";
 import { loginApi, registerApi, logoutApi, getActiveSessionApi } from "../api/authApi.jsx";
 import { loginSuccess, logout as reduxLogout, setLoading as setReduxLoading, loginFailure } from "../state/authSlice.jsx";
+import { setToast } from "../../../shared/state/uiSlice.jsx";
 
 export const AuthContext = createContext(null);
 
@@ -105,17 +106,50 @@ export const AuthProvider = ({ children }) => {
   }, [dispatch, navigate]);
 
   /**
+   * 5. Update user plan in context (without re-login)
+   */
+  const updateUserPlan = useCallback((newPlan) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const updated = {
+        ...prev,
+        plan: newPlan,
+        role: newPlan === "enterprise" ? "Enterprise VPC Admin" : newPlan === "pro" ? "Pro Cloud Creator" : "Sandbox Developer",
+      };
+      localStorage.setItem("userPlan", newPlan);
+      return updated;
+    });
+  }, []);
+
+  /**
    * 4. App Initialization & OAuth Callback Processing
    */
   useEffect(() => {
     const initializeAuth = async () => {
       setIsLoading(true);
 
-      // Check URL Hash Fragment for OAuth return (#id_token=...&access_token=...)
-      if (typeof window !== "undefined" && window.location.hash) {
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
-        const hashIdToken = hashParams.get("id_token");
+      // Check URL Hash and Query for OAuth return (#id_token=... or error)
+      if (typeof window !== "undefined") {
+        const hashParams = window.location.hash ? new URLSearchParams(window.location.hash.substring(1)) : null;
+        const searchParams = window.location.search ? new URLSearchParams(window.location.search) : null;
 
+        const oauthError =
+          hashParams?.get("error_description") ||
+          hashParams?.get("error") ||
+          searchParams?.get("error_description") ||
+          searchParams?.get("errorMessage");
+
+        if (oauthError) {
+          dispatch(
+            setToast({
+              type: "error",
+              message: decodeURIComponent(oauthError).replace(/\+/g, " "),
+            })
+          );
+          window.history.replaceState(null, "", window.location.pathname);
+        }
+
+        const hashIdToken = hashParams?.get("id_token");
         if (hashIdToken) {
           if (!isTokenExpired(hashIdToken)) {
             const claims = parseJwt(hashIdToken);
@@ -126,6 +160,12 @@ export const AuthProvider = ({ children }) => {
               // Clean hash parameters from URL bar without full page reload
               window.history.replaceState(null, "", window.location.pathname);
               setIsLoading(false);
+              dispatch(
+                setToast({
+                  type: "success",
+                  message: `Signed in with Google as ${userData.name}! Welcome to OmniDrive AI.`,
+                })
+              );
               navigate("/dashboard", { replace: true });
               return;
             }
@@ -169,6 +209,8 @@ export const AuthProvider = ({ children }) => {
     loginWithEmail,
     logout,
     getIdToken,
+    establishSession,
+    updateUserPlan,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <!-- Background subtle halo -->
+    <radialGradient id="haloGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1a73e8" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Top / Cloud Loop Gradient -->
+    <linearGradient id="blueGlow" x1="20" y1="24" x2="108" y2="24" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1a73e8" />
+      <stop offset="50%" stop-color="#2563eb" />
+      <stop offset="100%" stop-color="#00d2ff" />
+    </linearGradient>
+
+    <!-- Left / Neural Spine Gradient -->
+    <linearGradient id="purpleGlow" x1="18" y1="36" x2="64" y2="108" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1a73e8" />
+      <stop offset="60%" stop-color="#6366f1" />
+      <stop offset="100%" stop-color="#8b5cf6" />
+    </linearGradient>
+
+    <!-- Right / Media Pipeline Gradient -->
+    <linearGradient id="emeraldGlow" x1="110" y1="40" x2="64" y2="108" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#00d2ff" />
+      <stop offset="50%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+
+    <!-- Center AI Spark Core -->
+    <radialGradient id="sparkGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="40%" stop-color="#93c5fd" />
+      <stop offset="100%" stop-color="#1a73e8" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Filter for crisp drop shadow -->
+    <filter id="softShadow" x="-10%" y="-10%" width="120%" height="120%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#0f172a" flood-opacity="0.25" />
+    </filter>
+  </defs>
+
+  <!-- Background Base Container for Favicon High Visibility -->
+  <rect width="128" height="128" rx="28" fill="#0b1329" />
+  <circle cx="64" cy="64" r="54" fill="url(#haloGrad)" />
+
+  <!-- OmniDrive AI Interconnected Loop Geometry -->
+  <g filter="url(#softShadow)">
+    <!-- Top Cloud Arc -->
+    <path
+      d="M42 46 C34 46, 26 53, 26 62 C26 71, 33 78, 42 78 L86 78 C96 78, 104 70, 104 60 C104 51, 98 43, 89 42 C87 31, 77 22, 65 22 C55 22, 46 28, 42 36 Z"
+      fill="none"
+      stroke="url(#blueGlow)"
+      stroke-width="7"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      opacity="0.95"
+    />
+
+    <!-- Interlocking Triangular Drive Facets (Drive + AI Node) -->
+    <!-- Facet 1: Top-Left to Bottom Apex -->
+    <path
+      d="M40 38 L64 74 L48 74 L32 48 Z"
+      fill="url(#purpleGlow)"
+      opacity="0.9"
+    />
+
+    <!-- Facet 2: Top-Right to Bottom Apex -->
+    <path
+      d="M88 38 L64 74 L76 96 L98 56 Z"
+      fill="url(#emeraldGlow)"
+      opacity="0.85"
+    />
+
+    <!-- Facet 3: Base Connector Crossbar -->
+    <path
+      d="M48 74 L80 74 L64 100 Z"
+      fill="url(#blueGlow)"
+      opacity="0.95"
+    />
+
+    <!-- Central AI Neural Spark / Core Node -->
+    <circle cx="64" cy="60" r="14" fill="url(#sparkGrad)" />
+    <circle cx="64" cy="60" r="5" fill="#ffffff" />
+
+    <!-- Quantum Pulse Orbit Nodes -->
+    <circle cx="36" cy="60" r="2.5" fill="#60a5fa" />
+    <circle cx="92" cy="60" r="2.5" fill="#34d399" />
+    <circle cx="64" cy="30" r="2.5" fill="#a78bfa" />
+  </g>
+</svg>

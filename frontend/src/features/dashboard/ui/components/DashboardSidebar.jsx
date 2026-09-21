@@ -18,16 +18,16 @@ const DashboardSidebar = ({
   activeTab,
   onSelectTab,
   onUploadFile,
-  totalFilesCount = 3,
+  totalFilesCount = 0,
   storage: propStorage,
 }) => {
   const fileInputRef = useRef(null);
   const { plan, planDetails, handleOpenEnterpriseContact } = useAuth();
 
   const effectiveStorage = {
-    usedGB: planDetails?.storageUsedGB ?? propStorage?.usedGB ?? 1.2,
+    usedGB: planDetails?.storageUsedGB ?? propStorage?.usedGB ?? 0,
     totalGB: planDetails?.storageTotalGB ?? propStorage?.totalGB ?? 15.0,
-    usedPercentage: planDetails?.storageUsedPercentage ?? propStorage?.usedPercentage ?? 8,
+    usedPercentage: planDetails?.storageUsedPercentage ?? propStorage?.usedPercentage ?? 0,
     isUnlimited: planDetails?.isUnlimitedStorage ?? false,
   };
 
@@ -119,14 +119,16 @@ const DashboardSidebar = ({
         <div>
           <div className="flex justify-between items-baseline mb-1.5">
             <span className="text-base font-bold text-slate-900 dark:text-white">
-              {plan === "enterprise"
-                ? `${effectiveStorage.usedGB.toLocaleString()} GB (1.84 TB)`
+              {effectiveStorage.usedGB >= 1024
+                ? `${(effectiveStorage.usedGB / 1024).toFixed(1)} TB`
                 : `${effectiveStorage.usedGB} GB`}
             </span>
             <span className="text-xs text-slate-500">
               {effectiveStorage.isUnlimited
                 ? "of Unlimited VPC"
-                : `of ${effectiveStorage.totalGB.toLocaleString()} GB`}
+                : effectiveStorage.totalGB >= 1024
+                ? `of ${(effectiveStorage.totalGB / 1024).toFixed(0)} TB`
+                : `of ${effectiveStorage.totalGB} GB`}
             </span>
           </div>
           <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden flex">

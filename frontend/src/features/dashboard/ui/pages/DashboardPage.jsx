@@ -28,7 +28,6 @@ const DashboardPage = () => {
     uploadPipeline,
     previewModal,
     handleUploadFile,
-    simulateUpload,
     handleSelectTab,
     handleSelectFilter,
     handleSearch,

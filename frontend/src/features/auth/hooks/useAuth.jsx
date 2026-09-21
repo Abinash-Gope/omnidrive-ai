@@ -1,7 +1,7 @@
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
-import { updatePlan } from "../state/authSlice.jsx";
+import { updatePlan, loginSuccess, setPendingVerification, clearPendingVerification } from "../state/authSlice.jsx";
 import { closeModal, openModal, setToast } from "../../../shared/state/uiSlice.jsx";
 import { registerApi } from "../api/authApi.jsx";
 import { getPlanDetails } from "../../../shared/config/plans.jsx";
@@ -27,6 +27,7 @@ export const useAuth = () => {
     loginWithEmail,
     logout,
     getIdToken,
+    updateUserPlan,
   } = authContext;
 
   const { activeModal } = useSelector((state) => state.ui || {});
@@ -56,6 +57,7 @@ export const useAuth = () => {
     try {
       const data = await loginWithEmail(formData.email, formData.password);
       dispatch(closeModal());
+      dispatch(clearPendingVerification());
       dispatch(
         setToast({
           type: "success",
@@ -65,6 +67,22 @@ export const useAuth = () => {
       navigate("/dashboard");
       return data;
     } catch (err) {
+      if (err.code === "UserNotConfirmedException" || err.message?.includes("not confirmed")) {
+        dispatch(
+          setPendingVerification({
+            email: formData.email,
+            password: formData.password,
+          })
+        );
+        dispatch(openModal("verification"));
+        dispatch(
+          setToast({
+            type: "info",
+            message: "Please enter the verification code sent to your email.",
+          })
+        );
+        return;
+      }
       dispatch(
         setToast({
           type: "error",
@@ -76,7 +94,7 @@ export const useAuth = () => {
   };
 
   /**
-   * Handle Google SSO Redirect via Cognito Hosted UI
+   * Real Google Sign-In via AWS Cognito Hosted UI / OAuth2
    */
   const handleGoogleSSO = () => {
     dispatch(closeModal());
@@ -90,28 +108,64 @@ export const useAuth = () => {
     try {
       const data = await registerApi(formData);
       dispatch(closeModal());
-      dispatch(
-        setToast({
-          type: "success",
-          message: data.userConfirmed
-            ? `Workspace created! Welcome, ${data.user?.name || "Architect"}.`
-            : "Registration complete! Please check your email for verification.",
-        })
-      );
-      if (data.token) {
-        navigate("/dashboard");
+
+      if (data.userConfirmed) {
+        dispatch(
+          setToast({
+            type: "success",
+            message: `Workspace created! Welcome, ${formData.fullName || "Architect"}.`,
+          })
+        );
+        if (data.token) {
+          navigate("/dashboard");
+        } else {
+          await loginWithEmail(formData.email, formData.password);
+          navigate("/dashboard");
+        }
       } else {
-        dispatch(openModal("auth"));
+        // Save pending verification info and open verification modal
+        dispatch(
+          setPendingVerification({
+            email: formData.email,
+            password: formData.password,
+            fullName: formData.fullName,
+          })
+        );
+        dispatch(openModal("verification"));
+        dispatch(
+          setToast({
+            type: "info",
+            message: `Verification code sent to ${formData.email}. Please verify to activate your workspace.`,
+          })
+        );
       }
       return data;
     } catch (err) {
-      dispatch(
-        setToast({
-          type: "error",
-          message: err.message || "Registration failed. Please check your details.",
-        })
-      );
+      if (err.code === "UsernameExistsException") {
+        dispatch(openModal("auth"));
+        dispatch(
+          setToast({
+            type: "error",
+            message: "An account with this email already exists. Please sign in.",
+          })
+        );
+      } else {
+        dispatch(
+          setToast({
+            type: "error",
+            message: err.message || "Registration failed. Please check your details.",
+          })
+        );
+      }
       throw err;
+    }
+  };
+
+  const establishSessionFromToken = (token, user) => {
+    if (authContext.establishSession) {
+      authContext.establishSession(token, user);
+    } else {
+      dispatch(loginSuccess({ token, user }));
     }
   };
 
@@ -131,7 +185,9 @@ export const useAuth = () => {
       dispatch(openModal("enterpriseContact"));
       return;
     }
+    // Update both Redux state and AuthContext local user state
     dispatch(updatePlan(newPlan));
+    updateUserPlan?.(newPlan);
     const details = getPlanDetails(newPlan);
     dispatch(
       setToast({
@@ -169,6 +225,7 @@ export const useAuth = () => {
     handleLogout,
     handleUpdatePlan,
     handleOpenEnterpriseContact,
+    establishSessionFromToken,
   };
 };
 

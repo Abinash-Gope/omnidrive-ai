@@ -15,7 +15,7 @@ import {
 import usePublicPages from "../../hooks/usePublicPages.jsx";
 
 const OverviewPage = () => {
-  const { telemetry, isAuthenticated, handleOpenLogin, handleOpenRegister } = usePublicPages();
+  const { isAuthenticated, handleOpenLogin, handleOpenRegister } = usePublicPages();
 
   return (
     <div className="flex flex-col w-full">
@@ -79,26 +79,22 @@ const OverviewPage = () => {
           </Link>
         </div>
 
-        {/* Live Telemetry Pill Bar */}
-        <div className="mt-14 w-full max-w-3xl bg-white/90 dark:bg-slate-800/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-slate-700 p-4 shadow-sm flex flex-wrap items-center justify-around gap-4 text-xs font-mono">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-slate-500">SQS Telemetry:</span>
-            <span className="font-bold text-slate-900 dark:text-white">
-              {telemetry.msgsPerSec.toLocaleString()} msgs/sec
-            </span>
+        {/* Platform Technology Bar */}
+        <div className="mt-14 w-full max-w-3xl bg-white/90 dark:bg-slate-800/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-slate-700 px-5 py-3.5 shadow-sm grid grid-cols-3 divide-x divide-slate-200 dark:divide-slate-700 text-xs font-mono">
+          <div className="flex items-center gap-2 pr-4">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+            <span className="text-slate-500 shrink-0">Storage:</span>
+            <span className="font-bold text-slate-900 dark:text-white truncate">Amazon S3 (ap-south-1)</span>
           </div>
-          <div className="hidden sm:block w-[1px] h-4 bg-slate-200 dark:bg-slate-700" />
-          <div className="flex items-center gap-2">
-            <Zap className="w-3.5 h-3.5 text-amber-500" />
-            <span className="text-slate-500">Queue Latency:</span>
-            <span className="font-bold text-slate-900 dark:text-white">{telemetry.latencyMs}ms</span>
+          <div className="flex items-center gap-2 px-4">
+            <Zap className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+            <span className="text-slate-500 shrink-0">AI:</span>
+            <span className="font-bold text-slate-900 dark:text-white truncate">Rekognition + Bedrock Claude 3</span>
           </div>
-          <div className="hidden sm:block w-[1px] h-4 bg-slate-200 dark:bg-slate-700" />
-          <div className="flex items-center gap-2">
-            <Server className="w-3.5 h-3.5 text-blue-500" />
-            <span className="text-slate-500">Graviton3 Runners:</span>
-            <span className="font-bold text-slate-900 dark:text-white">{telemetry.activeRunners} Active</span>
+          <div className="flex items-center gap-2 pl-4">
+            <Server className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+            <span className="text-slate-500 shrink-0">Compute:</span>
+            <span className="font-bold text-slate-900 dark:text-white truncate">ARM64 Fargate + DynamoDB</span>
           </div>
         </div>
       </section>

@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { Cloud, ShieldCheck, Lock, CheckCircle2, Server } from "lucide-react";
+import { ShieldCheck, Lock, CheckCircle2, Server } from "lucide-react";
+import OmniDriveLogo from "../../../../shared/ui/components/OmniDriveLogo.jsx";
 
 const PublicFooter = () => {
   return (
@@ -10,9 +11,7 @@ const PublicFooter = () => {
           {/* Brand & Mission */}
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-full bg-[#1a73e8] flex items-center justify-center text-white">
-                <Cloud className="w-5 h-5" />
-              </div>
+              <OmniDriveLogo size="sm" />
               <span className="font-bold text-xl text-white tracking-tight">
                 OmniDrive<span className="text-[#60a5fa]">AI</span>
               </span>
@@ -24,7 +23,7 @@ const PublicFooter = () => {
             <div className="flex flex-wrap gap-2 pt-2">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-800 text-emerald-400 border border-slate-700">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                AWS US-East-1 Active
+                AWS ap-south-1 Active
               </span>
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-800 text-blue-400 border border-slate-700">
                 <ShieldCheck className="w-3.5 h-3.5" />

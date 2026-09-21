@@ -1,3 +1,5 @@
+import React from "react";
+import { Navigate, Outlet } from "react-router-dom";
 import { Loader2, Cloud } from "lucide-react";
 import { useAuthContext } from "../../features/auth/context/AuthContext.jsx";
 

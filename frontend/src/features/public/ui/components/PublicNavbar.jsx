@@ -1,15 +1,24 @@
 import React, { useState } from "react";
-import { NavLink, Link } from "react-router-dom";
-import { Cloud, Menu, X, ArrowRight, LayoutDashboard } from "lucide-react";
-import usePublicPages from "../../hooks/usePublicPages.jsx";
+import { Link, NavLink } from "react-router-dom";
+import {
+  Menu,
+  X,
+  Sparkles,
+  ArrowRight,
+  ShieldCheck,
+  Zap,
+  LayoutDashboard,
+} from "lucide-react";
+import OmniDriveLogo from "../../../../shared/ui/components/OmniDriveLogo.jsx";
+import { usePublicPages } from "../../hooks/usePublicPages.jsx";
 import { useAuthContext } from "../../../auth/context/AuthContext.jsx";
 
 const navItems = [
   { label: "Overview", path: "/" },
-  { label: "AI Features", path: "/features" },
+  { label: "Features", path: "/features" },
   { label: "How It Works", path: "/how-it-works" },
-  { label: "Safety & Privacy", path: "/safety" },
   { label: "Pricing", path: "/pricing" },
+  { label: "Safety & Ethics", path: "/safety" },
 ];
 
 const PublicNavbar = () => {
@@ -23,9 +32,7 @@ const PublicNavbar = () => {
         {/* Left: Brand Identity */}
         <div className="flex items-center gap-8">
           <Link to="/" className="flex items-center gap-2.5 group">
-            <div className="w-10 h-10 rounded-full bg-[#d8e2ff] dark:bg-[#1a365d] flex items-center justify-center text-[#005bbf] dark:text-[#adc7ff] transition-transform group-hover:scale-105 shadow-xs">
-              <Cloud className="w-5 h-5 fill-current" />
-            </div>
+            <OmniDriveLogo size="md" animate={true} />
             <div className="flex items-center gap-2">
               <span className="font-bold text-xl tracking-tight text-slate-900 dark:text-white">
                 OmniDrive<span className="text-[#1a73e8]">AI</span>

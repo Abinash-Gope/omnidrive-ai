@@ -111,7 +111,7 @@ const FileGrid = ({
           <p className="text-sm text-slate-500 max-w-sm mt-1">
             {searchQuery
               ? `No media matches your search term "${searchQuery}". Try searching for labels like "Urban", "Landscape", or file names.`
-              : "Your workspace is currently clean. Drag and drop media above or use the test triggers in the sidebar to simulate AI pipelines."}
+              : "Your workspace is currently clean. Drag and drop files above or click New Upload to store files directly in Amazon S3 and trigger AI pipelines."}
           </p>
         </div>
       ) : viewMode === "grid" ? (

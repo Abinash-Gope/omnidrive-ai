@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { Cloud, Lock, Mail, Eye, EyeOff, ShieldCheck, ArrowRight, Loader2 } from "lucide-react";
+import { Lock, Mail, Eye, EyeOff, ShieldCheck, ArrowRight, Loader2 } from "lucide-react";
 import ModalWrapper from "../../../../shared/ui/components/ModalWrapper.jsx";
+import OmniDriveLogo from "../../../../shared/ui/components/OmniDriveLogo.jsx";
 import { openModal, closeModal } from "../../../../shared/state/uiSlice.jsx";
 import useAuth from "../../hooks/useAuth.jsx";
 
@@ -44,9 +45,7 @@ const AuthModal = () => {
       {/* Brand Header */}
       <div className="text-center mb-3">
         <div className="inline-flex items-center gap-2 mb-1">
-          <div className="w-8 h-8 rounded-xl bg-[#d8e2ff] dark:bg-blue-950 text-[#005bbf] dark:text-blue-300 flex items-center justify-center shadow-xs">
-            <Cloud className="w-4 h-4 fill-current" />
-          </div>
+          <OmniDriveLogo size="sm" animate={true} />
           <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
             Sign in to OmniDrive AI
           </h2>

@@ -30,6 +30,9 @@ const AppRoutes = () => {
         {/* Public Marketing Presentation Site */}
         <Route element={<PublicLayout />}>
           <Route path="/" element={<OverviewPage />} />
+          {/* Alias redirects — /overview and /architecture → home */}
+          <Route path="/overview" element={<Navigate to="/" replace />} />
+          <Route path="/architecture" element={<Navigate to="/how-it-works" replace />} />
           <Route path="/features" element={<FeaturesPage />} />
           <Route path="/how-it-works" element={<HowItWorksPage />} />
           <Route path="/safety" element={<SafetyPage />} />

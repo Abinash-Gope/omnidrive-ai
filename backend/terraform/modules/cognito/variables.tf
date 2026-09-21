@@ -19,3 +19,17 @@ variable "logout_urls" {
   type        = list(string)
   default     = ["http://localhost:3000"]
 }
+
+variable "google_client_id" {
+  description = "Google OAuth Client ID from Google Cloud Console"
+  type        = string
+  default     = ""
+}
+
+variable "google_client_secret" {
+  description = "Google OAuth Client Secret from Google Cloud Console"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+

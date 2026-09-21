@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { Cloud, Search, LayoutGrid, List, LogOut, X, Bell } from "lucide-react";
+import { Search, LayoutGrid, List, LogOut, X, Bell } from "lucide-react";
+import OmniDriveLogo from "../../../../shared/ui/components/OmniDriveLogo.jsx";
 import useAuth from "../../../auth/hooks/useAuth.jsx";
 
 const DashboardHeader = ({
@@ -16,9 +17,7 @@ const DashboardHeader = ({
     <header className="h-16 px-4 sm:px-6 flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a] sticky top-0 z-30 transition-colors">
       {/* Left: Brand Identity */}
       <div className="flex items-center gap-3 shrink-0 cursor-pointer" onClick={onResetFilter}>
-        <div className="w-9 h-9 rounded-full bg-[#d8e2ff] dark:bg-blue-950 text-[#005bbf] dark:text-blue-300 flex items-center justify-center shadow-xs">
-          <Cloud className="w-5 h-5 fill-current" />
-        </div>
+        <OmniDriveLogo size="sm" animate={true} />
         <div className="flex items-center gap-2">
           <span className="font-bold text-lg tracking-tight text-slate-900 dark:text-white">
             OmniDrive<span className="text-[#1a73e8]">AI</span>

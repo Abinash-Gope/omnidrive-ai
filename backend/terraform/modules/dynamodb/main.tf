@@ -59,10 +59,6 @@ resource "aws_dynamodb_table" "files" {
     enabled = true
   }
 
-  server_side_encryption {
-    enabled = true
-  }
-
   tags = {
     Name        = "${var.project_name}-registry"
     Environment = var.environment

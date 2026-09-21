@@ -5,10 +5,10 @@ import { CognitoUserPool } from "amazon-cognito-identity-js";
  * Reads from Vite environment variables with graceful fallback defaults.
  */
 export const cognitoConfig = {
-  userPoolId: import.meta.env.VITE_COGNITO_USER_POOL_ID || "us-east-1_mockOmniDrivePool",
-  clientId: import.meta.env.VITE_COGNITO_CLIENT_ID || "mockOmniDriveClient123456789",
-  region: import.meta.env.VITE_AWS_REGION || "us-east-1",
-  domain: import.meta.env.VITE_COGNITO_DOMAIN || "omnidrive-ai.auth.us-east-1.amazoncognito.com",
+  userPoolId: import.meta.env.VITE_COGNITO_USER_POOL_ID || "ap-south-1_S6BEWSSAC",
+  clientId: import.meta.env.VITE_COGNITO_CLIENT_ID || "4gh5u5t7ckq7bpau1e7q6o0j3k",
+  region: import.meta.env.VITE_AWS_REGION || "ap-south-1",
+  domain: import.meta.env.VITE_COGNITO_DOMAIN || "omnidrive-ai-dev-6127c51d.auth.ap-south-1.amazoncognito.com",
   redirectUri: import.meta.env.VITE_COGNITO_REDIRECT_URI || (typeof window !== "undefined" ? window.location.origin : "http://localhost:3000"),
   responseType: "token", // Implicit grant returning #id_token=... in hash fragment
   scopes: ["email", "openid", "profile"],

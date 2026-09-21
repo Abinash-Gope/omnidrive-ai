@@ -13,6 +13,7 @@ const initialState = {
   isAuthenticated: !!validToken,
   isLoading: false,
   error: null,
+  pendingVerification: null, // { email, password, fullName }
 };
 
 export const authSlice = createSlice({
@@ -60,9 +61,23 @@ export const authSlice = createSlice({
       localStorage.removeItem("authToken");
       localStorage.removeItem("idToken");
     },
+    setPendingVerification: (state, action) => {
+      state.pendingVerification = action.payload;
+    },
+    clearPendingVerification: (state) => {
+      state.pendingVerification = null;
+    },
   },
 });
 
-export const { setLoading, loginSuccess, loginFailure, logout, updatePlan } = authSlice.actions;
+export const {
+  setLoading,
+  loginSuccess,
+  loginFailure,
+  logout,
+  updatePlan,
+  setPendingVerification,
+  clearPendingVerification,
+} = authSlice.actions;
 
 export default authSlice.reducer;

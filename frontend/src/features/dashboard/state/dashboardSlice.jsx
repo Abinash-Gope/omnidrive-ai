@@ -11,9 +11,9 @@ const initialState = {
   isLoading: false,
   error: null,
   storage: {
-    usedGB: 1.2,
+    usedGB: 0,
     totalGB: 15.0,
-    usedPercentage: 8,
+    usedPercentage: 0,
   },
   uploadPipeline: {
     isOpen: false,
@@ -40,7 +40,9 @@ export const dashboardSlice = createSlice({
   initialState,
   reducers: {
     setFiles: (state, action) => {
-      state.files = action.payload;
+      const all = action.payload || [];
+      state.files = all.filter((f) => f.status !== "REJECTED_SAFETY_VIOLATION");
+      state.quarantinedFiles = all.filter((f) => f.status === "REJECTED_SAFETY_VIOLATION");
       state.isLoading = false;
       state.error = null;
     },

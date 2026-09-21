@@ -4,6 +4,7 @@ import Toast from "../../shared/ui/components/Toast.jsx";
 import AuthModal from "../../features/auth/ui/components/AuthModal.jsx";
 import RegisterModal from "../../features/auth/ui/components/RegisterModal.jsx";
 import EnterpriseContactModal from "../../features/auth/ui/components/EnterpriseContactModal.jsx";
+import VerificationModal from "../../features/auth/ui/components/VerificationModal.jsx";
 
 const AppLayout = () => {
   return (
@@ -12,6 +13,7 @@ const AppLayout = () => {
       <Toast />
       <AuthModal />
       <RegisterModal />
+      <VerificationModal />
       <EnterpriseContactModal />
     </div>
   );

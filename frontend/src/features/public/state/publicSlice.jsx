@@ -1,12 +1,7 @@
 import { createSlice } from "@reduxjs/toolkit";
 
 const initialState = {
-  telemetry: {
-    msgsPerSec: 14280,
-    latencyMs: 11.4,
-    activeRunners: 48,
-    uptimeSla: "99.999%",
-  },
+  telemetry: null,
   activePricingTier: "pro",
   activeFaqIndex: null,
 };

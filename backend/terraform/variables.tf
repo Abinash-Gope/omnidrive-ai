@@ -1,7 +1,7 @@
 variable "aws_region" {
   description = "AWS deployment region"
   type        = string
-  default     = "us-east-1"
+  default     = "ap-south-1"
 }
 
 variable "project_name" {
@@ -15,3 +15,17 @@ variable "environment" {
   type        = string
   default     = "dev"
 }
+
+variable "google_client_id" {
+  description = "Google OAuth Client ID from Google Cloud Console"
+  type        = string
+  default     = ""
+}
+
+variable "google_client_secret" {
+  description = "Google OAuth Client Secret from Google Cloud Console"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+

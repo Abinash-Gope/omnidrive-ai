@@ -44,6 +44,28 @@ resource "aws_cognito_user_pool" "pool" {
 }
 
 # =========================================================================
+# COGNITO IDENTITY PROVIDER: Google Social Federation
+# =========================================================================
+resource "aws_cognito_identity_provider" "google" {
+  count         = var.google_client_id != "" ? 1 : 0
+  user_pool_id  = aws_cognito_user_pool.pool.id
+  provider_name = "Google"
+  provider_type = "Google"
+
+  provider_details = {
+    client_id        = var.google_client_id
+    client_secret    = var.google_client_secret
+    authorize_scopes = "email openid profile"
+  }
+
+  attribute_mapping = {
+    email    = "email"
+    name     = "name"
+    username = "sub"
+  }
+}
+
+# =========================================================================
 # COGNITO USER POOL CLIENT: Public SPA Web Client (Zero Secret)
 # =========================================================================
 resource "aws_cognito_user_pool_client" "client" {
@@ -56,7 +78,7 @@ resource "aws_cognito_user_pool_client" "client" {
     "ALLOW_REFRESH_TOKEN_AUTH",
     "ALLOW_USER_PASSWORD_AUTH",
   ]
-  supported_identity_providers         = ["COGNITO"]
+  supported_identity_providers         = var.google_client_id != "" ? ["COGNITO", "Google"] : ["COGNITO"]
   allowed_oauth_flows_user_pool_client = true
   allowed_oauth_flows                  = ["code", "implicit"]
   allowed_oauth_scopes                 = ["email", "openid", "profile"]
@@ -64,6 +86,8 @@ resource "aws_cognito_user_pool_client" "client" {
   logout_urls                          = var.logout_urls
 
   prevent_user_existence_errors = "ENABLED"
+
+  depends_on = [aws_cognito_identity_provider.google]
 }
 
 # =========================================================================

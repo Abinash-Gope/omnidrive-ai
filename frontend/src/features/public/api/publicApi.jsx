@@ -1,18 +1,8 @@
 /**
  * Public Feature API Layer
- * Pure async functions for public marketing telemetry and plans.
+ * Pure async functions for public marketing and plans.
  */
 
-export const getTelemetryStats = async () => {
-  // Simulated AWS EventBridge & SQS live stream telemetry
-  return {
-    msgsPerSec: 14280 + Math.floor(Math.random() * 450 - 225),
-    latencyMs: +(11.4 + (Math.random() * 0.8 - 0.4)).toFixed(1),
-    activeRunners: 48,
-    uptimeSla: "99.999%",
-    zeroNatCost: true,
-  };
-};
 
 export const getPricingPlans = async () => {
   return [
