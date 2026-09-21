@@ -126,9 +126,13 @@ resource "aws_iam_policy" "ecs_task_runtime_policy" {
         Effect = "Allow"
         Action = [
           "dynamodb:UpdateItem",
-          "dynamodb:GetItem"
+          "dynamodb:GetItem",
+          "dynamodb:Query"
         ]
-        Resource = [var.dynamodb_table_arn]
+        Resource = [
+          var.dynamodb_table_arn,
+          "${var.dynamodb_table_arn}/index/*"
+        ]
       }
     ]
   })
@@ -171,9 +175,10 @@ resource "aws_ecs_task_definition" "transcoder" {
       }
       environment = [
         { name = "AWS_REGION", value = var.aws_region },
-        { name = "RAW_BUCKET_ARN", value = var.raw_bucket_arn },
-        { name = "PROCESSED_BUCKET_ARN", value = var.processed_bucket_arn },
-        { name = "DYNAMODB_TABLE_ARN", value = var.dynamodb_table_arn }
+        { name = "RAW_BUCKET_NAME", value = var.raw_bucket_name },
+        { name = "PROCESSED_BUCKET_NAME", value = var.processed_bucket_name },
+        { name = "DYNAMODB_TABLE_NAME", value = var.dynamodb_table_name },
+        { name = "VIDEO_QUEUE_URL", value = var.video_queue_url }
       ]
     }
   ])

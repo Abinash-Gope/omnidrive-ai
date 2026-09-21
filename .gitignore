@@ -1,85 +1,39 @@
-# Dependencies
-node_modules/
-.pnp
-.pnp.js
-.pnpm-store/
+# ==============================================================================
+# OmniDrive AI - Root Workspace Git Ignore
+# Note: Specific component rules are isolated in:
+#   - frontend/.gitignore
+#   - backend/.gitignore
+# ==============================================================================
 
-# Production Build Outputs
-dist/
-dist-ssr/
-build/
-out/
-.cache/
-
-# Environment Variables & Secrets
-.env
-.env.development.local
-.env.test.local
-.env.production.local
-.env.local
-*.env
-
-# Terraform & Cloud State
-.terraform/
-*.tfstate
-*.tfstate.*
-crash.log
-crash.*.log
-*.tfvars
-*.tfvars.json
-override.tf
-override.tf.json
-*_override.tf
-*_override.tf.json
-.terraformrc
-terraform.rc
-
-# Python & Lambda artifacts
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-.pytest_cache/
-.coverage
-htmlcov/
-.venv/
-venv/
-ENV/
-
-# OS & Editor Files
+# OS Metadata & System Files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 Desktop.ini
+
+# IDE & Editor Configurations
 .vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
 .idea/
-*.sublime-project
-*.sublime-workspace
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
 *.swp
 *.swo
+*~
+*.sublime-project
+*.sublime-workspace
 
-# Logs
-logs/
+# Temporary & Log Files
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+logs/
+.tmp/
+temp/

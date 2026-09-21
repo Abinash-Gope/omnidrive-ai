@@ -55,10 +55,12 @@ def main():
     body = json.loads(msg["Body"])
 
     file_id = body.get("file_id")
-    raw_bucket = body.get("bucket")
-    raw_key = body.get("key")
+    user_id = body.get("user_id")
+    raw_bucket = body.get("bucket", PROCESSED_BUCKET_NAME)
+    raw_key = body.get("key", "")
 
-    logger.info("Processing video job for file_id: %s (s3://%s/%s)", file_id, raw_bucket, raw_key)
+    user_pk, file_sk = resolve_keys(table, file_id, user_id, raw_key)
+    logger.info("Processing video job for %s / %s (s3://%s/%s)", user_pk, file_sk, raw_bucket, raw_key)
 
     work_dir = f"/tmp/transcode_{file_id}"
     os.makedirs(work_dir, exist_ok=True)
@@ -68,7 +70,7 @@ def main():
 
     try:
         # 2. Update status to PROCESSING
-        update_dynamo(table, file_id, "PROCESSING", "Transcoding into multi-bitrate HLS streams (1080p, 720p, 480p)")
+        update_dynamo(table, user_pk, file_sk, "PROCESSING", "Transcoding into multi-bitrate HLS streams (1080p, 720p, 480p)")
 
         # 3. Download raw video from S3
         logger.info("Downloading raw S3 asset to local worker: %s", input_file)
@@ -88,7 +90,8 @@ def main():
         # 6. Update DynamoDB to COMPLETED
         update_dynamo(
             table,
-            file_id,
+            user_pk,
+            file_sk,
             "COMPLETED",
             "HLS Adaptive Video Transcoding finished",
             extra={
@@ -104,12 +107,35 @@ def main():
 
     except Exception as e:
         logger.error("Transcoding failed for file %s: %s", file_id, str(e), exc_info=True)
-        update_dynamo(table, file_id, "FAILED", f"Transcode error: {str(e)}")
+        update_dynamo(table, user_pk, file_sk, "FAILED", f"Transcode error: {str(e)}")
         sys.exit(1)
     finally:
         # Clean local scratch space
         shutil.rmtree(work_dir, ignore_errors=True)
         logger.info("Worker task finished. Container stopping naturally.")
+
+
+def resolve_keys(table, file_id, user_id=None, raw_key=None):
+    """Resolves single-table PK (USER#<id>) and SK (FILE#<id>)"""
+    if user_id:
+        return f"USER#{user_id}", f"FILE#{file_id}"
+    if raw_key and raw_key.startswith("raw/"):
+        parts = raw_key.split("/")
+        if len(parts) >= 3:
+            return f"USER#{parts[1]}", f"FILE#{file_id}"
+    try:
+        from boto3.dynamodb.conditions import Key
+        resp = table.query(
+            IndexName="FileLookupIndex",
+            KeyConditionExpression=Key("file_id").eq(file_id),
+            Limit=1,
+        )
+        items = resp.get("Items", [])
+        if items:
+            return items[0].get("PK"), items[0].get("SK")
+    except Exception as e:
+        logger.warning("FileLookupIndex query fallback failed: %s", str(e))
+    return f"USER#unknown", f"FILE#{file_id}"
 
 
 def run_ffmpeg_hls(input_path, output_dir):
@@ -162,7 +188,11 @@ def upload_hls_directory(local_dir, bucket, s3_prefix):
             )
 
 
-def update_dynamo(table, file_id, status, step, extra=None):
+def update_dynamo(table, user_pk, file_sk, status, step, extra=None):
+    if not user_pk or not file_sk:
+        logger.error("Cannot update DynamoDB: missing user_pk (%s) or file_sk (%s)", user_pk, file_sk)
+        return
+
     now = datetime.now(timezone.utc).isoformat()
     update_expr = "SET #s = :status, pipeline_step = :step, updated_at = :now"
     expr_names = {"#s": "status"}
@@ -174,7 +204,7 @@ def update_dynamo(table, file_id, status, step, extra=None):
             expr_values[f":{k}"] = v
 
     table.update_item(
-        Key={"file_id": file_id},
+        Key={"PK": user_pk, "SK": file_sk},
         UpdateExpression=update_expr,
         ExpressionAttributeNames=expr_names,
         ExpressionAttributeValues=expr_values,

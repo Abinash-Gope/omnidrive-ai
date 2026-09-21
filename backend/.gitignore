@@ -1,0 +1,59 @@
+# ==============================================================================
+# OmniDrive AI - Backend Git Ignore Rules
+# ==============================================================================
+
+# Python & Lambda Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Terraform State & Secrets
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# Local Secrets & Credentials
+.env
+.env.*
+*.pem
+*.key
+
+# Logs & Temp Files
+logs/
+*.log
+/tmp/
