@@ -10,7 +10,7 @@ import {
   PlayCircle,
   FileText,
   Image as ImageIcon,
-  CloudDone,
+  Cloud,
   ArrowRight,
   ShieldAlert,
   Zap,
@@ -167,7 +167,7 @@ const DashboardSidebar = ({
       <div className="bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 space-y-3 shadow-xs">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <CloudDone className="w-4 h-4 text-[#1a73e8]" />
+            <Cloud className="w-4 h-4 text-[#1a73e8]" />
             <span className="text-xs font-semibold text-slate-900 dark:text-white">Cloud Storage</span>
           </div>
           <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">

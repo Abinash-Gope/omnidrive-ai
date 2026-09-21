@@ -3,7 +3,7 @@ import { useDispatch } from "react-redux";
 import { Link } from "react-router-dom";
 import { Cloud } from "lucide-react";
 import AuthModal from "../components/AuthModal.jsx";
-import { openModal } from "../../../shared/state/uiSlice.jsx";
+import { openModal } from "../../../../shared/state/uiSlice.jsx";
 
 const LoginPage = () => {
   const dispatch = useDispatch();

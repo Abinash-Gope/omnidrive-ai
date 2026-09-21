@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { useDispatch } from "react-redux";
 import { Cloud, Lock, Mail, User, Eye, EyeOff, ShieldCheck, ArrowRight, Loader2, Check } from "lucide-react";
-import ModalWrapper from "../../../shared/ui/components/ModalWrapper.jsx";
-import { openModal, closeModal } from "../../../shared/state/uiSlice.jsx";
+import ModalWrapper from "../../../../shared/ui/components/ModalWrapper.jsx";
+import { openModal, closeModal } from "../../../../shared/state/uiSlice.jsx";
 import useAuth from "../../hooks/useAuth.jsx";
 
 const RegisterModal = () => {

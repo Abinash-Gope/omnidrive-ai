@@ -3,7 +3,7 @@ import { useDispatch } from "react-redux";
 import { Link } from "react-router-dom";
 import { Cloud } from "lucide-react";
 import RegisterModal from "../components/RegisterModal.jsx";
-import { openModal } from "../../../shared/state/uiSlice.jsx";
+import { openModal } from "../../../../shared/state/uiSlice.jsx";
 
 const RegisterPage = () => {
   const dispatch = useDispatch();
