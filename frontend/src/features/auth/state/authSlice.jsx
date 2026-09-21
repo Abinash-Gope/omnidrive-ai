@@ -1,21 +1,16 @@
 import { createSlice } from "@reduxjs/toolkit";
+import { parseJwt, isTokenExpired, formatUserFromClaims } from "../utils/jwtHelper.jsx";
 
-const token = localStorage.getItem("authToken");
-
-const storedPlan = localStorage.getItem("userPlan") || "free";
+const storedToken = localStorage.getItem("idToken") || localStorage.getItem("authToken");
+const validToken = storedToken && !isTokenExpired(storedToken) ? storedToken : null;
+const decodedClaims = validToken ? parseJwt(validToken) : null;
+const initialUser = decodedClaims ? formatUserFromClaims(decodedClaims, validToken) : null;
 
 const initialState = {
-  user: token
-    ? {
-        name: "Alex Gope",
-        email: "alex.gope@omnidrive.ai",
-        avatar: "AG",
-        role: storedPlan === "enterprise" ? "Enterprise VPC Admin" : storedPlan === "pro" ? "Pro Cloud Creator" : "Sandbox Developer",
-        plan: storedPlan,
-      }
-    : null,
-  token: token || null,
-  isAuthenticated: !!token,
+  user: initialUser,
+  token: validToken,
+  idToken: validToken,
+  isAuthenticated: !!validToken,
   isLoading: false,
   error: null,
 };
@@ -35,10 +30,12 @@ export const authSlice = createSlice({
         role: activePlan === "enterprise" ? "Enterprise VPC Admin" : activePlan === "pro" ? "Pro Cloud Creator" : "Sandbox Developer",
       };
       state.token = action.payload.token;
+      state.idToken = action.payload.token;
       state.isAuthenticated = true;
       state.isLoading = false;
       state.error = null;
       localStorage.setItem("authToken", action.payload.token);
+      localStorage.setItem("idToken", action.payload.token);
       localStorage.setItem("userPlan", activePlan);
     },
     updatePlan: (state, action) => {
@@ -57,9 +54,11 @@ export const authSlice = createSlice({
     logout: (state) => {
       state.user = null;
       state.token = null;
+      state.idToken = null;
       state.isAuthenticated = false;
       state.error = null;
       localStorage.removeItem("authToken");
+      localStorage.removeItem("idToken");
     },
   },
 });

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { Cloud, Lock, Mail, Eye, EyeOff, ShieldCheck, ArrowRight, Zap, Loader2 } from "lucide-react";
+import { Cloud, Lock, Mail, Eye, EyeOff, ShieldCheck, ArrowRight, Loader2 } from "lucide-react";
 import ModalWrapper from "../../../../shared/ui/components/ModalWrapper.jsx";
 import { openModal, closeModal } from "../../../../shared/state/uiSlice.jsx";
 import useAuth from "../../hooks/useAuth.jsx";
@@ -17,7 +17,6 @@ const AuthModal = () => {
     loginForm,
     handleLogin,
     handleGoogleSSO,
-    handleDemoLogin,
   } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
 
@@ -176,19 +175,6 @@ const AuthModal = () => {
           )}
         </button>
       </form>
-
-      {/* 1-Click Demo Sandbox */}
-      <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800">
-        <button
-          type="button"
-          onClick={handleDemoLogin}
-          disabled={isLoading}
-          className="w-full py-1.5 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[11px] font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-center gap-1.5 transition-colors"
-        >
-          <Zap className="w-3 h-3 text-amber-500 shrink-0" />
-          <span>Instant Demo Access: 1-Click Sandbox Login</span>
-        </button>
-      </div>
 
       {/* Security & Trust Footer */}
       <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800 text-[10px] text-slate-400 flex items-center justify-around gap-1 font-mono">

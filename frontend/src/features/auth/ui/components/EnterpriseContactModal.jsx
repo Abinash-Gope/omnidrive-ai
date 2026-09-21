@@ -123,7 +123,7 @@ const EnterpriseContactModal = () => {
               }}
               className="w-full sm:flex-1 py-2.5 rounded-full bg-gradient-to-r from-[#1a73e8] to-purple-600 hover:from-[#1557bf] hover:to-purple-700 text-white text-xs font-semibold shadow-md transition-all"
             >
-              Activate Enterprise Tier for Demo
+              Activate Enterprise Subscription Plan
             </button>
             <button
               onClick={handleClose}

@@ -1,96 +1,133 @@
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
-import { setLoading, loginSuccess, loginFailure, logout, updatePlan } from "../state/authSlice.jsx";
+import { updatePlan } from "../state/authSlice.jsx";
 import { closeModal, openModal, setToast } from "../../../shared/state/uiSlice.jsx";
-import { loginApi, logoutApi, googleOAuthApi, registerApi } from "../api/authApi.jsx";
+import { registerApi } from "../api/authApi.jsx";
 import { getPlanDetails } from "../../../shared/config/plans.jsx";
+import { useAuthContext } from "../context/AuthContext.jsx";
 
 /**
- * Layer 2: Orchestrator custom hook for authentication
- * Binds UI to API & Redux state, manages forms, modals, and redirects to /dashboard.
+ * Unified useAuth custom hook
+ * Integrates React AuthContext with Redux state, UI modals, forms, and plan management.
  */
 export const useAuth = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { user, token, isAuthenticated, isLoading, error } = useSelector(
-    (state) => state.auth || {}
-  );
+
+  // Consume core Cognito Authentication Context
+  const authContext = useAuthContext();
+  const {
+    isAuthenticated,
+    user,
+    idToken,
+    isLoading,
+    error,
+    loginWithGoogle,
+    loginWithEmail,
+    logout,
+    getIdToken,
+  } = authContext;
+
   const { activeModal } = useSelector((state) => state.ui || {});
 
+  // Clean form state without hardcoded demo credentials
   const loginForm = useForm({
     defaultValues: {
-      email: "alex.gope@omnidrive.ai",
-      password: "demo-password-123",
-      rememberMe: true,
+      email: "",
+      password: "",
+      rememberMe: false,
     },
   });
 
   const registerForm = useForm({
     defaultValues: {
-      fullName: "Alex Chen",
-      email: "alex@company.com",
-      password: "Enterprise#2026!",
-      termsAccepted: true,
+      fullName: "",
+      email: "",
+      password: "",
+      termsAccepted: false,
     },
   });
 
+  /**
+   * Handle Email + Password Submit via Cognito SRP
+   */
   const handleLogin = async (formData) => {
     try {
-      dispatch(setLoading(true));
-      const data = await loginApi(formData);
-      dispatch(loginSuccess(data));
+      const data = await loginWithEmail(formData.email, formData.password);
       dispatch(closeModal());
-      dispatch(setToast({ type: "success", message: `Welcome back, ${data.user.name}!` }));
+      dispatch(
+        setToast({
+          type: "success",
+          message: `Welcome back, ${data.user.name}!`,
+        })
+      );
       navigate("/dashboard");
+      return data;
     } catch (err) {
-      dispatch(loginFailure(err.message || "Failed to authenticate."));
-      dispatch(setToast({ type: "error", message: err.message || "Authentication failed." }));
+      dispatch(
+        setToast({
+          type: "error",
+          message: err.message || "Invalid credentials. Please try again.",
+        })
+      );
+      throw err;
     }
   };
 
-  const handleGoogleSSO = async () => {
-    try {
-      dispatch(setLoading(true));
-      const data = await googleOAuthApi();
-      dispatch(loginSuccess(data));
-      dispatch(closeModal());
-      dispatch(setToast({ type: "success", message: `Signed in with Google as ${data.user.name}` }));
-      navigate("/dashboard");
-    } catch (err) {
-      dispatch(loginFailure(err.message || "Google OAuth failed."));
-      dispatch(setToast({ type: "error", message: "Google OAuth sign-in failed." }));
-    }
+  /**
+   * Handle Google SSO Redirect via Cognito Hosted UI
+   */
+  const handleGoogleSSO = () => {
+    dispatch(closeModal());
+    loginWithGoogle();
   };
 
+  /**
+   * Handle User Registration
+   */
   const handleRegister = async (formData) => {
     try {
-      dispatch(setLoading(true));
       const data = await registerApi(formData);
-      dispatch(loginSuccess(data));
       dispatch(closeModal());
-      dispatch(setToast({ type: "success", message: `Enterprise Workspace launched for ${data.user.name}!` }));
-      navigate("/dashboard");
+      dispatch(
+        setToast({
+          type: "success",
+          message: data.userConfirmed
+            ? `Workspace created! Welcome, ${data.user?.name || "Architect"}.`
+            : "Registration complete! Please check your email for verification.",
+        })
+      );
+      if (data.token) {
+        navigate("/dashboard");
+      } else {
+        dispatch(openModal("auth"));
+      }
+      return data;
     } catch (err) {
-      dispatch(loginFailure(err.message || "Registration failed."));
-      dispatch(setToast({ type: "error", message: err.message || "Registration failed." }));
+      dispatch(
+        setToast({
+          type: "error",
+          message: err.message || "Registration failed. Please check your details.",
+        })
+      );
+      throw err;
     }
   };
 
-  const handleDemoLogin = async () => {
-    await handleLogin({ email: "demo.architect@omnidrive.ai", password: "demo" });
-  };
-
+  /**
+   * Handle Logout across Cognito and Application State
+   */
   const handleLogout = async () => {
-    await logoutApi();
-    dispatch(logout());
+    await logout();
     dispatch(setToast({ type: "info", message: "Signed out successfully." }));
-    navigate("/");
   };
 
+  /**
+   * Plan Upgrade & Consultation Logic
+   */
   const handleUpdatePlan = (newPlan) => {
     if (newPlan === "enterprise") {
-      // Enterprise requires contacting first
       dispatch(openModal("enterpriseContact"));
       return;
     }
@@ -114,17 +151,21 @@ export const useAuth = () => {
     user,
     plan: user?.plan || "free",
     planDetails: activePlanDetails,
-    token,
+    token: idToken,
+    idToken,
     isAuthenticated,
     isLoading,
     error,
     activeModal,
     loginForm,
     registerForm,
+    loginWithGoogle,
+    loginWithEmail,
+    logout,
+    getIdToken,
     handleLogin,
     handleGoogleSSO,
     handleRegister,
-    handleDemoLogin,
     handleLogout,
     handleUpdatePlan,
     handleOpenEnterpriseContact,

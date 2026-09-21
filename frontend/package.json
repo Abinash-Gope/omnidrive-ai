@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.2.0",
+    "amazon-cognito-identity-js": "^6.3.20",
     "axios": "^1.6.8",
     "clsx": "^2.1.0",
     "hls.js": "^1.5.8",

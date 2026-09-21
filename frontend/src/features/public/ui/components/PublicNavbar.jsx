@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { NavLink, Link } from "react-router-dom";
 import { Cloud, Menu, X, ArrowRight, LayoutDashboard } from "lucide-react";
 import usePublicPages from "../../hooks/usePublicPages.jsx";
+import { useAuthContext } from "../../../auth/context/AuthContext.jsx";
 
 const navItems = [
   { label: "Overview", path: "/" },
@@ -13,6 +14,7 @@ const navItems = [
 
 const PublicNavbar = () => {
   const { isAuthenticated, handleOpenLogin, handleOpenRegister } = usePublicPages();
+  const { loginWithGoogle } = useAuthContext();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
@@ -75,7 +77,7 @@ const PublicNavbar = () => {
                 Sign In
               </button>
               <button
-                onClick={handleOpenRegister}
+                onClick={loginWithGoogle}
                 className="inline-flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-full bg-[#1a73e8] hover:bg-[#1557bf] text-white text-sm font-medium shadow-sm hover:shadow transition-all active:scale-95"
               >
                 <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24">
