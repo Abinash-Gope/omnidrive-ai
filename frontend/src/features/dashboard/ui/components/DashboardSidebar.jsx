@@ -24,10 +24,25 @@ const DashboardSidebar = ({
   const fileInputRef = useRef(null);
   const { plan, planDetails, handleOpenEnterpriseContact } = useAuth();
 
+  let extraStorageGB = 0;
+  if (plan === "pro") {
+    try {
+      const saved = localStorage.getItem("omni_pro_addons");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        extraStorageGB = parsed.extraStorageGB || 0;
+      }
+    } catch {}
+  }
+
+  const rawTotalGB = (planDetails?.storageTotalGB ?? propStorage?.totalGB ?? 15.0) + extraStorageGB;
+  const rawUsedGB = planDetails?.storageUsedGB ?? propStorage?.usedGB ?? 0;
+  const rawUsedPercentage = rawTotalGB > 0 ? Math.min(100, Math.round((rawUsedGB / rawTotalGB) * 100)) : 0;
+
   const effectiveStorage = {
-    usedGB: planDetails?.storageUsedGB ?? propStorage?.usedGB ?? 0,
-    totalGB: planDetails?.storageTotalGB ?? propStorage?.totalGB ?? 15.0,
-    usedPercentage: planDetails?.storageUsedPercentage ?? propStorage?.usedPercentage ?? 0,
+    usedGB: rawUsedGB,
+    totalGB: rawTotalGB,
+    usedPercentage: rawUsedPercentage,
     isUnlimited: planDetails?.isUnlimitedStorage ?? false,
   };
 
@@ -150,13 +165,15 @@ const DashboardSidebar = ({
             <span>Dedicated VPC Active</span>
           </button>
         ) : plan === "pro" ? (
-          <button
-            onClick={handleOpenEnterpriseContact}
-            className="w-full pt-1 text-xs font-semibold text-[#1a73e8] hover:text-[#1557bf] flex items-center justify-center gap-1 transition-colors"
+          <Link
+            to="/profile"
+            className="w-full pt-1 text-xs font-semibold text-[#1a73e8] hover:text-[#1557bf] flex items-center justify-center gap-1 transition-colors hover:underline"
           >
-            <Lock className="w-3 h-3 text-purple-600" />
-            <span>Contact for Enterprise VPC</span>
-          </button>
+            <span>
+              Pro Cloud ({effectiveStorage.totalGB >= 1024 ? `${(effectiveStorage.totalGB / 1024).toFixed(0)} TB` : `${effectiveStorage.totalGB} GB`} Active)
+            </span>
+            <ArrowRight className="w-3 h-3" />
+          </Link>
         ) : (
           <Link
             to="/pricing"

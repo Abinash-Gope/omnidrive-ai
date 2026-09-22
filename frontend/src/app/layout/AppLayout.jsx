@@ -13,11 +13,12 @@ const AppLayout = () => {
   return (
     <div className="min-h-screen flex flex-col bg-[#faf8ff] dark:bg-[#060b19] text-slate-900 dark:text-slate-100 antialiased selection:bg-blue-100 selection:text-[#1a73e8]">
       <Outlet />
-      <Toast />
       <AuthModal />
       <RegisterModal />
       <VerificationModal />
       <EnterpriseContactModal />
+      {/* Toast rendered last with z-[9999] so it floats crisp and unblurred above all backdrops */}
+      <Toast />
     </div>
   );
 };

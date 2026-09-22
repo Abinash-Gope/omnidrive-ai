@@ -31,6 +31,8 @@ export const useAuth = () => {
   } = authContext;
 
   const { activeModal } = useSelector((state) => state.ui || {});
+  const reduxError = useSelector((state) => state.auth?.error);
+  const combinedError = error || reduxError;
 
   // Clean form state without hardcoded demo credentials
   const loginForm = useForm({
@@ -211,7 +213,7 @@ export const useAuth = () => {
     idToken,
     isAuthenticated,
     isLoading,
-    error,
+    error: combinedError,
     activeModal,
     loginForm,
     registerForm,

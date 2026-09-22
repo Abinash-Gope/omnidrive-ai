@@ -208,9 +208,10 @@ const FeaturesPage = () => {
         ) : (
           <button
             onClick={handleOpenRegister}
-            className="px-8 py-3.5 rounded-full bg-[#1a73e8] hover:bg-[#1557bf] text-white font-semibold shadow-md hover:shadow-lg transition-all"
+            className="inline-flex items-center gap-2 px-8 py-3.5 rounded-full bg-[#1a73e8] hover:bg-[#1557bf] text-white font-semibold shadow-md hover:shadow-lg transition-all cursor-pointer"
           >
-            Try All AI Features on 15GB Free Tier
+            <span>Start Free 15GB Workspace</span>
+            <ArrowRight className="w-4 h-4" />
           </button>
         )}
       </div>

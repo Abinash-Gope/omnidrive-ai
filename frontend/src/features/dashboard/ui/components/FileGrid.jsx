@@ -10,6 +10,7 @@ import {
   Lock,
 } from "lucide-react";
 import FileCard from "./FileCard.jsx";
+import FileGridSkeleton from "./FileGridSkeleton.jsx";
 
 const FileGrid = ({
   files = [],
@@ -19,6 +20,7 @@ const FileGrid = ({
   onSelectFilter,
   searchQuery = "",
   viewMode = "grid",
+  isLoading = false,
   onOpenPreview,
   onResetSearch,
 }) => {
@@ -102,7 +104,9 @@ const FileGrid = ({
       </div>
 
       {/* Files Display Container */}
-      {files.length === 0 ? (
+      {isLoading ? (
+        <FileGridSkeleton viewMode={viewMode} count={8} />
+      ) : files.length === 0 ? (
         <div className="py-20 text-center flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-8 bg-slate-50/50 dark:bg-slate-900/30">
           <div className="w-16 h-16 rounded-full bg-blue-50 dark:bg-blue-950/60 text-[#1a73e8] flex items-center justify-center mb-4">
             <Inbox className="w-8 h-8 stroke-[1.5]" />

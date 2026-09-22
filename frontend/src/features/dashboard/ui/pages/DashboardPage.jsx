@@ -90,6 +90,7 @@ const DashboardPage = () => {
             onSelectFilter={handleSelectFilter}
             searchQuery={searchQuery}
             viewMode={viewMode}
+            isLoading={isLoading}
             onOpenPreview={handleOpenPreview}
             onResetSearch={() => handleSearch("")}
           />

@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { Lock, Mail, Eye, EyeOff, ArrowRight, Loader2 } from "lucide-react";
+import { Lock, Mail, Eye, EyeOff, ArrowRight, Loader2, AlertCircle } from "lucide-react";
 import ModalWrapper from "../../../../shared/ui/components/ModalWrapper.jsx";
 import OmniDriveLogo from "../../../../shared/ui/components/OmniDriveLogo.jsx";
 import { openModal, closeModal } from "../../../../shared/state/uiSlice.jsx";
@@ -20,6 +20,7 @@ const AuthModal = () => {
     handleGoogleSSO,
   } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
+  const [localError, setLocalError] = useState(null);
 
   const {
     register,
@@ -29,7 +30,23 @@ const AuthModal = () => {
 
   const isOpen = activeModal === "auth" && !isAuthenticated;
 
+  useEffect(() => {
+    if (!isOpen) {
+      setLocalError(null);
+    }
+  }, [isOpen]);
+
+  const onLoginSubmit = async (data) => {
+    setLocalError(null);
+    try {
+      await handleLogin(data);
+    } catch (err) {
+      setLocalError(err.message || "Invalid email or password. Please try again.");
+    }
+  };
+
   const handleClose = () => {
+    setLocalError(null);
     dispatch(closeModal());
     if (window.location.pathname === "/login" || window.location.pathname === "/register") {
       navigate("/");
@@ -37,8 +54,11 @@ const AuthModal = () => {
   };
 
   const handleSwitchToRegister = () => {
+    setLocalError(null);
     dispatch(openModal("register"));
   };
+
+  const displayError = localError || error;
 
   return (
     <ModalWrapper
@@ -57,7 +77,7 @@ const AuthModal = () => {
             <OmniDriveLogo size="sm" animate={true} />
           </div>
           <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-            Sign in to OmniDrive AI
+            Log in to OmniDrive AI
           </h2>
         </div>
         <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -102,15 +122,15 @@ const AuthModal = () => {
         <div className="flex-1 border-t border-slate-200 dark:border-slate-700/80" />
       </div>
 
-      {error && (
-        <div className="mb-2.5 p-2 rounded-xl bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 text-xs flex items-start gap-2">
-          <div className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1 shrink-0" />
-          <span>{error}</span>
+      {displayError && (
+        <div className="mb-3.5 p-3 rounded-xl bg-rose-500/10 dark:bg-rose-950/60 border border-rose-500/30 dark:border-rose-800 text-rose-600 dark:text-rose-300 text-xs flex items-start gap-2.5 animate-fade-in shadow-xs">
+          <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+          <div className="flex-1 font-medium leading-relaxed">{displayError}</div>
         </div>
       )}
 
       {/* Login Form */}
-      <form onSubmit={handleSubmit(handleLogin)} className="space-y-3">
+      <form onSubmit={handleSubmit(onLoginSubmit)} className="space-y-3">
         <div>
           <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1">
             Work Email
@@ -181,7 +201,7 @@ const AuthModal = () => {
             <Loader2 className="w-4 h-4 animate-spin" />
           ) : (
             <>
-              <span>Continue to Dashboard</span>
+              <span>Log In to Workspace</span>
               <ArrowRight className="w-4 h-4" />
             </>
           )}
@@ -195,7 +215,7 @@ const AuthModal = () => {
           onClick={handleSwitchToRegister}
           className="font-semibold text-[#1a73e8] hover:text-blue-500 hover:underline transition-colors cursor-pointer"
         >
-          Create Workspace
+          Create Free Account
         </button>
       </div>
     </ModalWrapper>

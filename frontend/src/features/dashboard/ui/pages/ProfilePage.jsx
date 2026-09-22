@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import OmniDriveLogo from "../../../../shared/ui/components/OmniDriveLogo.jsx";
 import {
@@ -22,12 +22,20 @@ import {
   Sun,
   Moon,
   Monitor,
+  HardDrive,
+  Plus,
+  X,
+  Zap,
+  Loader2,
 } from "lucide-react";
 import useAuth from "../../../auth/hooks/useAuth.jsx";
 import { setToast } from "../../../../shared/state/uiSlice.jsx";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { PLANS, getPlanDetails } from "../../../../shared/config/plans.jsx";
 import useTheme from "../../../../shared/hooks/useTheme.jsx";
+import { setFiles } from "../../state/dashboardSlice.jsx";
+import { getFilesApi } from "../../api/dashboardApi.jsx";
+import ProfileSkeleton from "../components/ProfileSkeleton.jsx";
 
 const ProfilePage = () => {
   const navigate = useNavigate();
@@ -40,15 +48,276 @@ const ProfilePage = () => {
     handleUpdatePlan,
     handleOpenEnterpriseContact,
   } = useAuth();
+  const { files = [] } = useSelector((state) => state.dashboard || {});
   const { theme, isDark, changeTheme, toggleTheme } = useTheme();
+
+  // Fetch actual user files if not already loaded into Redux store
+  useEffect(() => {
+    if (!files || files.length === 0) {
+      getFilesApi()
+        .then((data) => {
+          if (data && data.length > 0) {
+            dispatch(setFiles(data));
+          }
+        })
+        .catch(() => {});
+    }
+  }, []);
+
+  // Compute real dynamic storage usage from user uploaded files
+  const getFileBytes = (file) => {
+    if (typeof file.fileSize === "number" && file.fileSize > 0) return file.fileSize;
+    if (typeof file.rawSizeBytes === "number" && file.rawSizeBytes > 0) return file.rawSizeBytes;
+    if (typeof file.size === "string") {
+      const match = file.size.match(/([\d.]+)\s*(MB|KB|GB|B)/i);
+      if (match) {
+        const val = parseFloat(match[1]);
+        const unit = match[2].toUpperCase();
+        if (unit === "GB") return val * 1024 * 1024 * 1024;
+        if (unit === "MB") return val * 1024 * 1024;
+        if (unit === "KB") return val * 1024;
+        return val;
+      }
+    }
+    return 0;
+  };
+
+  const videoBytes = (files || [])
+    .filter((f) => f.type === "video")
+    .reduce((acc, f) => acc + getFileBytes(f), 0);
+  const imageBytes = (files || [])
+    .filter((f) => f.type === "image")
+    .reduce((acc, f) => acc + getFileBytes(f), 0);
+  const docBytes = (files || [])
+    .filter((f) => f.type === "pdf" || f.type === "document" || f.type === "other")
+    .reduce((acc, f) => acc + getFileBytes(f), 0);
+  const totalUsedBytes = videoBytes + imageBytes + docBytes;
+
+  // Pro Cloud Add-ons & Quota Expansion State
+  const [proAddons, setProAddons] = useState(() => {
+    try {
+      const saved = localStorage.getItem("omni_pro_addons");
+      return saved
+        ? JSON.parse(saved)
+        : {
+            extraStorageGB: 0,
+            extraBedrockTokens: 0,
+            extraRekognitionScans: 0,
+            extraFargateMins: 0,
+            activePacks: [],
+          };
+    } catch {
+      return {
+        extraStorageGB: 0,
+        extraBedrockTokens: 0,
+        extraRekognitionScans: 0,
+        extraFargateMins: 0,
+        activePacks: [],
+      };
+    }
+  });
+
+  const [addonModal, setAddonModal] = useState({ isOpen: false, tab: "all" });
+
+  const saveProAddons = (newAddons) => {
+    setProAddons(newAddons);
+    try {
+      localStorage.setItem("omni_pro_addons", JSON.stringify(newAddons));
+    } catch {}
+  };
+
+  const availableStoragePacks = [
+    {
+      id: "storage_1tb",
+      name: "+1 TB High-Speed S3",
+      category: "storage",
+      extraGB: 1024,
+      price: "$10/mo",
+      description: "Direct AWS S3 multi-region bucket expansion with sub-50ms regional egress.",
+      tag: "Popular",
+    },
+    {
+      id: "storage_2tb",
+      name: "+2 TB High-Speed S3",
+      category: "storage",
+      extraGB: 2048,
+      price: "$18/mo",
+      description: "Doubles workspace capacity to 4 TB with dedicated S3 cross-region replication.",
+      tag: "Best Value",
+    },
+    {
+      id: "storage_4tb",
+      name: "+4 TB High-Speed S3",
+      category: "storage",
+      extraGB: 4096,
+      price: "$32/mo",
+      description: "Massive 6 TB storage vault for multi-camera 4K video production teams.",
+      tag: "Studio",
+    },
+  ];
+
+  const availableAiPacks = [
+    {
+      id: "ai_tokens_500k",
+      name: "+500K Bedrock AI Tokens",
+      category: "ai",
+      extraTokens: 500000,
+      extraDocs: 2500,
+      price: "$12/mo",
+      description: "Claude 3 Haiku high-throughput token allowance for PDF OCR and synthesis.",
+      tag: "AI Starter",
+    },
+    {
+      id: "ai_scans_5k",
+      name: "+5,000 Rekognition Scans",
+      category: "ai",
+      extraScans: 5000,
+      price: "$8/mo",
+      description: "Automated content moderation, explicit frame detection & visual metadata.",
+      tag: "Moderation",
+    },
+    {
+      id: "ai_fargate_120m",
+      name: "+120 Mins Fargate Transcode",
+      category: "ai",
+      extraFargate: 120,
+      price: "$10/mo",
+      description: "Dedicated ARM64 Graviton3 compute minutes for 4K & 1080p HLS rendering.",
+      tag: "Compute",
+    },
+    {
+      id: "ai_mega_booster",
+      name: "Pro AI Mega Booster",
+      category: "ai",
+      extraTokens: 1000000,
+      extraDocs: 5000,
+      extraScans: 10000,
+      extraFargate: 240,
+      price: "$24/mo",
+      description: "Full-pipeline 2x capacity: 1M Tokens, 10K Vision Scans & 240 Transcode Mins.",
+      tag: "Recommended",
+    },
+  ];
+
+  const handleTogglePack = (pack) => {
+    const isCurrentlyActive = proAddons.activePacks.includes(pack.id);
+    let newPacks = [];
+    let newStorage = proAddons.extraStorageGB;
+    let newTokens = proAddons.extraBedrockTokens;
+    let newScans = proAddons.extraRekognitionScans;
+    let newFargate = proAddons.extraFargateMins;
+
+    if (isCurrentlyActive) {
+      newPacks = proAddons.activePacks.filter((p) => p !== pack.id);
+      if (pack.extraGB) newStorage = Math.max(0, newStorage - pack.extraGB);
+      if (pack.extraTokens) newTokens = Math.max(0, newTokens - pack.extraTokens);
+      if (pack.extraScans) newScans = Math.max(0, newScans - pack.extraScans);
+      if (pack.extraFargate) newFargate = Math.max(0, newFargate - pack.extraFargate);
+      dispatch(setToast({ type: "info", message: `Removed ${pack.name} from your subscription.` }));
+    } else {
+      newPacks = [...proAddons.activePacks, pack.id];
+      if (pack.extraGB) newStorage += pack.extraGB;
+      if (pack.extraTokens) newTokens += pack.extraTokens;
+      if (pack.extraScans) newScans += pack.extraScans;
+      if (pack.extraFargate) newFargate += pack.extraFargate;
+      dispatch(setToast({ type: "success", message: `Activated ${pack.name}! Quotas updated instantly.` }));
+    }
+
+    saveProAddons({
+      extraStorageGB: newStorage,
+      extraBedrockTokens: newTokens,
+      extraRekognitionScans: newScans,
+      extraFargateMins: newFargate,
+      activePacks: newPacks,
+    });
+  };
+
+  // Quotas calculations incorporating active Pro Add-ons
+  const effectiveExtraStorageGB = plan === "pro" ? (proAddons.extraStorageGB || 0) : 0;
+  const effectiveExtraTokens = plan === "pro" ? (proAddons.extraBedrockTokens || 0) : 0;
+  const effectiveExtraScans = plan === "pro" ? (proAddons.extraRekognitionScans || 0) : 0;
+  const effectiveExtraFargate = plan === "pro" ? (proAddons.extraFargateMins || 0) : 0;
+
+  const totalQuotaGB = (planDetails?.storageTotalGB || 15.0) + effectiveExtraStorageGB;
+  const totalQuotaBytes = totalQuotaGB * 1024 * 1024 * 1024;
+
+  const formattedQuota = planDetails?.isUnlimitedStorage
+    ? "Unlimited (Customer VPC S3)"
+    : totalQuotaGB >= 1024
+    ? `${(totalQuotaGB / 1024).toFixed(0)} TB`
+    : `${totalQuotaGB} GB`;
+
+  const tierBadgeStorage = planDetails?.isUnlimitedStorage
+    ? "Unlimited VPC Storage"
+    : totalQuotaGB >= 1024
+    ? `${(totalQuotaGB / 1024).toFixed(0)} TB Storage Tier`
+    : `${totalQuotaGB} GB Storage Tier`;
+
+  const effectiveTokensTotal = (planDetails?.bedrockTokensTotal || 50000) + effectiveExtraTokens;
+  const effectiveScansTotal = (planDetails?.rekognitionMonthlyScans || 500) + effectiveExtraScans;
+  const effectiveFargateTotal = (planDetails?.fargateComputeMonthlyMins || 30) + effectiveExtraFargate;
+  const effectiveMonthlyDocs = (planDetails?.bedrockMonthlyDocs || 50) + (effectiveExtraTokens > 0 ? Math.round(effectiveExtraTokens / 200) : 0);
+
+  const formatSize = (bytes) => {
+    if (!bytes || bytes <= 0) return "0 MB";
+    if (bytes >= 1024 * 1024 * 1024 * 1024) {
+      return `${(bytes / (1024 * 1024 * 1024 * 1024)).toFixed(2)} TB`;
+    }
+    if (bytes >= 1024 * 1024 * 1024) {
+      return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+    }
+    if (bytes >= 1024 * 1024) {
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    }
+    return `${(bytes / 1024).toFixed(0)} KB`;
+  };
+
+  const videoPercentage = totalQuotaBytes > 0 && videoBytes > 0
+    ? Math.max(0.5, ((videoBytes / totalQuotaBytes) * 100)).toFixed(2)
+    : 0;
+  const imagePercentage = totalQuotaBytes > 0 && imageBytes > 0
+    ? Math.max(0.5, ((imageBytes / totalQuotaBytes) * 100)).toFixed(2)
+    : 0;
+  const docPercentage = totalQuotaBytes > 0 && docBytes > 0
+    ? Math.max(0.5, ((docBytes / totalQuotaBytes) * 100)).toFixed(2)
+    : 0;
+
+  const totalUsedPercentage = totalQuotaBytes > 0 && totalUsedBytes > 0
+    ? Math.min(100, Math.round((totalUsedBytes / totalQuotaBytes) * 100))
+    : 0;
+
+  const totalUsedDisplay = totalUsedBytes > 0
+    ? totalUsedBytes >= 1024 * 1024 * 1024 * 1024
+      ? `${(totalUsedBytes / (1024 * 1024 * 1024 * 1024)).toFixed(2)} TB consumed`
+      : totalUsedBytes >= 1024 * 1024 * 1024
+      ? `${(totalUsedBytes / (1024 * 1024 * 1024)).toFixed(2)} GB consumed`
+      : `${(totalUsedBytes / (1024 * 1024)).toFixed(1)} MB consumed`
+    : "0 GB consumed";
+
+  // Dynamic user client detection
+  const getClientSession = () => {
+    const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+    let browser = "Chrome";
+    if (ua.includes("Firefox/")) browser = "Firefox";
+    else if (ua.includes("Edg/")) browser = "Edge";
+    else if (ua.includes("Safari/") && !ua.includes("Chrome/")) browser = "Safari";
+
+    let os = "Windows";
+    if (ua.includes("Mac OS") || ua.includes("Macintosh")) os = "macOS";
+    else if (ua.includes("Linux")) os = "Linux";
+    else if (ua.includes("Android")) os = "Android";
+    else if (ua.includes("iPhone") || ua.includes("iPad")) os = "iOS";
+
+    return `${browser} on ${os}`;
+  };
 
   const [activeTab, setActiveTab] = useState("general");
   const [formData, setFormData] = useState({
-    fullName: user?.name || "Alex Gope",
-    email: user?.email || "alex.gope@omnidrive.ai",
-    title: user?.role || "Lead Cloud Architect",
-    organization: "Acme Engineering & Cloud Platforms",
-    timezone: "America/New_York (EST, UTC-5)",
+    fullName: user?.name || "Abinash Gope",
+    email: user?.email || "abinash.gope@omnidrive.ai",
+    title: user?.role || "Developer",
+    organization: "OmniDrive AI Workspace",
+    timezone: (typeof Intl !== "undefined" && Intl.DateTimeFormat().resolvedOptions().timeZone) || "America/New_York (EST, UTC-5)",
     language: "English (United States)",
     dateFormat: "YYYY-MM-DD (ISO)",
     theme: "Dark",
@@ -60,16 +329,34 @@ const ProfilePage = () => {
     confirmPassword: "",
   });
 
-  const handleSave = (e) => {
+  const [isPageLoading, setIsPageLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [isRevoking, setIsRevoking] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsPageLoading(false);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleSave = async (e) => {
     e.preventDefault();
+    setIsSaving(true);
+    await new Promise((resolve) => setTimeout(resolve, 550));
+    setIsSaving(false);
     dispatch(setToast({ type: "success", message: "Profile settings saved successfully!" }));
   };
 
-  const handleRevokeSessions = () => {
+  const handleRevokeSessions = async () => {
+    setIsRevoking(true);
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    setIsRevoking(false);
     dispatch(setToast({ type: "info", message: "All other active sessions have been revoked." }));
   };
 
-  const handlePasswordUpdate = (e) => {
+  const handlePasswordUpdate = async (e) => {
     e.preventDefault();
     if (!passwordState.newPassword) {
       dispatch(setToast({ type: "error", message: "Please enter a new password." }));
@@ -79,6 +366,9 @@ const ProfilePage = () => {
       dispatch(setToast({ type: "error", message: "New passwords do not match." }));
       return;
     }
+    setIsUpdatingPassword(true);
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    setIsUpdatingPassword(false);
     dispatch(setToast({ type: "success", message: "Password updated successfully!" }));
     setPasswordState({ currentPassword: "", newPassword: "", confirmPassword: "" });
   };
@@ -161,7 +451,11 @@ const ProfilePage = () => {
 
       {/* Main Container */}
       <main className="max-w-4xl mx-auto w-full p-6 sm:p-8 space-y-6">
-        {/* User Identity Hero Card */}
+        {isPageLoading ? (
+          <ProfileSkeleton />
+        ) : (
+          <>
+            {/* User Identity Hero Card */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
           <div className="flex items-center gap-5">
             {/* Avatar with Camera Overlay */}
@@ -202,9 +496,7 @@ const ProfilePage = () => {
                   </span>
                 </span>
                 <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                  {planDetails.isUnlimitedStorage
-                    ? "Unlimited VPC Storage"
-                    : `${planDetails.storageTotalGB} GB Storage Tier`}
+                  {tierBadgeStorage}
                 </span>
               </div>
             </div>
@@ -219,10 +511,13 @@ const ProfilePage = () => {
               Discard
             </button>
             <button
+              type="button"
+              disabled={isSaving}
               onClick={handleSave}
-              className="px-6 py-2.5 rounded-full bg-[#1a73e8] hover:bg-[#1557bf] text-white text-xs font-semibold shadow-md hover:shadow-lg transition-all"
+              className="px-6 py-2.5 rounded-full bg-[#1a73e8] hover:bg-[#1557bf] text-white text-xs font-semibold shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer disabled:opacity-70 active:scale-95"
             >
-              Save Changes
+              {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              <span>{isSaving ? "Saving..." : "Save Changes"}</span>
             </button>
           </div>
         </div>
@@ -268,8 +563,8 @@ const ProfilePage = () => {
                   </span>
                 </div>
 
-                {/* 3 Tier Switcher Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Tier Switcher Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Free Sandbox */}
                   <div
                     className={`p-5 rounded-2xl border transition-all flex flex-col justify-between ${
@@ -350,13 +645,26 @@ const ProfilePage = () => {
 
                     <div className="pt-5">
                       {plan === "pro" ? (
-                        <span className="block text-center py-2 px-3 rounded-xl bg-[#1a73e8] text-white text-xs font-bold shadow-xs">
-                          Active Plan
-                        </span>
+                        <div className="space-y-2">
+                          <span className="block text-center py-2 px-3 rounded-xl bg-[#1a73e8] text-white text-xs font-bold shadow-xs">
+                            Active Plan {effectiveExtraStorageGB > 0 ? `(${formattedQuota})` : ""}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveTab("quotas");
+                              setAddonModal({ isOpen: true, tab: "all" });
+                            }}
+                            className="w-full text-center text-[11px] font-semibold text-[#1a73e8] dark:text-blue-400 hover:underline flex items-center justify-center gap-1 cursor-pointer pt-1"
+                          >
+                            <Zap className="w-3.5 h-3.5 text-amber-500" />
+                            <span>Upgrade Storage &amp; AI Quotas</span>
+                          </button>
+                        </div>
                       ) : (
                         <button
                           onClick={() => handleUpdatePlan("pro")}
-                          className="w-full py-2 px-3 rounded-xl bg-[#1a73e8] hover:bg-[#1557bf] text-white text-xs font-semibold shadow-xs transition-all"
+                          className="w-full py-2 px-3 rounded-xl bg-[#1a73e8] hover:bg-[#1557bf] text-white text-xs font-semibold shadow-xs transition-all cursor-pointer"
                         >
                           Switch to Pro Cloud
                         </button>
@@ -364,64 +672,27 @@ const ProfilePage = () => {
                     </div>
                   </div>
 
-                  {/* Enterprise Dedicated VPC */}
-                  <div
-                    className={`p-5 rounded-2xl border transition-all flex flex-col justify-between ${
-                      plan === "enterprise"
-                        ? "border-purple-500 bg-purple-50/40 dark:bg-purple-950/20 ring-2 ring-purple-500/20"
-                        : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40"
-                    }`}
-                  >
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-bold text-slate-900 dark:text-white">Enterprise VPC</span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300">
-                          Custom Billing
+                  {/* Active Enterprise status if user already on Enterprise */}
+                  {plan === "enterprise" && (
+                    <div className="p-5 rounded-2xl border border-purple-500 bg-purple-50/40 dark:bg-purple-950/20 ring-2 ring-purple-500/20 flex flex-col justify-between md:col-span-2">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-bold text-slate-900 dark:text-white">Enterprise VPC</span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300">
+                            Dedicated
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 dark:text-slate-400">
+                          Your account is provisioned with Customer BYOK KMS Keys and dedicated VPC isolation.
+                        </p>
+                      </div>
+                      <div className="pt-4">
+                        <span className="block text-center py-2 px-3 rounded-xl bg-purple-700 text-white text-xs font-bold shadow-xs">
+                          Active Dedicated VPC
                         </span>
                       </div>
-                      <ul className="text-xs text-slate-600 dark:text-slate-400 space-y-1.5 pt-1">
-                        <li className="flex items-center gap-2">
-                          <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                          <span>Unlimited S3 (Customer VPC)</span>
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                          <span>Customer BYOK KMS Keys</span>
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                          <span>Zero Model Retention Endpoints</span>
-                        </li>
-                      </ul>
-                      <div className="p-2 rounded-xl bg-purple-50/80 dark:bg-purple-950/40 border border-purple-200/50 dark:border-purple-800/50 text-[10px] text-purple-700 dark:text-purple-300">
-                        ⚡ <strong>Contact Required:</strong> Enterprise VPCs require dedicated AWS architecture consultation.
-                      </div>
                     </div>
-
-                    <div className="pt-4">
-                      {plan === "enterprise" ? (
-                        <div className="space-y-2">
-                          <span className="block text-center py-2 px-3 rounded-xl bg-purple-700 text-white text-xs font-bold shadow-xs">
-                            Active Dedicated VPC
-                          </span>
-                          <button
-                            onClick={handleOpenEnterpriseContact}
-                            className="w-full text-center text-[11px] font-semibold text-purple-600 dark:text-purple-400 hover:underline"
-                          >
-                            Contact Assigned Architect
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={handleOpenEnterpriseContact}
-                          className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-[#1a73e8] to-purple-600 hover:from-[#1557bf] hover:to-purple-700 text-white text-xs font-semibold shadow-xs flex items-center justify-center gap-1.5 transition-all"
-                        >
-                          <Lock className="w-3.5 h-3.5" />
-                          <span>Contact Enterprise Sales</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
 
@@ -698,7 +969,7 @@ const ProfilePage = () => {
                     Password & Credentials
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Password last changed 30 days ago. Manage your enterprise sign-in credentials.
+                    Update and manage your account sign-in credentials.
                   </p>
                 </div>
 
@@ -750,9 +1021,11 @@ const ProfilePage = () => {
 
                   <button
                     type="submit"
-                    className="px-5 py-2 rounded-full bg-[#1a73e8] hover:bg-[#1557bf] text-white text-xs font-semibold transition-all shadow-xs"
+                    disabled={isUpdatingPassword}
+                    className="px-5 py-2 rounded-full bg-[#1a73e8] hover:bg-[#1557bf] text-white text-xs font-semibold transition-all shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-70 active:scale-95"
                   >
-                    Update Password
+                    {isUpdatingPassword && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    <span>{isUpdatingPassword ? "Updating Password..." : "Update Password"}</span>
                   </button>
                 </form>
               </div>
@@ -801,10 +1074,13 @@ const ProfilePage = () => {
                     </p>
                   </div>
                   <button
+                    type="button"
+                    disabled={isRevoking}
                     onClick={handleRevokeSessions}
-                    className="text-xs font-semibold text-rose-600 hover:text-rose-700 dark:text-rose-400 hover:underline"
+                    className="text-xs font-semibold text-rose-600 hover:text-rose-700 dark:text-rose-400 hover:underline flex items-center gap-1.5 cursor-pointer disabled:opacity-70"
                   >
-                    Revoke All Other Sessions
+                    {isRevoking && <Loader2 className="w-3 h-3 animate-spin" />}
+                    <span>{isRevoking ? "Revoking Sessions..." : "Revoke All Other Sessions"}</span>
                   </button>
                 </div>
 
@@ -816,10 +1092,10 @@ const ProfilePage = () => {
                       </div>
                       <div>
                         <span className="font-semibold block text-slate-900 dark:text-white">
-                          Chrome on macOS Sonoma (Current Session)
+                          {getClientSession()} (Current Session)
                         </span>
                         <span className="text-slate-500 text-[11px]">
-                          IP: 198.51.100.24 • New York, United States
+                          Authorized via AWS Cognito JWT • Session Secure
                         </span>
                       </div>
                     </div>
@@ -827,23 +1103,6 @@ const ProfilePage = () => {
                       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                       <span>Active now</span>
                     </span>
-                  </div>
-
-                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500">
-                        <Laptop className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <span className="font-semibold block text-slate-900 dark:text-white">
-                          Chrome on Windows 11
-                        </span>
-                        <span className="text-slate-500 text-[11px]">
-                          IP: 203.0.113.88 • Seattle, United States
-                        </span>
-                      </div>
-                    </div>
-                    <span className="text-xs text-slate-400">Active 2 hours ago</span>
                   </div>
                 </div>
               </div>
@@ -865,45 +1124,43 @@ const ProfilePage = () => {
                     </p>
                   </div>
                   <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 font-semibold text-xs border border-emerald-200 dark:border-emerald-800">
-                    {planDetails.storageUsedPercentage}% {planDetails.isUnlimitedStorage ? "Provisioned" : "Consumed"}
+                    {totalUsedPercentage}% {planDetails.isUnlimitedStorage ? "Provisioned" : "Consumed"}
                   </span>
                 </div>
 
                 <div>
                   <div className="flex justify-between items-baseline mb-2">
                     <span className="text-xl font-bold text-slate-900 dark:text-white">
-                      {plan === "enterprise"
-                        ? `${planDetails.storageUsedGB.toLocaleString()} GB (1.84 TB) consumed`
-                        : `${planDetails.storageUsedGB} GB consumed`}
+                      {totalUsedDisplay}
                     </span>
                     <span className="text-xs font-semibold text-slate-500">
-                      {planDetails.isUnlimitedStorage
+                      {planDetails?.isUnlimitedStorage
                         ? "of Unlimited (Customer VPC S3)"
-                        : `of ${planDetails.storageTotalGB.toLocaleString()} GB Quota`}
+                        : `of ${formattedQuota} Quota`}
                     </span>
                   </div>
                   <div className="w-full h-3 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden flex">
-                    <div
-                      className="h-full bg-[#1a73e8]"
-                      style={{
-                        width: plan === "enterprise" ? "12%" : plan === "pro" ? "4.2%" : "5.5%",
-                      }}
-                      title="Videos"
-                    />
-                    <div
-                      className="h-full bg-emerald-500"
-                      style={{
-                        width: plan === "enterprise" ? "4%" : plan === "pro" ? "1.2%" : "1.8%",
-                      }}
-                      title="Images"
-                    />
-                    <div
-                      className="h-full bg-purple-500"
-                      style={{
-                        width: plan === "enterprise" ? "2%" : plan === "pro" ? "0.6%" : "0.7%",
-                      }}
-                      title="Documents"
-                    />
+                    {Number(videoPercentage) > 0 && (
+                      <div
+                        className="h-full bg-[#1a73e8]"
+                        style={{ width: `${videoPercentage}%` }}
+                        title={`Videos: ${formatSize(videoBytes)}`}
+                      />
+                    )}
+                    {Number(imagePercentage) > 0 && (
+                      <div
+                        className="h-full bg-emerald-500"
+                        style={{ width: `${imagePercentage}%` }}
+                        title={`Images: ${formatSize(imageBytes)}`}
+                      />
+                    )}
+                    {Number(docPercentage) > 0 && (
+                      <div
+                        className="h-full bg-purple-500"
+                        style={{ width: `${docPercentage}%` }}
+                        title={`Documents: ${formatSize(docBytes)}`}
+                      />
+                    )}
                   </div>
                 </div>
 
@@ -916,7 +1173,7 @@ const ProfilePage = () => {
                       </span>
                     </div>
                     <span className="text-lg font-bold text-slate-900 dark:text-white">
-                      {plan === "enterprise" ? "1.2 TB" : plan === "pro" ? "85.0 GB" : "850 MB"}
+                      {formatSize(videoBytes)}
                     </span>
                     <span className="block text-[11px] text-slate-400 mt-0.5">
                       {planDetails.maxVideoQuality}
@@ -931,7 +1188,7 @@ const ProfilePage = () => {
                       </span>
                     </div>
                     <span className="text-lg font-bold text-slate-900 dark:text-white">
-                      {plan === "enterprise" ? "420 GB" : plan === "pro" ? "28.0 GB" : "250 MB"}
+                      {formatSize(imageBytes)}
                     </span>
                     <span className="block text-[11px] text-slate-400 mt-0.5">
                       {plan === "enterprise" ? "Zero-Retention Rekognition" : "Vision AI & Hardware EXIF"}
@@ -946,7 +1203,7 @@ const ProfilePage = () => {
                       </span>
                     </div>
                     <span className="text-lg font-bold text-slate-900 dark:text-white">
-                      {plan === "enterprise" ? "220 GB" : plan === "pro" ? "11.5 GB" : "100 MB"}
+                      {formatSize(docBytes)}
                     </span>
                     <span className="block text-[11px] text-slate-400 mt-0.5">
                       {plan === "enterprise" ? "Customer KMS Vector Store" : "Textract OCR & Claude 3"}
@@ -956,33 +1213,42 @@ const ProfilePage = () => {
 
                 <div className="pt-2 flex flex-wrap items-center gap-3">
                   {plan === "free" && (
-                    <>
-                      <button
-                        onClick={() => handleUpdatePlan("pro")}
-                        className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#1a73e8] hover:bg-[#1557bf] text-white text-xs font-semibold shadow-md hover:shadow-lg transition-all"
-                      >
-                        <span>Upgrade to Pro Cloud ($19/mo)</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={handleOpenEnterpriseContact}
-                        className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-purple-300 dark:border-purple-800 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/40 text-xs font-semibold transition-all"
-                      >
-                        <Lock className="w-3.5 h-3.5" />
-                        <span>Contact Enterprise Sales (Contact First)</span>
-                      </button>
-                    </>
+                    <button
+                      onClick={() => handleUpdatePlan("pro")}
+                      className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#1a73e8] hover:bg-[#1557bf] text-white text-xs font-semibold shadow-md hover:shadow-lg transition-all"
+                    >
+                      <span>Upgrade to Pro Cloud ($19/mo)</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
                   )}
 
                   {plan === "pro" && (
-                    <button
-                      onClick={handleOpenEnterpriseContact}
-                      className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-[#1a73e8] to-purple-600 hover:from-[#1557bf] hover:to-purple-700 text-white text-xs font-semibold shadow-md hover:shadow-lg transition-all"
-                    >
-                      <Lock className="w-4 h-4" />
-                      <span>Contact Enterprise Sales for Dedicated VPC</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
+                    <div className="flex flex-wrap items-center gap-3 w-full">
+                      <span className="text-xs font-bold text-[#1a73e8] px-3.5 py-1.5 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 flex items-center gap-1.5">
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Pro Cloud Active ({formattedQuota} S3)</span>
+                      </span>
+                      {effectiveExtraStorageGB > 0 && (
+                        <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800">
+                          +{effectiveExtraStorageGB >= 1024 ? `${(effectiveExtraStorageGB / 1024).toFixed(0)} TB` : `${effectiveExtraStorageGB} GB`} Storage Upgraded
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setAddonModal({ isOpen: true, tab: "storage" })}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#1a73e8] hover:bg-[#1557bf] text-white text-xs font-semibold shadow-xs hover:shadow transition-all active:scale-95 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Buy More Storage</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleUpdatePlan("free")}
+                        className="text-xs font-semibold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:underline sm:ml-auto cursor-pointer"
+                      >
+                        Downgrade to Free Tier
+                      </button>
+                    </div>
                   )}
 
                   {plan === "enterprise" && (
@@ -990,12 +1256,6 @@ const ProfilePage = () => {
                       <span className="text-xs font-bold text-purple-700 dark:text-purple-300 px-3 py-1 rounded-full bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800">
                         ⚡ Dedicated AWS VPC Active (vpc-0a89d71c89f2a4e1)
                       </span>
-                      <button
-                        onClick={handleOpenEnterpriseContact}
-                        className="text-xs font-semibold text-[#1a73e8] hover:underline"
-                      >
-                        Contact Solutions Architect for Cluster Scaling
-                      </button>
                     </div>
                   )}
                 </div>
@@ -1003,22 +1263,46 @@ const ProfilePage = () => {
 
               {/* AI Processing Quotas */}
               <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 space-y-4 shadow-xs">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                    AI Pipeline Inference Quotas ({planDetails.name})
-                  </h3>
-                  <span className="text-xs font-mono text-slate-500">
-                    Max Docs: {planDetails.bedrockMonthlyDocs.toLocaleString()}/mo
-                  </span>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                      AI Pipeline Inference Quotas ({planDetails.name})
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Max Docs: {effectiveMonthlyDocs.toLocaleString()}/mo
+                      {effectiveExtraTokens > 0 && (
+                        <span className="ml-1 text-purple-600 dark:text-purple-400 font-medium">
+                          (+{Math.round(effectiveExtraTokens / 200).toLocaleString()} boosted docs)
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  {plan === "pro" && (
+                    <button
+                      type="button"
+                      onClick={() => setAddonModal({ isOpen: true, tab: "ai" })}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-xs hover:shadow transition-all active:scale-95 cursor-pointer"
+                    >
+                      <Zap className="w-3.5 h-3.5" />
+                      <span>Buy More AI Quotas</span>
+                    </button>
+                  )}
                 </div>
 
                 <div className="space-y-3 text-xs">
-                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div>
-                      <span className="font-semibold block text-slate-900 dark:text-white">
-                        Amazon Bedrock (Claude 3 Haiku)
-                      </span>
-                      <span className="text-slate-500 text-[11px]">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-slate-900 dark:text-white">
+                          Amazon Bedrock (Claude 3 Haiku)
+                        </span>
+                        {effectiveExtraTokens > 0 && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/60 dark:text-purple-300">
+                            +{effectiveExtraTokens >= 1000000 ? `${(effectiveExtraTokens / 1000000).toFixed(1)}M` : `${(effectiveExtraTokens / 1000).toFixed(0)}K`} Boosted
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-slate-500 text-[11px] block mt-0.5">
                         {plan === "enterprise"
                           ? "Zero model retention dedicated VPC endpoint"
                           : plan === "pro"
@@ -1026,42 +1310,220 @@ const ProfilePage = () => {
                           : "Monthly token allowance for executive document synthesis"}
                       </span>
                     </div>
-                    <span className="font-mono font-bold text-purple-600">
-                      {planDetails.bedrockTokensUsed.toLocaleString()} / {planDetails.bedrockTokensTotal.toLocaleString()} Tokens ({Math.round((planDetails.bedrockTokensUsed / planDetails.bedrockTokensTotal) * 100)}%)
+                    <span className="font-mono font-bold text-purple-600 whitespace-nowrap">
+                      {planDetails.bedrockTokensUsed.toLocaleString()} / {effectiveTokensTotal.toLocaleString()} Tokens ({Math.round((planDetails.bedrockTokensUsed / effectiveTokensTotal) * 100)}%)
                     </span>
                   </div>
 
-                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div>
-                      <span className="font-semibold block text-slate-900 dark:text-white">
-                        Amazon Rekognition Moderation Gate
-                      </span>
-                      <span className="text-slate-500 text-[11px]">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-slate-900 dark:text-white">
+                          Amazon Rekognition Moderation Gate
+                        </span>
+                        {effectiveExtraScans > 0 && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300">
+                            +{(effectiveExtraScans / 1000).toFixed(0)}K Boosted
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-slate-500 text-[11px] block mt-0.5">
                         {plan === "enterprise"
                           ? "Custom confidence thresholds & real-time webhook quarantine"
                           : "Automated toxicity & explicit image scan checks"}
                       </span>
                     </div>
-                    <span className="font-mono font-bold text-emerald-600">
-                      {planDetails.rekognitionScansUsed.toLocaleString()} / {planDetails.rekognitionMonthlyScans.toLocaleString()} Scans ({Math.round((planDetails.rekognitionScansUsed / planDetails.rekognitionMonthlyScans) * 100)}%)
+                    <span className="font-mono font-bold text-emerald-600 whitespace-nowrap">
+                      {planDetails.rekognitionScansUsed.toLocaleString()} / {effectiveScansTotal.toLocaleString()} Scans ({Math.round((planDetails.rekognitionScansUsed / effectiveScansTotal) * 100)}%)
                     </span>
                   </div>
 
-                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div>
-                      <span className="font-semibold block text-slate-900 dark:text-white">
-                        AWS ECS Fargate ARM64 FFmpeg
-                      </span>
-                      <span className="text-slate-500 text-[11px]">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-slate-900 dark:text-white">
+                          AWS ECS Fargate ARM64 FFmpeg
+                        </span>
+                        {effectiveExtraFargate > 0 && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300">
+                            +{effectiveExtraFargate}m Boosted
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-slate-500 text-[11px] block mt-0.5">
                         {planDetails.maxVideoQuality} • {plan === "enterprise" ? "Dedicated task cluster" : "Spot worker execution"}
                       </span>
                     </div>
-                    <span className="font-mono font-bold text-blue-600">
-                      {planDetails.fargateComputeUsedMins} / {planDetails.fargateComputeMonthlyMins} Transcode Mins ({Math.round((planDetails.fargateComputeUsedMins / planDetails.fargateComputeMonthlyMins) * 100)}%)
+                    <span className="font-mono font-bold text-blue-600 whitespace-nowrap">
+                      {planDetails.fargateComputeUsedMins} / {effectiveFargateTotal} Transcode Mins ({Math.round((planDetails.fargateComputeUsedMins / effectiveFargateTotal) * 100)}%)
                     </span>
                   </div>
                 </div>
               </div>
+
+              {/* Pro Cloud Add-ons & Quota Upgrades Section */}
+              {plan === "pro" && (
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-xs">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-5 h-5 text-amber-500" />
+                        <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                          Pro Quota Add-ons &amp; Capacity Upgrades
+                        </h3>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Scale your cloud storage and AI token allowance on-demand. Upgrades apply immediately to your active workspace.
+                      </p>
+                    </div>
+                    {proAddons.activePacks.length > 0 && (
+                      <span className="self-start sm:self-auto text-xs font-semibold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                        {proAddons.activePacks.length} Booster{proAddons.activePacks.length > 1 ? "s" : ""} Active
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Storage Upgrades Section */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <HardDrive className="w-4 h-4 text-[#1a73e8]" />
+                        <span>High-Speed AWS S3 Storage Expansion</span>
+                      </span>
+                      <span className="text-xs text-slate-400">
+                        Active: +{effectiveExtraStorageGB >= 1024 ? `${(effectiveExtraStorageGB / 1024).toFixed(0)} TB` : `${effectiveExtraStorageGB} GB`}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {availableStoragePacks.map((pack) => {
+                        const isActive = proAddons.activePacks.includes(pack.id);
+                        return (
+                          <div
+                            key={pack.id}
+                            className={`p-4 rounded-2xl border transition-all flex flex-col justify-between ${
+                              isActive
+                                ? "bg-blue-50/60 dark:bg-blue-950/30 border-[#1a73e8] dark:border-blue-700 ring-1 ring-[#1a73e8]"
+                                : "bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                            }`}
+                          >
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-slate-900 dark:text-white">
+                                  {pack.name}
+                                </span>
+                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#1a73e8]/10 text-[#1a73e8] dark:bg-blue-900/60 dark:text-blue-300">
+                                  {pack.tag}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2">
+                                {pack.description}
+                              </p>
+                            </div>
+
+                            <div className="pt-4 mt-2 border-t border-slate-200/60 dark:border-slate-800 flex items-center justify-between">
+                              <span className="text-sm font-bold text-slate-900 dark:text-white">
+                                {pack.price}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleTogglePack(pack)}
+                                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all active:scale-95 flex items-center gap-1 cursor-pointer ${
+                                  isActive
+                                    ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+                                    : "bg-[#1a73e8] hover:bg-[#1557bf] text-white shadow-xs"
+                                }`}
+                              >
+                                {isActive ? (
+                                  <>
+                                    <Check className="w-3 h-3" />
+                                    <span>Active</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Plus className="w-3 h-3" />
+                                    <span>Add Pack</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* AI Pipeline Upgrades Section */}
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <Zap className="w-4 h-4 text-purple-600" />
+                        <span>AI Inference &amp; Compute Boosters</span>
+                      </span>
+                      <span className="text-xs text-slate-400">
+                        Claude 3 • Rekognition • Fargate
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {availableAiPacks.map((pack) => {
+                        const isActive = proAddons.activePacks.includes(pack.id);
+                        return (
+                          <div
+                            key={pack.id}
+                            className={`p-4 rounded-2xl border transition-all flex flex-col justify-between ${
+                              isActive
+                                ? "bg-purple-50/60 dark:bg-purple-950/30 border-purple-600 dark:border-purple-700 ring-1 ring-purple-600"
+                                : "bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                            }`}
+                          >
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-slate-900 dark:text-white">
+                                  {pack.name}
+                                </span>
+                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/60 dark:text-purple-300">
+                                  {pack.tag}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2">
+                                {pack.description}
+                              </p>
+                            </div>
+
+                            <div className="pt-4 mt-2 border-t border-slate-200/60 dark:border-slate-800 flex items-center justify-between">
+                              <span className="text-sm font-bold text-slate-900 dark:text-white">
+                                {pack.price}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleTogglePack(pack)}
+                                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all active:scale-95 flex items-center gap-1 cursor-pointer ${
+                                  isActive
+                                    ? "bg-purple-700 hover:bg-purple-800 text-white shadow-xs"
+                                    : "bg-purple-600 hover:bg-purple-700 text-white shadow-xs"
+                                }`}
+                              >
+                                {isActive ? (
+                                  <>
+                                    <Check className="w-3 h-3" />
+                                    <span>Active</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Plus className="w-3 h-3" />
+                                    <span>Add Pack</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -1252,6 +1714,132 @@ const ProfilePage = () => {
             </div>
           )}
         </div>
+          </>
+        )}
+
+        {/* Pro Add-ons & Quota Upgrade Modal */}
+        {addonModal.isOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800 rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl relative space-y-6 max-h-[90vh] overflow-y-auto">
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-amber-500" />
+                    <span>Pro Cloud Capacity Boosters</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Add high-speed AWS S3 storage and Claude 3 AI tokens to your active subscription.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAddonModal({ isOpen: false, tab: "all" })}
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Filter Tabs */}
+              <div className="flex gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
+                {[
+                  { id: "all", label: "All Upgrades" },
+                  { id: "storage", label: "AWS Storage (+TB)" },
+                  { id: "ai", label: "AI Quotas & Tokens" },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setAddonModal((prev) => ({ ...prev, tab: tab.id }))}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
+                      addonModal.tab === tab.id
+                        ? "bg-[#1a73e8] text-white"
+                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Pack List */}
+              <div className="space-y-3">
+                {[
+                  ...(addonModal.tab === "all" || addonModal.tab === "storage" ? availableStoragePacks : []),
+                  ...(addonModal.tab === "all" || addonModal.tab === "ai" ? availableAiPacks : []),
+                ].map((pack) => {
+                  const isActive = proAddons.activePacks.includes(pack.id);
+                  return (
+                    <div
+                      key={pack.id}
+                      className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                        isActive
+                          ? "bg-blue-50/60 dark:bg-blue-950/30 border-[#1a73e8] dark:border-blue-700"
+                          : "bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                      }`}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-slate-900 dark:text-white">
+                            {pack.name}
+                          </span>
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                            {pack.tag}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          {pack.description}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                        <span className="text-sm font-bold text-slate-900 dark:text-white">
+                          {pack.price}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleTogglePack(pack)}
+                          className={`px-4 py-2 rounded-full text-xs font-semibold transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer ${
+                            isActive
+                              ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+                              : "bg-[#1a73e8] hover:bg-[#1557bf] text-white shadow-xs"
+                          }`}
+                        >
+                          {isActive ? (
+                            <>
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Active</span>
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>Buy Upgrade</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Footer Summary */}
+              <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                <span className="text-slate-500">
+                  Active boosters are automatically added to your cloud workspace quotas.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setAddonModal({ isOpen: false, tab: "all" })}
+                  className="px-5 py-2 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold transition-colors cursor-pointer"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

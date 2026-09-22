@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { Lock, Mail, User, Eye, EyeOff, ArrowRight, Loader2 } from "lucide-react";
+import { Lock, Mail, User, Eye, EyeOff, ArrowRight, Loader2, AlertCircle } from "lucide-react";
 import ModalWrapper from "../../../../shared/ui/components/ModalWrapper.jsx";
 import OmniDriveLogo from "../../../../shared/ui/components/OmniDriveLogo.jsx";
 import { openModal, closeModal } from "../../../../shared/state/uiSlice.jsx";
@@ -28,7 +28,7 @@ const getPasswordStrength = (pwd = "") => {
       level: 1,
       label: "Weak",
       colorClass: "bg-rose-500",
-      textClass: "text-rose-500 dark:text-rose-400",
+      textClass: "text-rose-600 dark:text-rose-400",
     };
   }
 
@@ -37,24 +37,24 @@ const getPasswordStrength = (pwd = "") => {
       level: 2,
       label: "Fair",
       colorClass: "bg-amber-500",
-      textClass: "text-amber-500 dark:text-amber-400",
+      textClass: "text-amber-600 dark:text-amber-400",
     };
   }
 
-  if (varietyCount === 3 && pwd.length < 10) {
+  if (pwd.length >= 8 && varietyCount >= 3) {
     return {
       level: 3,
-      label: "Good",
-      colorClass: "bg-blue-500",
-      textClass: "text-blue-500 dark:text-blue-400",
+      label: "Strong",
+      colorClass: "bg-emerald-500",
+      textClass: "text-emerald-600 dark:text-emerald-400",
     };
   }
 
   return {
-    level: 4,
-    label: "Strong",
-    colorClass: "bg-emerald-500",
-    textClass: "text-emerald-600 dark:text-emerald-400",
+    level: 2,
+    label: "Fair",
+    colorClass: "bg-amber-500",
+    textClass: "text-amber-600 dark:text-amber-400",
   };
 };
 
@@ -71,6 +71,7 @@ const RegisterModal = () => {
     handleGoogleSSO,
   } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
+  const [localError, setLocalError] = useState(null);
 
   const {
     register,
@@ -85,7 +86,14 @@ const RegisterModal = () => {
 
   const isOpen = activeModal === "register" && !isAuthenticated;
 
+  useEffect(() => {
+    if (!isOpen) {
+      setLocalError(null);
+    }
+  }, [isOpen]);
+
   const handleClose = () => {
+    setLocalError(null);
     dispatch(closeModal());
     if (window.location.pathname === "/login" || window.location.pathname === "/register") {
       navigate("/");
@@ -93,12 +101,20 @@ const RegisterModal = () => {
   };
 
   const handleSwitchToLogin = () => {
+    setLocalError(null);
     dispatch(openModal("auth"));
   };
 
-  const onFormSubmit = (data) => {
-    handleRegister(data);
+  const onFormSubmit = async (data) => {
+    setLocalError(null);
+    try {
+      await handleRegister(data);
+    } catch (err) {
+      setLocalError(err.message || "Registration failed. Please check your details.");
+    }
   };
+
+  const displayError = localError || error;
 
   return (
     <ModalWrapper
@@ -162,10 +178,10 @@ const RegisterModal = () => {
         <div className="flex-1 border-t border-slate-200 dark:border-slate-700/80" />
       </div>
 
-      {error && (
-        <div className="mb-2.5 p-2 rounded-xl bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 text-xs flex items-start gap-2">
-          <div className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1 shrink-0" />
-          <span>{error}</span>
+      {displayError && (
+        <div className="mb-3.5 p-3 rounded-xl bg-rose-500/10 dark:bg-rose-950/60 border border-rose-500/30 dark:border-rose-800 text-rose-600 dark:text-rose-300 text-xs flex items-start gap-2.5 animate-fade-in shadow-xs">
+          <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+          <div className="flex-1 font-medium leading-relaxed">{displayError}</div>
         </div>
       )}
 
@@ -293,7 +309,7 @@ const RegisterModal = () => {
           onClick={handleSwitchToLogin}
           className="font-semibold text-[#1a73e8] hover:text-blue-500 hover:underline transition-colors cursor-pointer"
         >
-          Sign In
+          Log In
         </button>
       </div>
     </ModalWrapper>

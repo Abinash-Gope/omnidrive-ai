@@ -202,7 +202,7 @@ const VerificationModal = () => {
           onClick={handleSwitchToLogin}
           className="text-[11px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 underline"
         >
-          ← Return to Sign In
+          ← Return to Log In
         </button>
       </div>
     </ModalWrapper>

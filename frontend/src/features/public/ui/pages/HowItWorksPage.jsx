@@ -133,16 +133,17 @@ const HowItWorksPage = () => {
           in real time.
         </p>
         <div className="flex flex-wrap justify-center gap-4">
-          <Link
-            to="/dashboard"
-            className="px-8 py-3.5 rounded-full bg-[#1a73e8] hover:bg-[#1557bf] text-white font-semibold transition-all shadow-md"
-          >
-            Launch Interactive Dashboard
-          </Link>
-          {!isAuthenticated && (
+          {isAuthenticated ? (
+            <Link
+              to="/dashboard"
+              className="px-8 py-3.5 rounded-full bg-[#1a73e8] hover:bg-[#1557bf] text-white font-semibold transition-all shadow-md"
+            >
+              Open Dashboard
+            </Link>
+          ) : (
             <button
               onClick={handleOpenRegister}
-              className="px-8 py-3.5 rounded-full bg-slate-800 hover:bg-slate-700 text-white font-semibold border border-slate-700 transition-colors"
+              className="px-8 py-3.5 rounded-full bg-[#1a73e8] hover:bg-[#1557bf] text-white font-semibold transition-all shadow-md cursor-pointer"
             >
               Create Free Account
             </button>

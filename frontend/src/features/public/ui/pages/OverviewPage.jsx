@@ -9,8 +9,11 @@ import {
   ArrowRight,
   CheckCircle2,
   Server,
+  Sparkles,
+  Play,
 } from "lucide-react";
 import usePublicPages from "../../hooks/usePublicPages.jsx";
+import PipelineShowcase from "../components/PipelineShowcase.jsx";
 
 const OverviewPage = () => {
   const { isAuthenticated, handleOpenLogin, handleOpenRegister } = usePublicPages();
@@ -19,9 +22,19 @@ const OverviewPage = () => {
     <div className="flex flex-col w-full">
       {/* 1. HERO SECTION */}
       <section className="relative overflow-hidden pt-12 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto flex flex-col items-center text-center">
-        {/* Glow ambient background effect */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-gradient-to-tr from-blue-400/15 via-indigo-400/10 to-transparent blur-3xl pointer-events-none rounded-full" />
+        {/* Ambient Glow Background Effect */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[650px] h-[380px] bg-gradient-to-tr from-blue-400/15 via-indigo-400/10 to-transparent blur-3xl pointer-events-none rounded-full" />
 
+        {/* Feature Announcement Pill */}
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-blue-500/10 text-[#005bbf] dark:text-blue-300 border border-blue-200/80 dark:border-blue-800/80 shadow-xs mb-6 backdrop-blur-md">
+          <Sparkles className="w-3.5 h-3.5 text-[#1a73e8]" />
+          <span>Next-Generation Serverless Cloud Storage</span>
+          <span className="w-1 h-1 rounded-full bg-blue-400" />
+          <span className="text-slate-500 dark:text-slate-400 font-normal hidden sm:inline">
+            Direct-to-S3 • ARM64 Graviton3 • AWS Bedrock
+          </span>
+          <ArrowRight className="w-3 h-3 text-[#1a73e8]" />
+        </div>
 
         {/* Main Headline */}
         <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-slate-900 dark:text-white max-w-4xl leading-[1.15]">
@@ -38,51 +51,85 @@ const OverviewPage = () => {
         </p>
 
         {/* Call to Actions */}
-        <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
+        <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3.5 w-full sm:w-auto">
           {isAuthenticated ? (
             <Link
               to="/dashboard"
-              className="inline-flex items-center gap-2.5 px-7 py-3.5 rounded-full bg-[#1a73e8] hover:bg-[#1557bf] text-white text-base font-semibold shadow-md hover:shadow-lg transition-all active:scale-95"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-8 py-3.5 rounded-full bg-[#1a73e8] hover:bg-[#1557bf] text-white text-base font-semibold shadow-[0_4px_14px_rgba(26,115,232,0.35)] hover:shadow-[0_6px_20px_rgba(26,115,232,0.45)] transition-all active:scale-95 group"
             >
               <span>Go to My Dashboard</span>
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
             </Link>
           ) : (
-            <button
-              onClick={handleOpenRegister}
-              className="inline-flex items-center gap-2.5 px-7 py-3.5 rounded-full bg-[#1a73e8] hover:bg-[#1557bf] text-white text-base font-semibold shadow-md hover:shadow-lg transition-all active:scale-95"
-            >
-              <svg className="w-5 h-5 fill-current shrink-0" viewBox="0 0 24 24">
-                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-              </svg>
-              <span>Try Free with Google (15GB)</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
+            <>
+              <button
+                onClick={handleOpenRegister}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-8 py-3.5 rounded-full bg-[#1a73e8] hover:bg-[#1557bf] text-white text-base font-semibold shadow-[0_4px_14px_rgba(26,115,232,0.35)] hover:shadow-[0_6px_20px_rgba(26,115,232,0.45)] transition-all active:scale-95 group cursor-pointer"
+              >
+                <span>Start Free Workspace</span>
+                <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+              </button>
+              <Link
+                to="/how-it-works"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-base font-medium border border-slate-200/80 dark:border-slate-700 transition-all active:scale-95"
+              >
+                <Play className="w-3.5 h-3.5 fill-current text-slate-500 dark:text-slate-400" />
+                <span>Explore Architecture</span>
+              </Link>
+            </>
           )}
+        </div>
 
+        {/* Existing User Login Shortcut */}
+        {!isAuthenticated && (
+          <div className="mt-4 flex items-center justify-center gap-1.5 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+            <span>Already have an OmniDrive account?</span>
+            <button
+              onClick={handleOpenLogin}
+              className="font-semibold text-[#1a73e8] dark:text-blue-400 hover:text-[#1557bf] dark:hover:text-blue-300 hover:underline inline-flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              <span>Log in here</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        {/* Micro-Trust Indicators */}
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-slate-500 dark:text-slate-400 font-medium">
+          <span className="flex items-center gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> 15 GB Free S3 Storage
+          </span>
+          <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600 hidden sm:inline-block" />
+          <span className="flex items-center gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> Zero Credit Card Required
+          </span>
+          <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600 hidden sm:inline-block" />
+          <span className="flex items-center gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> Instant Bedrock & Rekognition AI
+          </span>
         </div>
 
         {/* Platform Technology Bar */}
-        <div className="mt-14 w-full max-w-3xl bg-white/90 dark:bg-slate-800/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-slate-700 px-5 py-3.5 shadow-sm grid grid-cols-3 divide-x divide-slate-200 dark:divide-slate-700 text-xs font-mono">
-          <div className="flex items-center gap-2 pr-4">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+        <div className="mt-10 w-full max-w-4xl bg-white/90 dark:bg-slate-800/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-slate-700 px-5 py-3.5 shadow-sm grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 dark:divide-slate-700 text-xs font-mono gap-y-2 sm:gap-y-0">
+          <div className="flex items-center gap-2 sm:pr-4 py-1 sm:py-0">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
             <span className="text-slate-500 shrink-0">Storage:</span>
-            <span className="font-bold text-slate-900 dark:text-white truncate">Amazon S3 (ap-south-1)</span>
+            <span className="font-bold text-slate-900 dark:text-white">Amazon S3 (ap-south-1)</span>
           </div>
-          <div className="flex items-center gap-2 px-4">
+          <div className="flex items-center gap-2 sm:px-4 py-1 sm:py-0">
             <Zap className="w-3.5 h-3.5 text-amber-500 shrink-0" />
             <span className="text-slate-500 shrink-0">AI:</span>
-            <span className="font-bold text-slate-900 dark:text-white truncate">Rekognition + Bedrock Claude 3</span>
+            <span className="font-bold text-slate-900 dark:text-white">Rekognition + Bedrock Claude 3</span>
           </div>
-          <div className="flex items-center gap-2 pl-4">
+          <div className="flex items-center gap-2 sm:pl-4 py-1 sm:py-0">
             <Server className="w-3.5 h-3.5 text-blue-500 shrink-0" />
             <span className="text-slate-500 shrink-0">Compute:</span>
-            <span className="font-bold text-slate-900 dark:text-white truncate">ARM64 Fargate + DynamoDB</span>
+            <span className="font-bold text-slate-900 dark:text-white">ARM64 Fargate + DynamoDB</span>
           </div>
         </div>
+
+        {/* Live Interactive Pipeline Telemetry Showcase */}
+        <PipelineShowcase />
       </section>
 
       {/* 2. CORE CAPABILITY CARDS */}
@@ -189,63 +236,6 @@ const OverviewPage = () => {
                 Inspect safety protocols <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 3. STORAGE COMPARISON SECTION */}
-      <section className="py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-gradient-to-br from-white to-blue-50/40 dark:from-slate-800 dark:to-slate-900 rounded-3xl p-8 sm:p-12 border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-10">
-          <div className="space-y-4 max-w-xl">
-            <span className="text-xs font-bold uppercase tracking-wider text-[#1a73e8]">
-              Decoupled Architecture
-            </span>
-            <h2 className="text-3xl font-bold text-slate-900 dark:text-white">
-              Why Direct-to-S3 Processing Beats Monolithic Web Servers
-            </h2>
-            <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed">
-              Standard web apps upload gigabyte videos through heavy Node/Python servers, choking CPU
-              and draining memory. OmniDrive AI issues short-lived presigned S3 URLs, letting your browser
-              upload directly to Amazon S3 while serverless EventBridge workers do the heavy lifting in parallel.
-            </p>
-            <div className="pt-2 space-y-2 text-sm">
-              <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200">
-                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>Zero web server memory bottlenecks or upload timeouts</span>
-              </div>
-              <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200">
-                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>ARM64 Graviton3 Fargate containers auto-scale from 0 to 1,000</span>
-              </div>
-              <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200">
-                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>DynamoDB single-digit millisecond metadata retrieval</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="w-full lg:w-auto shrink-0 flex flex-col gap-3">
-            {isAuthenticated ? (
-              <Link
-                to="/dashboard"
-                className="px-8 py-3.5 rounded-full bg-[#1a73e8] hover:bg-[#1557bf] text-white font-semibold text-center shadow-md hover:shadow-lg transition-all"
-              >
-                Go to My Dashboard
-              </Link>
-            ) : (
-              <button
-                onClick={handleOpenRegister}
-                className="px-8 py-3.5 rounded-full bg-[#1a73e8] hover:bg-[#1557bf] text-white font-semibold text-center shadow-md hover:shadow-lg transition-all"
-              >
-                Start Free 15GB Workspace
-              </button>
-            )}
-            <Link
-              to="/how-it-works"
-              className="px-8 py-3.5 rounded-full bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-semibold text-center hover:bg-slate-50 transition-colors"
-            >
-              View Full Architecture
-            </Link>
           </div>
         </div>
       </section>

@@ -21,7 +21,7 @@ export const getPricingPlans = async () => {
         "Bedrock Claude 3 Document Summaries (50 docs/mo)",
         "Community Support",
       ],
-      buttonText: "Start Free with Google",
+      buttonText: "Start Free Workspace",
       popular: false,
     },
     {

@@ -8,7 +8,7 @@ const initialState = {
   filterType: "all", // 'all' | 'video' | 'image' | 'pdf'
   searchQuery: "",
   viewMode: "grid", // 'grid' | 'list'
-  isLoading: false,
+  isLoading: true,
   error: null,
   storage: {
     usedGB: 0,
