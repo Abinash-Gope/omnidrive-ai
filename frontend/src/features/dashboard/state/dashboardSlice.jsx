@@ -1,8 +1,41 @@
 import { createSlice } from "@reduxjs/toolkit";
 import { calculateStorageFromFiles } from "../utils/storageHelper.jsx";
 
+// LocalStorage persistence helpers for Starred and Trashed files
+const loadStoredStarredIds = () => {
+  try {
+    const raw = localStorage.getItem("omnidrive_starred_files");
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveStoredStarredIds = (ids) => {
+  try {
+    localStorage.setItem("omnidrive_starred_files", JSON.stringify(ids));
+  } catch {}
+};
+
+const loadStoredTrashFiles = () => {
+  try {
+    const raw = localStorage.getItem("omnidrive_trashed_files");
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveStoredTrashFiles = (files) => {
+  try {
+    localStorage.setItem("omnidrive_trashed_files", JSON.stringify(files));
+  } catch {}
+};
+
 const initialState = {
   files: [],
+  trashFiles: loadStoredTrashFiles(),
+  starredIds: loadStoredStarredIds(),
   quarantinedFiles: [],
   selectedFile: null,
   activeTab: "my-files", // 'my-files' | 'recent' | 'starred' | 'shared' | 'trash' | 'videos' | 'documents' | 'photos'
@@ -59,7 +92,18 @@ export const dashboardSlice = createSlice({
   reducers: {
     setFiles: (state, action) => {
       const all = action.payload || [];
-      state.files = all.filter((f) => f.status !== "REJECTED_SAFETY_VIOLATION");
+      const trashIdSet = new Set((state.trashFiles || []).map((t) => t.id || t.file_id));
+      const starredIdSet = new Set(state.starredIds || []);
+
+      const validFiles = all
+        .filter((f) => f.status !== "REJECTED_SAFETY_VIOLATION")
+        .filter((f) => !trashIdSet.has(f.id || f.file_id))
+        .map((f) => ({
+          ...f,
+          isStarred: starredIdSet.has(f.id || f.file_id),
+        }));
+
+      state.files = validFiles;
       state.quarantinedFiles = all.filter((f) => f.status === "REJECTED_SAFETY_VIOLATION");
       state.isLoading = false;
       state.error = null;
@@ -209,6 +253,68 @@ export const dashboardSlice = createSlice({
         state.previewModal.file = { ...state.previewModal.file, ...updates };
       }
     },
+    toggleStar: (state, action) => {
+      const fileId = action.payload;
+      const index = state.starredIds.indexOf(fileId);
+      if (index >= 0) {
+        state.starredIds.splice(index, 1);
+      } else {
+        state.starredIds.push(fileId);
+      }
+      saveStoredStarredIds(state.starredIds);
+
+      // Update in active files
+      const targetFile = state.files.find((f) => f.id === fileId || f.file_id === fileId);
+      if (targetFile) {
+        targetFile.isStarred = state.starredIds.includes(fileId);
+      }
+      if (state.previewModal.file && (state.previewModal.file.id === fileId || state.previewModal.file.file_id === fileId)) {
+        state.previewModal.file.isStarred = state.starredIds.includes(fileId);
+      }
+    },
+    moveToTrash: (state, action) => {
+      const fileId = action.payload;
+      const fileToTrash = state.files.find((f) => f.id === fileId || f.file_id === fileId);
+      if (fileToTrash) {
+        state.files = state.files.filter((f) => f.id !== fileId && f.file_id !== fileId);
+        const trashedItem = {
+          ...fileToTrash,
+          inTrash: true,
+          trashedAt: new Date().toISOString(),
+        };
+        state.trashFiles = [trashedItem, ...state.trashFiles.filter((t) => t.id !== fileId && t.file_id !== fileId)];
+        saveStoredTrashFiles(state.trashFiles);
+        state.storage = calculateStorageFromFiles(state.files, state.storage?.totalGB || 15.0);
+      }
+    },
+    restoreFromTrash: (state, action) => {
+      const fileId = action.payload;
+      const fileToRestore = state.trashFiles.find((f) => f.id === fileId || f.file_id === fileId);
+      if (fileToRestore) {
+        state.trashFiles = state.trashFiles.filter((f) => f.id !== fileId && f.file_id !== fileId);
+        saveStoredTrashFiles(state.trashFiles);
+        const restoredItem = {
+          ...fileToRestore,
+          inTrash: false,
+          trashedAt: null,
+          isStarred: state.starredIds.includes(fileId),
+        };
+        state.files = [restoredItem, ...state.files.filter((f) => f.id !== fileId && f.file_id !== fileId)];
+        state.storage = calculateStorageFromFiles(state.files, state.storage?.totalGB || 15.0);
+      }
+    },
+    permanentDeleteFile: (state, action) => {
+      const fileId = action.payload;
+      state.trashFiles = state.trashFiles.filter((f) => f.id !== fileId && f.file_id !== fileId);
+      state.files = state.files.filter((f) => f.id !== fileId && f.file_id !== fileId);
+      state.quarantinedFiles = state.quarantinedFiles.filter((f) => f.id !== fileId && f.file_id !== fileId);
+      saveStoredTrashFiles(state.trashFiles);
+      state.storage = calculateStorageFromFiles(state.files, state.storage?.totalGB || 15.0);
+    },
+    emptyTrash: (state) => {
+      state.trashFiles = [];
+      saveStoredTrashFiles([]);
+    },
   },
 });
 
@@ -233,6 +339,11 @@ export const {
   closePreviewModal,
   updateVideoQuality,
   updateFileStatus,
+  toggleStar,
+  moveToTrash,
+  restoreFromTrash,
+  permanentDeleteFile,
+  emptyTrash,
 } = dashboardSlice.actions;
 
 export default dashboardSlice.reducer;

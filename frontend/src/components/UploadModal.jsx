@@ -264,8 +264,19 @@ const UploadModal = ({ isOpen, onClose, onUploadComplete }) => {
                 <span className="text-[#1a73e8] hover:underline">browse</span>
               </p>
               <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-                Supports MP4, MOV, JPEG, PNG, WEBP, and PDF (Max 500 MB)
+                Direct cloud upload with intelligent vision safety, video transcoding & AI summarization
               </p>
+              <div className="flex items-center justify-center gap-2 mt-4 pt-3 border-t border-slate-200/60 dark:border-slate-800/80">
+                <span className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-blue-100/70 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200/50 dark:border-blue-800/50">
+                  🎬 MP4 / MOV
+                </span>
+                <span className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-emerald-100/70 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-800/50">
+                  📷 JPG / PNG
+                </span>
+                <span className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-purple-100/70 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/50 dark:border-purple-800/50">
+                  📑 PDF
+                </span>
+              </div>
             </div>
           ) : (
             /* STATE 3: SELECTED FILE PREVIEW & PROGRESS */

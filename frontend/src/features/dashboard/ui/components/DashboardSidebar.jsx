@@ -27,7 +27,9 @@ const DashboardSidebar = ({
   activeTab,
   onSelectTab,
   onUploadFile,
+  onOpenUploadModal,
   totalFilesCount = 0,
+  tabCounts = {},
   storage: propStorage,
 }) => {
   const fileInputRef = useRef(null);
@@ -69,7 +71,6 @@ const DashboardSidebar = ({
     ? `${(totalGB / 1024).toFixed(0)} TB`
     : `${totalGB} GB`;
 
-  // Provide a minimum visual sliver (1.5%) so user sees that storage contains data
   const visualPercentage =
     propStorage?.visualPercentage ??
     (usedBytes > 0 ? Math.max(1.5, Math.min(100, rawRatio)) : 0);
@@ -93,12 +94,23 @@ const DashboardSidebar = ({
     }
   };
 
+  const myCount = tabCounts.myFilesCount ?? totalFilesCount;
+  const starCount = tabCounts.starredCount ?? 0;
+  const sharedCount = tabCounts.sharedCount ?? 0;
+  const trashCount = tabCounts.trashCount ?? 0;
+
   const navItems = [
-    { id: "my-files", label: "My Files", icon: Folder, count: totalFilesCount },
+    { id: "my-files", label: "My Files", icon: Folder, count: myCount },
     { id: "recent", label: "Recent", icon: Clock },
-    { id: "starred", label: "Starred", icon: Star },
-    { id: "shared", label: "Shared with me", icon: Users },
-    { id: "trash", label: "Trash", icon: Trash2 },
+    { id: "starred", label: "Starred", icon: Star, count: starCount > 0 ? starCount : undefined },
+    { id: "shared", label: "Shared with me", icon: Users, count: sharedCount > 0 ? sharedCount : undefined },
+    {
+      id: "trash",
+      label: "Trash",
+      icon: Trash2,
+      count: trashCount > 0 ? trashCount : undefined,
+      isDanger: trashCount > 0,
+    },
   ];
 
   // Dynamic progress bar color matching quota threshold
@@ -124,7 +136,13 @@ const DashboardSidebar = ({
             accept="video/*,image/*,application/pdf"
           />
           <button
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => {
+              if (onOpenUploadModal) {
+                onOpenUploadModal();
+              } else {
+                fileInputRef.current?.click();
+              }
+            }}
             className="w-full h-12 bg-[#1a73e8] hover:bg-[#1557bf] text-white rounded-full px-5 flex items-center justify-center gap-2.5 shadow-md hover:shadow-lg transition-all active:scale-95 text-sm font-semibold group"
           >
             <Plus className="w-5 h-5 transition-transform group-hover:rotate-90 duration-200" />
@@ -152,7 +170,13 @@ const DashboardSidebar = ({
                   <span>{item.label}</span>
                 </div>
                 {item.count !== undefined && (
-                  <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded-full bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                  <span
+                    className={`text-xs font-mono font-semibold px-2 py-0.5 rounded-full ${
+                      item.isDanger
+                        ? "bg-rose-100 dark:bg-rose-950/80 text-rose-600 dark:text-rose-400"
+                        : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300"
+                    }`}
+                  >
                     {item.count}
                   </span>
                 )}

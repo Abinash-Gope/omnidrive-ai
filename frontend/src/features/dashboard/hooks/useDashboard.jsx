@@ -19,6 +19,11 @@ import {
   openPreviewModal,
   closePreviewModal,
   updateVideoQuality,
+  toggleStar,
+  moveToTrash,
+  restoreFromTrash,
+  permanentDeleteFile,
+  emptyTrash,
 } from "../state/dashboardSlice.jsx";
 import { setToast } from "../../../shared/state/uiSlice.jsx";
 import {
@@ -43,6 +48,8 @@ export const useDashboard = () => {
   const dispatch = useDispatch();
   const {
     files,
+    trashFiles,
+    starredIds,
     quarantinedFiles,
     activeTab,
     filterType,
@@ -248,18 +255,48 @@ export const useDashboard = () => {
     }
   };
 
-  // Filter & Search Logic
-  const filteredFiles = files.filter((f) => {
-    const matchesSearch =
-      f.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (f.labels && f.labels.some((l) => l.name.toLowerCase().includes(searchQuery.toLowerCase()))) ||
-      (f.summary && f.summary.executive?.toLowerCase().includes(searchQuery.toLowerCase()));
+  // Filter & Search Logic for Active Tabs
+  const filteredFiles = (() => {
+    let sourceList = files;
+    if (activeTab === "trash") {
+      sourceList = trashFiles || [];
+    } else if (activeTab === "starred") {
+      sourceList = files.filter(
+        (f) => f.isStarred || (starredIds && starredIds.includes(f.id || f.file_id))
+      );
+    } else if (activeTab === "recent") {
+      // Sort newest files first
+      sourceList = [...files].sort((a, b) => {
+        const timeA = new Date(a.createdAt || a.date || 0).getTime();
+        const timeB = new Date(b.createdAt || b.date || 0).getTime();
+        return timeB - timeA;
+      });
+    } else if (activeTab === "shared") {
+      sourceList = files.filter((f) => Boolean(f.isShared));
+    }
 
-    if (!matchesSearch) return false;
+    return sourceList.filter((f) => {
+      const matchesSearch =
+        !searchQuery ||
+        f.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (f.labels && f.labels.some((l) => l.name.toLowerCase().includes(searchQuery.toLowerCase()))) ||
+        (f.summary && f.summary.executive?.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    if (filterType === "all") return true;
-    return f.type === filterType;
-  });
+      if (!matchesSearch) return false;
+
+      if (filterType === "all") return true;
+      return f.type === filterType;
+    });
+  })();
+
+  // Dynamic tab counts for badges
+  const myFilesCount = files.length;
+  const recentCount = files.length;
+  const starredCount = files.filter(
+    (f) => f.isStarred || (starredIds && starredIds.includes(f.id || f.file_id))
+  ).length;
+  const sharedCount = files.filter((f) => Boolean(f.isShared)).length;
+  const trashCount = (trashFiles || []).length;
 
   // Action handlers
   const handleSelectTab = (tabId) => dispatch(setActiveTab(tabId));
@@ -271,16 +308,56 @@ export const useDashboard = () => {
   const handleClosePreview = () => dispatch(closePreviewModal());
   const handleChangeQuality = (quality) => dispatch(updateVideoQuality(quality));
 
-  // Delete / Remove file handler
-  const handleDeleteFile = async (file) => {
+  // Toggle star handler
+  const handleToggleStar = (fileOrId) => {
+    const fileId = typeof fileOrId === "object" ? fileOrId.id || fileOrId.file_id : fileOrId;
+    if (!fileId) return;
+    dispatch(toggleStar(fileId));
+    const wasStarred = starredIds && starredIds.includes(fileId);
+    dispatch(
+      setToast({
+        type: "info",
+        message: wasStarred ? "Removed from Starred." : "Added to Starred.",
+      })
+    );
+  };
+
+  // Soft-delete to Trash
+  const handleMoveToTrash = (file) => {
+    if (!file) return;
+    const fileId = file.id || file.file_id;
+    dispatch(moveToTrash(fileId));
+    dispatch(
+      setToast({
+        type: "info",
+        message: `"${file.name}" moved to Trash.`,
+      })
+    );
+  };
+
+  // Restore from Trash back to active files
+  const handleRestoreFile = (file) => {
+    if (!file) return;
+    const fileId = file.id || file.file_id;
+    dispatch(restoreFromTrash(fileId));
+    dispatch(
+      setToast({
+        type: "success",
+        message: `"${file.name}" restored to My Files.`,
+      })
+    );
+  };
+
+  // Permanent Delete File Handler (AWS S3 & DynamoDB purge)
+  const handlePermanentDelete = async (file) => {
     if (!file) return;
     const fileId = file.id || file.file_id;
     const fileName = file.name;
     const s3Key = file.s3Key || file.s3_key;
 
     try {
-      // Optimistically remove from UI
-      dispatch(removeFile(fileId));
+      // Optimistically remove from state & trash
+      dispatch(permanentDeleteFile(fileId));
 
       // Call API / clear offline storage and blacklist from refresh
       await deleteFileApi(fileId, s3Key, fileName);
@@ -288,17 +365,53 @@ export const useDashboard = () => {
       dispatch(
         setToast({
           type: "success",
-          message: `"${file.name}" was removed successfully.`,
+          message: `"${fileName}" was permanently deleted.`,
         })
       );
     } catch (err) {
-      console.error("Failed to delete file:", err);
+      console.error("Failed to delete file permanently:", err);
       dispatch(
         setToast({
           type: "error",
-          message: err.message || "Failed to remove file.",
+          message: err.message || "Failed to remove file permanently.",
         })
       );
+    }
+  };
+
+  // Bulk Empty Trash
+  const handleEmptyTrash = async () => {
+    const items = [...(trashFiles || [])];
+    if (items.length === 0) return;
+
+    dispatch(emptyTrash());
+    dispatch(
+      setToast({
+        type: "success",
+        message: `Trash emptied (${items.length} items permanently deleted).`,
+      })
+    );
+
+    // Concurrently purge from S3 & DynamoDB
+    for (const f of items) {
+      const fileId = f.id || f.file_id;
+      const s3Key = f.s3Key || f.s3_key;
+      const fileName = f.name;
+      try {
+        await deleteFileApi(fileId, s3Key, fileName);
+      } catch (err) {
+        console.warn(`Failed to permanently delete ${fileId}:`, err);
+      }
+    }
+  };
+
+  // Generic delete handler dispatched by cards
+  const handleDeleteFile = async (file) => {
+    if (!file) return;
+    if (activeTab === "trash" || file.inTrash) {
+      await handlePermanentDelete(file);
+    } else {
+      handleMoveToTrash(file);
     }
   };
 
@@ -341,13 +454,8 @@ export const useDashboard = () => {
       previewSnippet: "Uploaded to S3 raw bucket",
       s3Key: uploadedInfo.s3_key,
       isOffline: !navigator.onLine,
+      isStarred: false,
     };
-
-    // Do NOT persist to localStorage offline cache for authenticated sessions.
-    // The background poller (getFilesApi every 2s) will re-fetch from DynamoDB
-    // which returns proper S3 presigned download_url / thumbnail_url visible on
-    // any browser/device. Writing browser-local thumbnail blobs to localStorage
-    // was the root cause of missing previews when logging in from a different browser.
 
     dispatch(addFile(newFile));
   };
@@ -356,6 +464,18 @@ export const useDashboard = () => {
     files: filteredFiles,
     totalFilesCount: files.length,
     allFilesCount: files.length,
+    tabCounts: {
+      myFilesCount,
+      recentCount,
+      starredCount,
+      sharedCount,
+      trashCount,
+    },
+    myFilesCount,
+    recentCount,
+    starredCount,
+    sharedCount,
+    trashCount,
     quarantinedFiles,
     activeTab,
     filterType,
@@ -368,6 +488,11 @@ export const useDashboard = () => {
     previewModal,
     handleUploadFile,
     handleDeleteFile,
+    handleMoveToTrash,
+    handleRestoreFile,
+    handlePermanentDelete,
+    handleEmptyTrash,
+    handleToggleStar,
     handleUploadedFileSuccess,
     reloadFiles: loadFiles,
     handleSelectTab: (tab) => dispatch(setActiveTab(tab)),

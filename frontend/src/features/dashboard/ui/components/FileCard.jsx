@@ -12,16 +12,30 @@ import {
   Camera,
   Layers,
   Trash2,
+  Star,
+  RotateCcw,
 } from "lucide-react";
 import FileStatusBadge from "./FileStatusBadge.jsx";
 import PdfPreview from "./PdfPreview.jsx";
 import VideoPreview from "./VideoPreview.jsx";
 
-const FileCard = ({ file, onOpenPreview, onDeleteFile, viewMode = "grid" }) => {
+const FileCard = ({
+  file,
+  onOpenPreview,
+  onDeleteFile,
+  onToggleStar,
+  onMoveToTrash,
+  onRestoreFile,
+  onPermanentDelete,
+  activeTab,
+  viewMode = "grid",
+}) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isCardHovered, setIsCardHovered] = useState(false);
   const [realPageCount, setRealPageCount] = useState(file.pages || file.summary?.pages || null);
   const menuRef = useRef(null);
+
+  const isInTrash = activeTab === "trash" || Boolean(file.inTrash);
 
   useEffect(() => {
     if (file.pages) setRealPageCount(file.pages);
@@ -89,30 +103,82 @@ const FileCard = ({ file, onOpenPreview, onDeleteFile, viewMode = "grid" }) => {
         </div>
 
         {/* Right: Meta & Actions */}
-        <div className="flex items-center gap-4 shrink-0 text-xs text-slate-500 dark:text-slate-400">
+        <div className="flex items-center gap-3 shrink-0 text-xs text-slate-500 dark:text-slate-400">
           <span className="w-16 text-right font-mono">{file.size}</span>
           <span className="w-20 text-right hidden md:inline">{file.date}</span>
           <div className="flex items-center gap-1">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenPreview(file);
-              }}
-              className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
-              title="Inspect with AI Preview"
-            >
-              <ExternalLink className="w-4 h-4" />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onDeleteFile) onDeleteFile(file);
-              }}
-              className="p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
-              title="Delete / Remove file"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
+            {!isInTrash && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onToggleStar) onToggleStar(file);
+                }}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  file.isStarred
+                    ? "text-amber-500 hover:text-amber-600 bg-amber-50/70 dark:bg-amber-950/40"
+                    : "text-slate-400 hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-slate-700"
+                }`}
+                title={file.isStarred ? "Starred" : "Star file"}
+              >
+                <Star className={`w-4 h-4 ${file.isStarred ? "fill-amber-400" : ""}`} />
+              </button>
+            )}
+
+            {!isInTrash && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenPreview(file);
+                }}
+                className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                title="Inspect with AI Preview"
+              >
+                <ExternalLink className="w-4 h-4" />
+              </button>
+            )}
+
+            {isInTrash ? (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onRestoreFile) onRestoreFile(file);
+                  }}
+                  className="p-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 transition-colors"
+                  title="Restore File"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onPermanentDelete) onPermanentDelete(file);
+                    else if (onDeleteFile) onDeleteFile(file);
+                  }}
+                  className="p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-500 hover:text-rose-600 transition-colors"
+                  title="Delete Permanently"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onMoveToTrash) onMoveToTrash(file);
+                  else if (onDeleteFile) onDeleteFile(file);
+                }}
+                className="p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
+                title="Move to Trash"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -200,57 +266,118 @@ const FileCard = ({ file, onOpenPreview, onDeleteFile, viewMode = "grid" }) => {
       {/* Card Content Footer */}
       <div className="p-4 flex-1 flex flex-col justify-between">
         <div>
-          <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start justify-between gap-1.5">
             <h3
               className="text-sm font-semibold text-slate-900 dark:text-white truncate group-hover:text-[#1a73e8] transition-colors flex-1"
               title={file.name}
             >
               {file.name}
             </h3>
-            <div className="relative" ref={menuRef}>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsMenuOpen((prev) => !prev);
-                }}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 -mr-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                title="Options"
-              >
-                <MoreVertical className="w-4 h-4" />
-              </button>
-
-              {/* Context Dropdown Menu */}
-              {isMenuOpen && (
-                <div
-                  className="absolute right-0 top-full mt-1 w-44 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl py-1 z-30 animate-fadeIn text-xs"
-                  onClick={(e) => e.stopPropagation()}
+            <div className="flex items-center gap-0.5 shrink-0">
+              {!isInTrash && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onToggleStar) onToggleStar(file);
+                  }}
+                  className={`p-1 rounded-md transition-colors ${
+                    file.isStarred
+                      ? "text-amber-500 hover:text-amber-600"
+                      : "text-slate-300 dark:text-slate-600 hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  }`}
+                  title={file.isStarred ? "Starred" : "Star file"}
                 >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsMenuOpen(false);
-                      onOpenPreview(file);
-                    }}
-                    className="w-full px-3 py-2 text-left text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60 flex items-center gap-2"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-                    <span>View & AI Preview</span>
-                  </button>
-                  <div className="h-px bg-slate-100 dark:bg-slate-700/60 my-1" />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsMenuOpen(false);
-                      if (onDeleteFile) onDeleteFile(file);
-                    }}
-                    className="w-full px-3 py-2 text-left text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center gap-2 font-medium"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Remove / Delete</span>
-                  </button>
-                </div>
+                  <Star className={`w-4 h-4 ${file.isStarred ? "fill-amber-400" : ""}`} />
+                </button>
               )}
+              <div className="relative" ref={menuRef}>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsMenuOpen((prev) => !prev);
+                  }}
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  title="Options"
+                >
+                  <MoreVertical className="w-4 h-4" />
+                </button>
+
+                {/* Context Dropdown Menu */}
+                {isMenuOpen && (
+                  <div
+                    className="absolute right-0 top-full mt-1 w-44 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl py-1 z-30 animate-fadeIn text-xs"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {!isInTrash && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsMenuOpen(false);
+                          if (onToggleStar) onToggleStar(file);
+                        }}
+                        className="w-full px-3 py-2 text-left text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60 flex items-center gap-2"
+                      >
+                        <Star className={`w-3.5 h-3.5 ${file.isStarred ? "fill-amber-400 text-amber-500" : "text-slate-400"}`} />
+                        <span>{file.isStarred ? "Unstar File" : "Star File"}</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMenuOpen(false);
+                        onOpenPreview(file);
+                      }}
+                      className="w-full px-3 py-2 text-left text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60 flex items-center gap-2"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+                      <span>View & AI Preview</span>
+                    </button>
+                    <div className="h-px bg-slate-100 dark:bg-slate-700/60 my-1" />
+                    {isInTrash ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsMenuOpen(false);
+                            if (onRestoreFile) onRestoreFile(file);
+                          }}
+                          className="w-full px-3 py-2 text-left text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 flex items-center gap-2 font-medium"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>Restore File</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsMenuOpen(false);
+                            if (onPermanentDelete) onPermanentDelete(file);
+                            else if (onDeleteFile) onDeleteFile(file);
+                          }}
+                          className="w-full px-3 py-2 text-left text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center gap-2 font-medium"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Delete Permanently</span>
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsMenuOpen(false);
+                          if (onMoveToTrash) onMoveToTrash(file);
+                          else if (onDeleteFile) onDeleteFile(file);
+                        }}
+                        className="w-full px-3 py-2 text-left text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center gap-2 font-medium"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Move to Trash</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -287,6 +414,37 @@ const FileCard = ({ file, onOpenPreview, onDeleteFile, viewMode = "grid" }) => {
               </p>
             )}
           </div>
+
+          {/* Dedicated Trash Action Buttons on Card */}
+          {isInTrash && (
+            <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800/80 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onRestoreFile) onRestoreFile(file);
+                }}
+                className="flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200/60 dark:border-emerald-800/60 transition-colors flex items-center justify-center gap-1.5"
+                title="Restore file back to My Files"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span>Restore</span>
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onPermanentDelete) onPermanentDelete(file);
+                  else if (onDeleteFile) onDeleteFile(file);
+                }}
+                className="flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200/60 dark:border-rose-800/60 transition-colors flex items-center justify-center gap-1.5"
+                title="Permanently delete file"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                <span>Delete</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Footer Meta Row */}

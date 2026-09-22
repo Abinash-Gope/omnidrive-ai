@@ -8,6 +8,10 @@ import {
   Sparkles,
   Inbox,
   Lock,
+  Trash2,
+  Star,
+  Clock,
+  Users,
 } from "lucide-react";
 import FileCard from "./FileCard.jsx";
 import FileGridSkeleton from "./FileGridSkeleton.jsx";
@@ -23,6 +27,12 @@ const FileGrid = ({
   isLoading = false,
   onOpenPreview,
   onDeleteFile,
+  onToggleStar,
+  onMoveToTrash,
+  onRestoreFile,
+  onPermanentDelete,
+  onEmptyTrash,
+  trashCount = 0,
   onResetSearch,
 }) => {
   const filterOptions = [
@@ -63,6 +73,35 @@ const FileGrid = ({
               ))}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Trash Top Notice & Bulk Empty Trash Bar */}
+      {activeTab === "trash" && (
+        <div className="p-4 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/60 flex items-center justify-between gap-4 flex-wrap text-amber-900 dark:text-amber-200 shadow-xs">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2 rounded-xl bg-amber-100 dark:bg-amber-900/60 text-amber-600 dark:text-amber-400 shrink-0">
+              <Trash2 className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <h4 className="text-sm font-bold text-amber-950 dark:text-amber-100">
+                Trash Management
+              </h4>
+              <p className="text-xs text-amber-700 dark:text-amber-300/90 mt-0.5">
+                Items in trash are automatically purged after 30 days. Restored files return directly to My Files.
+              </p>
+            </div>
+          </div>
+          {files.length > 0 && (
+            <button
+              type="button"
+              onClick={onEmptyTrash}
+              className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold shadow-sm hover:shadow transition-all flex items-center gap-1.5 shrink-0 active:scale-95"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Empty Trash</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -110,23 +149,58 @@ const FileGrid = ({
       ) : files.length === 0 ? (
         <div className="py-20 text-center flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-8 bg-slate-50/50 dark:bg-slate-900/30">
           <div className="w-16 h-16 rounded-full bg-blue-50 dark:bg-blue-950/60 text-[#1a73e8] flex items-center justify-center mb-4">
-            <Inbox className="w-8 h-8 stroke-[1.5]" />
+            {activeTab === "starred" ? (
+              <Star className="w-8 h-8 stroke-[1.5] text-amber-500 fill-amber-400/20" />
+            ) : activeTab === "trash" ? (
+              <Trash2 className="w-8 h-8 stroke-[1.5] text-slate-400" />
+            ) : activeTab === "shared" ? (
+              <Users className="w-8 h-8 stroke-[1.5] text-indigo-500" />
+            ) : activeTab === "recent" ? (
+              <Clock className="w-8 h-8 stroke-[1.5] text-blue-500" />
+            ) : (
+              <Inbox className="w-8 h-8 stroke-[1.5]" />
+            )}
           </div>
-          <h3 className="text-lg font-bold text-slate-900 dark:text-white">No files found</h3>
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+            {searchQuery
+              ? "No matching files"
+              : activeTab === "starred"
+              ? "No starred files yet"
+              : activeTab === "trash"
+              ? "Trash is empty"
+              : activeTab === "shared"
+              ? "No files shared with you"
+              : activeTab === "recent"
+              ? "No recent files"
+              : "No files found"}
+          </h3>
           <p className="text-sm text-slate-500 max-w-sm mt-1">
             {searchQuery
               ? `No media matches your search term "${searchQuery}". Try searching for labels like "Urban", "Landscape", or file names.`
-              : "Your workspace is currently clean. Drag and drop files above or click New Upload to store files directly in Amazon S3 and trigger AI pipelines."}
+              : activeTab === "starred"
+              ? "Star files to easily bookmark them and find them here anytime."
+              : activeTab === "trash"
+              ? "Items moved to trash will be kept here until permanently deleted."
+              : activeTab === "shared"
+              ? "Files and media shared with your account will appear here."
+              : activeTab === "recent"
+              ? "Upload or interact with files to see them in your recent activity."
+              : "Your workspace is clean. Click '+ New Upload' in the sidebar to upload files directly to AWS S3 and trigger AI pipelines."}
           </p>
         </div>
       ) : viewMode === "grid" ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           {files.map((file) => (
             <FileCard
-              key={file.id}
+              key={file.id || file.file_id}
               file={file}
               onOpenPreview={onOpenPreview}
               onDeleteFile={onDeleteFile}
+              onToggleStar={onToggleStar}
+              onMoveToTrash={onMoveToTrash}
+              onRestoreFile={onRestoreFile}
+              onPermanentDelete={onPermanentDelete}
+              activeTab={activeTab}
               viewMode="grid"
             />
           ))}
@@ -145,10 +219,15 @@ const FileGrid = ({
           <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
             {files.map((file) => (
               <FileCard
-                key={file.id}
+                key={file.id || file.file_id}
                 file={file}
                 onOpenPreview={onOpenPreview}
                 onDeleteFile={onDeleteFile}
+                onToggleStar={onToggleStar}
+                onMoveToTrash={onMoveToTrash}
+                onRestoreFile={onRestoreFile}
+                onPermanentDelete={onPermanentDelete}
+                activeTab={activeTab}
                 viewMode="list"
               />
             ))}

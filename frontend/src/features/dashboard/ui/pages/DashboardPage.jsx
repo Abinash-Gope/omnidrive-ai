@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import useDashboard from "../../hooks/useDashboard.jsx";
 import DashboardHeader from "../components/DashboardHeader.jsx";
 import DashboardSidebar from "../components/DashboardSidebar.jsx";
-import FileUploadDropzone from "../components/FileUploadDropzone.jsx";
 import FileGrid from "../components/FileGrid.jsx";
 import PipelineDrawer from "../components/PipelineDrawer.jsx";
 import VideoPlayerModal from "../components/VideoPlayerModal.jsx";
@@ -19,6 +18,8 @@ const DashboardPage = () => {
   const {
     files,
     totalFilesCount,
+    tabCounts,
+    trashCount,
     quarantinedFiles,
     activeTab,
     filterType,
@@ -31,6 +32,11 @@ const DashboardPage = () => {
     previewModal,
     handleUploadFile,
     handleDeleteFile,
+    handleMoveToTrash,
+    handleRestoreFile,
+    handlePermanentDelete,
+    handleEmptyTrash,
+    handleToggleStar,
     handleUploadedFileSuccess,
     reloadFiles,
     handleSelectTab,
@@ -46,6 +52,39 @@ const DashboardPage = () => {
   const [isDirectUploadModalOpen, setIsDirectUploadModalOpen] = useState(false);
   const [fileToDelete, setFileToDelete] = useState(null);
   const [isDeletingFile, setIsDeletingFile] = useState(false);
+
+  // Dynamic header titles and subtitles per sidebar tab
+  const getHeaderInfo = () => {
+    switch (activeTab) {
+      case "recent":
+        return {
+          title: "Recent",
+          subtitle: "Files uploaded or accessed recently in your workspace",
+        };
+      case "starred":
+        return {
+          title: "Starred",
+          subtitle: "Priority files and bookmarks for immediate access",
+        };
+      case "shared":
+        return {
+          title: "Shared with me",
+          subtitle: "Collaborative documents and media shared with your account",
+        };
+      case "trash":
+        return {
+          title: "Trash",
+          subtitle: "Items in trash are automatically purged after 30 days",
+        };
+      default:
+        return {
+          title: "My Files",
+          subtitle: "Enterprise Cloud Storage with intelligent media processing & document AI pipelines",
+        };
+    }
+  };
+
+  const headerInfo = getHeaderInfo();
 
   return (
     <div className="min-h-screen bg-[#f8fafd] dark:bg-[#060b19] flex flex-col font-sans transition-colors">
@@ -69,36 +108,23 @@ const DashboardPage = () => {
           activeTab={activeTab}
           onSelectTab={handleSelectTab}
           onUploadFile={handleUploadFile}
+          onOpenUploadModal={() => setIsDirectUploadModalOpen(true)}
           totalFilesCount={totalFilesCount}
+          tabCounts={tabCounts}
           storage={storage}
         />
 
-        {/* Center/Right Content Area */}
+        {/* Center/Right Content Area - Ultra Clean Layout */}
         <main className="flex-1 overflow-y-auto p-6 lg:p-8 space-y-6">
           {/* Welcome / Active Folder Header */}
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight capitalize">
-                {activeTab.replace("-", " ")}
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+                {headerInfo.title}
               </h1>
               <p className="text-xs text-slate-500 mt-0.5">
-                Enterprise Cloud Storage with intelligent media processing & document AI pipelines
+                {headerInfo.subtitle}
               </p>
-            </div>
-          </div>
-
-          {/* Drag & Drop Upload Zone with Direct Modal Trigger */}
-          <div className="relative">
-            <FileUploadDropzone onUploadFile={handleUploadFile} />
-            <div className="mt-2 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setIsDirectUploadModalOpen(true)}
-                className="text-xs text-[#1a73e8] hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium inline-flex items-center gap-1 transition-colors"
-              >
-                <span>Need real-time S3 progress tracking? Open Upload Modal</span>
-                <span>&rarr;</span>
-              </button>
             </div>
           </div>
 
@@ -113,7 +139,19 @@ const DashboardPage = () => {
             viewMode={viewMode}
             isLoading={isLoading}
             onOpenPreview={handleOpenPreview}
-            onDeleteFile={(file) => setFileToDelete(file)}
+            onDeleteFile={(file) => {
+              if (activeTab === "trash" || file.inTrash) {
+                setFileToDelete(file);
+              } else {
+                handleMoveToTrash(file);
+              }
+            }}
+            onToggleStar={handleToggleStar}
+            onMoveToTrash={handleMoveToTrash}
+            onRestoreFile={handleRestoreFile}
+            onPermanentDelete={(file) => setFileToDelete(file)}
+            onEmptyTrash={handleEmptyTrash}
+            trashCount={trashCount}
             onResetSearch={() => handleSearch("")}
           />
         </main>
