@@ -1,4 +1,5 @@
 import { createSlice } from "@reduxjs/toolkit";
+import { calculateStorageFromFiles } from "../utils/storageHelper.jsx";
 
 const initialState = {
   files: [],
@@ -11,9 +12,26 @@ const initialState = {
   isLoading: true,
   error: null,
   storage: {
+    usedBytes: 0,
     usedGB: 0,
     totalGB: 15.0,
     usedPercentage: 0,
+    visualPercentage: 0,
+    formattedUsed: "0 KB",
+    formattedTotal: "15 GB",
+    formattedPercent: "0%",
+    freeBytesRemaining: 15 * 1024 * 1024 * 1024,
+    formattedFree: "15 GB",
+    breakdown: {
+      imagesBytes: 0,
+      formattedImages: "0 KB",
+      videosBytes: 0,
+      formattedVideos: "0 KB",
+      documentsBytes: 0,
+      formattedDocuments: "0 KB",
+      otherBytes: 0,
+      formattedOther: "0 KB",
+    },
   },
   uploadPipeline: {
     isOpen: false,
@@ -45,6 +63,19 @@ export const dashboardSlice = createSlice({
       state.quarantinedFiles = all.filter((f) => f.status === "REJECTED_SAFETY_VIOLATION");
       state.isLoading = false;
       state.error = null;
+
+      // Recalculate byte-accurate storage used based on real files in state
+      state.storage = calculateStorageFromFiles(state.files, state.storage?.totalGB || 15.0);
+
+      // Automatically sync any currently open preview modal with newly fetched labels/data
+      if (state.previewModal.isOpen && state.previewModal.file) {
+        const matching = state.files.find(
+          (f) => f.id === state.previewModal.file.id || f.name === state.previewModal.file.name
+        );
+        if (matching) {
+          state.previewModal.file = matching;
+        }
+      }
     },
     setLoading: (state, action) => {
       state.isLoading = action.payload;
@@ -93,18 +124,37 @@ export const dashboardSlice = createSlice({
       state.uploadPipeline.stepStatus[2] = "failed";
       state.uploadPipeline.stepStatus[3] = "skipped";
       state.uploadPipeline.stepStatus[4] = "skipped";
-      state.uploadPipeline.errorMessage = action.payload;
+      state.uploadPipeline.errorMessage = typeof action.payload === "string" ? action.payload : action.payload?.message;
+      state.uploadPipeline.errorTitle = "Flagged by Amazon Rekognition";
+    },
+    setPipelineError: (state, action) => {
+      const payload = action.payload || {};
+      const failedStep = payload.step || 1;
+      state.uploadPipeline.isViolation = true;
+      state.uploadPipeline.stepStatus[failedStep] = "failed";
+      // Mark remaining steps as skipped
+      for (let i = failedStep + 1; i <= 4; i++) {
+        state.uploadPipeline.stepStatus[i] = "skipped";
+      }
+      state.uploadPipeline.errorMessage = payload.message || "Operation failed.";
+      state.uploadPipeline.errorTitle = payload.title || "Pipeline Execution Error";
     },
     closeUploadPipeline: (state) => {
       state.uploadPipeline.isOpen = false;
     },
     addFile: (state, action) => {
       state.files.unshift(action.payload);
-      state.storage.usedGB = +(state.storage.usedGB + 0.1).toFixed(2);
-      state.storage.usedPercentage = Math.min(
-        100,
-        Math.round((state.storage.usedGB / state.storage.totalGB) * 100)
-      );
+      state.storage = calculateStorageFromFiles(state.files, state.storage?.totalGB || 15.0);
+    },
+    removeFile: (state, action) => {
+      const fileId = action.payload;
+      state.files = state.files.filter((f) => f.id !== fileId);
+      state.quarantinedFiles = state.quarantinedFiles.filter((f) => f.id !== fileId);
+      state.storage = calculateStorageFromFiles(state.files, state.storage?.totalGB || 15.0);
+    },
+    setStorageQuota: (state, action) => {
+      const totalGB = Number(action.payload) || 15.0;
+      state.storage = calculateStorageFromFiles(state.files, totalGB);
     },
     addQuarantinedFile: (state, action) => {
       state.quarantinedFiles.unshift(action.payload);
@@ -132,6 +182,16 @@ export const dashboardSlice = createSlice({
         state.previewModal.file.activeQuality = quality;
       }
     },
+    updateFileStatus: (state, action) => {
+      const { fileId, ...updates } = action.payload;
+      const file = state.files.find((f) => f.id === fileId);
+      if (file) {
+        Object.assign(file, updates);
+      }
+      if (state.previewModal.file && state.previewModal.file.id === fileId) {
+        state.previewModal.file = { ...state.previewModal.file, ...updates };
+      }
+    },
   },
 });
 
@@ -146,12 +206,16 @@ export const {
   openUploadPipeline,
   updatePipelineStep,
   setPipelineViolation,
+  setPipelineError,
   closeUploadPipeline,
   addFile,
+  removeFile,
+  setStorageQuota,
   addQuarantinedFile,
   openPreviewModal,
   closePreviewModal,
   updateVideoQuality,
+  updateFileStatus,
 } = dashboardSlice.actions;
 
 export default dashboardSlice.reducer;

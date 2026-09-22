@@ -2,8 +2,8 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { getGoogleOAuthUrl } from "../config/cognitoConfig.jsx";
-import { parseJwt, isTokenExpired, formatUserFromClaims } from "../utils/jwtHelper.jsx";
-import { loginApi, registerApi, logoutApi, getActiveSessionApi } from "../api/authApi.jsx";
+import { parseJwt, isTokenExpired, formatUserFromClaims, isSessionWithinSevenDays } from "../utils/jwtHelper.jsx";
+import { loginApi, registerApi, logoutApi, getActiveSessionApi, getOrRenewIdToken } from "../api/authApi.jsx";
 import { loginSuccess, logout as reduxLogout, setLoading as setReduxLoading, loginFailure } from "../state/authSlice.jsx";
 import { setToast } from "../../../shared/state/uiSlice.jsx";
 
@@ -21,21 +21,21 @@ export const AuthProvider = ({ children }) => {
 
   /**
    * Helper function to retrieve the active JWT token string
-   * Verifies that the token is present and not expired
+   * Always auto-renews via Cognito refresh token if expiring within 7-day window
    */
   const getIdToken = useCallback(() => {
     if (idToken && !isTokenExpired(idToken)) {
       return idToken;
     }
     const stored = localStorage.getItem("idToken") || localStorage.getItem("authToken");
-    if (stored && !isTokenExpired(stored)) {
+    if (stored && (!isTokenExpired(stored) || isSessionWithinSevenDays())) {
       return stored;
     }
     return null;
   }, [idToken]);
 
   /**
-   * Complete login session helper
+   * Complete login session helper with 7-day persistence
    */
   const establishSession = useCallback((token, userData) => {
     setIdToken(token);
@@ -43,14 +43,16 @@ export const AuthProvider = ({ children }) => {
     setIsAuthenticated(true);
     setError(null);
 
-    // Save tokens in persistent storage
+    // Save tokens and session timestamp in persistent storage (7-day window)
     localStorage.setItem("idToken", token);
     localStorage.setItem("authToken", token);
+    localStorage.setItem("last_login_timestamp", Date.now().toString());
     localStorage.setItem("userPlan", userData.plan || "free");
 
     // Sync with Redux auth slice
     dispatch(loginSuccess({ token, user: userData }));
   }, [dispatch]);
+
 
   /**
    * 1. Google OAuth Initiation
@@ -100,6 +102,7 @@ export const AuthProvider = ({ children }) => {
       setError(null);
       localStorage.removeItem("idToken");
       localStorage.removeItem("authToken");
+      localStorage.removeItem("last_login_timestamp");
       dispatch(reduxLogout());
       navigate("/");
     }

@@ -23,7 +23,30 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 dynamodb = boto3.resource("dynamodb")
+s3_client = boto3.client("s3")
 DYNAMODB_TABLE_NAME = os.environ.get("DYNAMODB_TABLE_NAME", "omnidrive-ai-registry-dev")
+RAW_BUCKET_NAME = os.environ.get("RAW_BUCKET_NAME", "omnidrive-ai-raw-dev-01ed8837")
+
+
+def enrich_file_urls(item):
+    """Generates an authenticated S3 presigned GET URL for secure client viewing."""
+    if not item:
+        return item
+    s3_key = item.get("s3_key") or item.get("s3_raw_key")
+    bucket = item.get("s3_bucket") or RAW_BUCKET_NAME
+    if s3_key and bucket:
+        try:
+            view_url = s3_client.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": bucket, "Key": s3_key},
+                ExpiresIn=3600,
+            )
+            item["download_url"] = view_url
+            if not item.get("thumbnail_url"):
+                item["thumbnail_url"] = view_url
+        except Exception as e:
+            logger.warning("Failed to generate presigned GET URL for key %s: %s", s3_key, str(e))
+    return item
 
 
 class DecimalEncoder(json.JSONEncoder):
@@ -52,8 +75,10 @@ def lambda_handler(event, context):
         path_parameters = event.get("pathParameters") or {}
         file_id = path_parameters.get("fileId")
 
-        # Route 1: GET /files/{fileId}
+        # Route 1: /files/{fileId}
         if file_id:
+            if http_method == "DELETE":
+                return handle_delete_file(user_id, file_id, event)
             return handle_get_file_detail(user_id, file_id)
 
         # Route 2: GET /files
@@ -99,12 +124,42 @@ def handle_list_user_files(user_id, status_filter=None):
     # Sort descending by created_at (most recent first)
     items.sort(key=lambda x: x.get("created_at", ""), reverse=True)
 
+    # Calculate exact byte-level storage metrics across user's files
+    total_bytes = sum(int(item.get("file_size") or 0) for item in items)
+    free_tier_limit_bytes = 15 * 1024 * 1024 * 1024  # 15 GB = 16,106,127,360 bytes
+    used_percentage = min(100.0, round((total_bytes / free_tier_limit_bytes) * 100, 3)) if free_tier_limit_bytes > 0 else 0.0
+
+    image_bytes = sum(int(item.get("file_size") or 0) for item in items if (item.get("content_type") or "").startswith("image/"))
+    video_bytes = sum(int(item.get("file_size") or 0) for item in items if (item.get("content_type") or "").startswith("video/"))
+    pdf_bytes = sum(int(item.get("file_size") or 0) for item in items if "pdf" in (item.get("content_type") or "").lower())
+    other_bytes = max(0, total_bytes - (image_bytes + video_bytes + pdf_bytes))
+
+    storage_info = {
+        "used_bytes": total_bytes,
+        "limit_bytes": free_tier_limit_bytes,
+        "used_gb": round(total_bytes / (1024 ** 3), 4),
+        "total_gb": 15.0,
+        "used_percentage": used_percentage,
+        "tier": "free",
+        "breakdown": {
+            "images_bytes": image_bytes,
+            "videos_bytes": video_bytes,
+            "documents_bytes": pdf_bytes,
+            "other_bytes": other_bytes,
+        },
+    }
+
+    # Enrich items with secure presigned GET URLs for direct high-res viewing in browser
+    for item in items:
+        enrich_file_urls(item)
+
     return build_response(
         200,
         {
             "user_id": user_id,
             "count": len(items),
             "files": items,
+            "storage": storage_info,
         },
     )
 
@@ -116,7 +171,8 @@ def handle_get_file_detail(user_id, file_id):
     """
     table = dynamodb.Table(DYNAMODB_TABLE_NAME)
     user_pk = f"USER#{user_id}"
-    file_sk = f"FILE#{file_id}"
+    clean_file_id = file_id.replace("FILE#", "").strip()
+    file_sk = f"FILE#{clean_file_id}"
 
     logger.info("Fetching file detail: %s for user: %s", file_sk, user_pk)
     response = table.get_item(
@@ -128,9 +184,59 @@ def handle_get_file_detail(user_id, file_id):
 
     item = response.get("Item")
     if not item:
-        return build_response(404, {"error": f"File with ID '{file_id}' not found."})
+        return build_response(404, {"error": f"File with ID '{clean_file_id}' not found."})
 
+    enrich_file_urls(item)
     return build_response(200, {"file": item})
+
+
+def handle_delete_file(user_id, file_id, event):
+    """
+    Deletes a file record from DynamoDB single-table (PK: USER#<id>, SK: FILE#<file_id>)
+    and cleans up corresponding raw S3 object if present.
+    """
+    table = dynamodb.Table(DYNAMODB_TABLE_NAME)
+    user_pk = f"USER#{user_id}"
+    clean_file_id = file_id.replace("FILE#", "").strip()
+    file_sk = f"FILE#{clean_file_id}"
+
+    logger.info("Attempting to delete file: %s for user: %s", file_sk, user_pk)
+
+    # 1. Fetch file record first to get S3 key
+    get_res = table.get_item(Key={"PK": user_pk, "SK": file_sk})
+    item = get_res.get("Item")
+
+    # 2. Delete item from DynamoDB
+    table.delete_item(Key={"PK": user_pk, "SK": file_sk})
+    logger.info("Successfully deleted DynamoDB record: PK=%s, SK=%s", user_pk, file_sk)
+
+    # 3. Clean up S3 object if s3_bucket and s3_key exist
+    body = {}
+    raw_body = event.get("body")
+    if raw_body:
+        try:
+            body = json.loads(raw_body) if isinstance(raw_body, str) else raw_body
+        except Exception:
+            body = {}
+
+    s3_key = (item.get("s3_key") or item.get("s3_raw_key") if item else None) or body.get("s3_key")
+    s3_bucket = (item.get("s3_bucket") if item else None) or body.get("s3_bucket") or os.environ.get("RAW_BUCKET_NAME", "omnidrive-ai-raw-dev-01ed8837")
+
+    if s3_key and s3_bucket:
+        try:
+            s3_client = boto3.client("s3")
+            s3_client.delete_object(Bucket=s3_bucket, Key=s3_key)
+            logger.info("Deleted S3 object s3://%s/%s", s3_bucket, s3_key)
+        except Exception as s3_err:
+            logger.warning("Could not delete S3 object: %s", str(s3_err))
+
+    return build_response(
+        200,
+        {
+            "message": f"File '{clean_file_id}' successfully deleted from DynamoDB.",
+            "file_id": clean_file_id,
+        },
+    )
 
 
 def extract_user_id(event):
@@ -167,8 +273,8 @@ def build_response(status_code, body):
         "headers": {
             "Content-Type": "application/json",
             "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Content-Type,Authorization,X-User-Id",
-            "Access-Control-Allow-Methods": "OPTIONS,GET",
+            "Access-Control-Allow-Headers": "Content-Type,Authorization,X-User-Id,X-Amz-Date,X-Api-Key,X-Amz-Security-Token",
+            "Access-Control-Allow-Methods": "OPTIONS,GET,POST,DELETE",
         },
         "body": json.dumps(body, cls=DecimalEncoder),
     }

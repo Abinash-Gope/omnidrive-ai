@@ -272,18 +272,30 @@ const RegisterModal = () => {
         </div>
 
         {/* Terms Checkbox */}
-        <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-600 dark:text-slate-300 pt-0.5 select-none">
-          <input
-            type="checkbox"
-            {...register("termsAccepted", { required: true })}
-            className="w-3.5 h-3.5 rounded text-[#1a73e8] focus:ring-[#1a73e8] border-slate-300 dark:border-slate-600 dark:bg-slate-800 shrink-0 cursor-pointer"
-          />
-          <span className="leading-tight">
-            I agree to the{" "}
-            <span className="text-[#1a73e8] hover:underline font-medium">Terms of Service</span> &amp;{" "}
-            <span className="text-[#1a73e8] hover:underline font-medium">Privacy Policy</span>
-          </span>
-        </label>
+        <div>
+          <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-600 dark:text-slate-300 pt-0.5 select-none">
+            <input
+              type="checkbox"
+              {...register("termsAccepted", {
+                required: "You must agree to the Terms of Service & Privacy Policy to proceed",
+              })}
+              className={`w-3.5 h-3.5 rounded text-[#1a73e8] focus:ring-[#1a73e8] dark:bg-slate-800 shrink-0 cursor-pointer ${
+                errors.termsAccepted ? "border-red-500 focus:ring-red-500 ring-1 ring-red-400" : "border-slate-300 dark:border-slate-600"
+              }`}
+            />
+            <span className="leading-tight">
+              I agree to the{" "}
+              <span className="text-[#1a73e8] hover:underline font-medium">Terms of Service</span> &amp;{" "}
+              <span className="text-[#1a73e8] hover:underline font-medium">Privacy Policy</span>
+            </span>
+          </label>
+          {errors.termsAccepted && (
+            <p className="text-red-500 text-[11px] mt-1 font-medium flex items-center gap-1 animate-fade-in">
+              <AlertCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />
+              <span>{errors.termsAccepted.message}</span>
+            </p>
+          )}
+        </div>
 
         {/* Submit */}
         <button

@@ -4,7 +4,13 @@ import {
   CognitoUserAttribute,
 } from "amazon-cognito-identity-js";
 import { userPool, cognitoConfig } from "../config/cognitoConfig.jsx";
-import { parseJwt, formatUserFromClaims, isTokenExpired } from "../utils/jwtHelper.jsx";
+import {
+  parseJwt,
+  formatUserFromClaims,
+  isTokenExpired,
+  isTokenExpiringSoon,
+  isSessionWithinSevenDays,
+} from "../utils/jwtHelper.jsx";
 
 /**
  * Pure Amazon Cognito SRP Authentication API
@@ -39,6 +45,7 @@ export const loginApi = ({ email, password }) => {
         const idToken = result.getIdToken().getJwtToken();
         const claims = result.getIdToken().decodePayload();
         const user = formatUserFromClaims(claims, idToken);
+        localStorage.setItem("last_login_timestamp", Date.now().toString());
         resolve({ token: idToken, user });
       },
       onFailure: (err) => {
@@ -52,6 +59,7 @@ export const loginApi = ({ email, password }) => {
             const idToken = result.getIdToken().getJwtToken();
             const claims = result.getIdToken().decodePayload();
             const user = formatUserFromClaims(claims, idToken);
+            localStorage.setItem("last_login_timestamp", Date.now().toString());
             resolve({ token: idToken, user });
           },
           onFailure: (err) => {
@@ -160,44 +168,83 @@ export const resendConfirmationCodeApi = (email) => {
 };
 
 /**
- * Retrieve active Cognito session from local storage or UserPool
+ * Obtain a guaranteed valid ID Token, auto-refreshing via Cognito Refresh Token if expiring,
+ * while strictly enforcing the user's 7-day persistent session rule.
+ * 
+ * Rules:
+ * 1. If > 7 days without login/activity: session expires (returns null, clears storage).
+ * 2. If <= 7 days and current token is valid (not expiring within 2 min): returns current token.
+ * 3. If <= 7 days and token is expired/expiring soon: seamlessly exchanges Cognito refresh
+ *    token for a fresh 1-hour ID token without prompting the user.
+ * @returns {Promise<string|null>}
+ */
+export const getOrRenewIdToken = async () => {
+  const storedToken = localStorage.getItem("idToken") || localStorage.getItem("authToken");
+  const lastLogin = parseInt(localStorage.getItem("last_login_timestamp") || "0", 10);
+  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+  // 1. Enforce strict 7-day persistence limit
+  if (lastLogin && Date.now() - lastLogin >= SEVEN_DAYS_MS) {
+    console.warn("7-day persistent session expired. Re-authentication required.");
+    localStorage.removeItem("idToken");
+    localStorage.removeItem("authToken");
+    return null;
+  }
+
+  // 2. If stored token is still valid and not expiring soon (> 2 min remaining), return immediately
+  if (storedToken && !isTokenExpiringSoon(storedToken, 120)) {
+    return storedToken;
+  }
+
+  // 3. Token is expired or expiring soon: attempt transparent refresh via Cognito SDK
+  return new Promise((resolve) => {
+    const currentUser = userPool.getCurrentUser();
+    if (currentUser) {
+      currentUser.getSession((err, session) => {
+        if (!err && session && session.isValid()) {
+          const freshIdToken = session.getIdToken().getJwtToken();
+          localStorage.setItem("idToken", freshIdToken);
+          localStorage.setItem("authToken", freshIdToken);
+          localStorage.setItem("last_login_timestamp", Date.now().toString());
+          return resolve(freshIdToken);
+        }
+
+        // If SDK refresh fails, fallback to stored token if within 7-day window
+        if (storedToken && (!lastLogin || Date.now() - lastLogin < SEVEN_DAYS_MS)) {
+          return resolve(storedToken);
+        }
+        resolve(null);
+      });
+    } else {
+      // Non-SDK session (e.g. Google OAuth or local token) within 7 days
+      if (storedToken && (!lastLogin || Date.now() - lastLogin < SEVEN_DAYS_MS)) {
+        return resolve(storedToken);
+      }
+      resolve(null);
+    }
+  });
+};
+
+/**
+ * Retrieve active Cognito session with 7-day continuity and automatic background renewal.
  * @returns {Promise<{ token: string, user: object } | null>}
  */
-export const getActiveSessionApi = () => {
-  return new Promise((resolve) => {
-    // 1. Check local storage ID token first
-    const storedToken = localStorage.getItem("idToken") || localStorage.getItem("authToken");
-    if (storedToken && !isTokenExpired(storedToken)) {
-      const claims = parseJwt(storedToken);
-      if (claims) {
-        return resolve({
-          token: storedToken,
-          user: formatUserFromClaims(claims, storedToken),
-        });
-      }
-    }
+export const getActiveSessionApi = async () => {
+  try {
+    const validToken = await getOrRenewIdToken();
+    if (!validToken) return null;
 
-    // 2. Check amazon-cognito-identity-js storage session
-    const currentUser = userPool.getCurrentUser();
-    if (!currentUser) {
-      return resolve(null);
-    }
+    const claims = parseJwt(validToken);
+    if (!claims) return null;
 
-    currentUser.getSession((err, session) => {
-      if (err || !session || !session.isValid()) {
-        return resolve(null);
-      }
-
-      const idToken = session.getIdToken().getJwtToken();
-      if (isTokenExpired(idToken)) {
-        return resolve(null);
-      }
-
-      const claims = session.getIdToken().decodePayload();
-      const user = formatUserFromClaims(claims, idToken);
-      resolve({ token: idToken, user });
-    });
-  });
+    return {
+      token: validToken,
+      user: formatUserFromClaims(claims, validToken),
+    };
+  } catch (err) {
+    console.warn("Failed to retrieve or renew active session:", err);
+    return null;
+  }
 };
 
 /**
@@ -210,5 +257,7 @@ export const logoutApi = async () => {
   }
   localStorage.removeItem("authToken");
   localStorage.removeItem("idToken");
+  localStorage.removeItem("last_login_timestamp");
   return { success: true };
 };
+

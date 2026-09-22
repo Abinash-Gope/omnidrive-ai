@@ -66,6 +66,7 @@ const ProfilePage = () => {
 
   // Compute real dynamic storage usage from user uploaded files
   const getFileBytes = (file) => {
+    if (typeof file.sizeBytes === "number" && file.sizeBytes > 0) return file.sizeBytes;
     if (typeof file.fileSize === "number" && file.fileSize > 0) return file.fileSize;
     if (typeof file.rawSizeBytes === "number" && file.rawSizeBytes > 0) return file.rawSizeBytes;
     if (typeof file.size === "string") {

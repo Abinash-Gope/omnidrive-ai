@@ -22,6 +22,7 @@ const FileGrid = ({
   viewMode = "grid",
   isLoading = false,
   onOpenPreview,
+  onDeleteFile,
   onResetSearch,
 }) => {
   const filterOptions = [
@@ -125,6 +126,7 @@ const FileGrid = ({
               key={file.id}
               file={file}
               onOpenPreview={onOpenPreview}
+              onDeleteFile={onDeleteFile}
               viewMode="grid"
             />
           ))}
@@ -146,6 +148,7 @@ const FileGrid = ({
                 key={file.id}
                 file={file}
                 onOpenPreview={onOpenPreview}
+                onDeleteFile={onDeleteFile}
                 viewMode="list"
               />
             ))}

@@ -46,6 +46,33 @@ export const isTokenExpired = (token) => {
 };
 
 /**
+ * Check whether a JWT token is expired or expiring very soon (within bufferSeconds)
+ * @param {string} token - The raw JWT token string
+ * @param {number} bufferSeconds - Buffer time in seconds (default: 120s / 2 min)
+ * @returns {boolean} True if token should be refreshed
+ */
+export const isTokenExpiringSoon = (token, bufferSeconds = 120) => {
+  const payload = parseJwt(token);
+  if (!payload || !payload.exp) return true;
+
+  const currentTime = Math.floor(Date.now() / 1000);
+  return payload.exp - currentTime <= bufferSeconds;
+};
+
+/**
+ * Check if the active session is within the user's 7-day persistence window
+ * @param {number|string} [timestamp] - Optional timestamp from localStorage
+ * @returns {boolean} True if user logged in or had active session within 7 days
+ */
+export const isSessionWithinSevenDays = (timestamp) => {
+  const ts = parseInt(timestamp || localStorage.getItem("last_login_timestamp") || "0", 10);
+  if (!ts) return false;
+  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+  return Date.now() - ts < SEVEN_DAYS_MS;
+};
+
+
+/**
  * Extract clean user details from decoded Cognito claims
  * @param {object} claims - Decoded JWT payload
  * @param {string} rawToken - Original JWT token

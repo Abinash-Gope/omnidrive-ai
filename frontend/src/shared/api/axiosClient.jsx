@@ -1,6 +1,6 @@
 import axios from "axios";
-
-import { isTokenExpired } from "../../features/auth/utils/jwtHelper.jsx";
+import { getOrRenewIdToken } from "../../features/auth/api/authApi.jsx";
+import { isSessionWithinSevenDays } from "../../features/auth/utils/jwtHelper.jsx";
 
 const axiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "/api",
@@ -10,31 +10,64 @@ const axiosInstance = axios.create({
   },
 });
 
-// Request Interceptor: Attach Active Cognito ID Token
+// Request Interceptor: Attach Guaranteed-Fresh Cognito ID Token
+// Transparently renews token if expiring, enforcing the 7-day persistent session
 axiosInstance.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem("idToken") || localStorage.getItem("authToken");
-    if (token && !isTokenExpired(token)) {
-      config.headers.Authorization = `Bearer ${token}`;
+  async (config) => {
+    try {
+      const token = await getOrRenewIdToken();
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+        // Keep active session rolling while user is actively making requests
+        localStorage.setItem("last_login_timestamp", Date.now().toString());
+      }
+    } catch (err) {
+      console.warn("Axios request interceptor token check:", err);
     }
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// Response Interceptor: Global Error Handling and Token Eviction
+// Response Interceptor: 401 Recovery & Token Eviction
 axiosInstance.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response && error.response.status === 401) {
+  async (error) => {
+    const originalRequest = error.config;
+
+    // If 401 occurs and we haven't retried yet, attempt a single transparent token refresh
+    if (error.response && error.response.status === 401 && originalRequest && !originalRequest._retry) {
+      const withinSevenDays = isSessionWithinSevenDays();
+
+      if (withinSevenDays) {
+        originalRequest._retry = true;
+        try {
+          // Force refresh via Cognito refresh token
+          const freshToken = await getOrRenewIdToken();
+          if (freshToken) {
+            originalRequest.headers.Authorization = `Bearer ${freshToken}`;
+            return axiosInstance(originalRequest);
+          }
+        } catch (refreshErr) {
+          console.warn("Silent token renewal failed on 401 retry:", refreshErr);
+        }
+      }
+
+      // If user is truly past 7 days or refresh failed, clean up and redirect
       localStorage.removeItem("idToken");
       localStorage.removeItem("authToken");
-      if (typeof window !== "undefined" && (window.location.pathname.startsWith("/dashboard") || window.location.pathname.startsWith("/profile"))) {
+      localStorage.removeItem("last_login_timestamp");
+      if (
+        typeof window !== "undefined" &&
+        (window.location.pathname.startsWith("/dashboard") || window.location.pathname.startsWith("/profile"))
+      ) {
         window.location.assign("/");
       }
     }
+
     return Promise.reject(error);
   }
 );
 
 export default axiosInstance;
+

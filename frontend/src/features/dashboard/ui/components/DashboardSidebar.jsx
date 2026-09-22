@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import {
   Plus,
@@ -9,10 +9,19 @@ import {
   Trash2,
   Cloud,
   ArrowRight,
-  Lock,
   ShieldCheck,
+  ChevronDown,
+  ChevronUp,
+  Image as ImageIcon,
+  Video as VideoIcon,
+  FileText,
+  HardDrive,
 } from "lucide-react";
 import useAuth from "../../../auth/hooks/useAuth.jsx";
+import {
+  formatStorageBytes,
+  formatStoragePercent,
+} from "../../utils/storageHelper.jsx";
 
 const DashboardSidebar = ({
   activeTab,
@@ -22,6 +31,7 @@ const DashboardSidebar = ({
   storage: propStorage,
 }) => {
   const fileInputRef = useRef(null);
+  const [showBreakdown, setShowBreakdown] = useState(false);
   const { plan, planDetails, handleOpenEnterpriseContact } = useAuth();
 
   let extraStorageGB = 0;
@@ -35,15 +45,44 @@ const DashboardSidebar = ({
     } catch {}
   }
 
-  const rawTotalGB = (planDetails?.storageTotalGB ?? propStorage?.totalGB ?? 15.0) + extraStorageGB;
-  const rawUsedGB = planDetails?.storageUsedGB ?? propStorage?.usedGB ?? 0;
-  const rawUsedPercentage = rawTotalGB > 0 ? Math.min(100, Math.round((rawUsedGB / rawTotalGB) * 100)) : 0;
+  // Quota totals: default Free Tier is 15.0 GB
+  const totalGB = (planDetails?.storageTotalGB || propStorage?.totalGB || 15.0) + extraStorageGB;
+  const isUnlimited = planDetails?.isUnlimitedStorage ?? false;
+  const totalLimitBytes = totalGB * 1024 * 1024 * 1024;
 
-  const effectiveStorage = {
-    usedGB: rawUsedGB,
-    totalGB: rawTotalGB,
-    usedPercentage: rawUsedPercentage,
-    isUnlimited: planDetails?.isUnlimitedStorage ?? false,
+  // Byte-accurate used storage prioritizing actual file calculations from Redux/DynamoDB
+  const usedBytes =
+    typeof propStorage?.usedBytes === "number"
+      ? propStorage.usedBytes
+      : propStorage?.usedGB
+      ? Math.round(propStorage.usedGB * 1024 * 1024 * 1024)
+      : 0;
+
+  const usedGB = propStorage?.usedGB ?? +(usedBytes / (1024 * 1024 * 1024)).toFixed(3);
+  const rawRatio = totalLimitBytes > 0 ? (usedBytes / totalLimitBytes) * 100 : 0;
+  const usedPercentage = Math.min(100, Math.round(rawRatio));
+  const formattedPercent = propStorage?.formattedPercent || formatStoragePercent(usedBytes, totalLimitBytes);
+  const formattedUsed = propStorage?.formattedUsed || formatStorageBytes(usedBytes);
+  const formattedTotal = isUnlimited
+    ? "Unlimited VPC"
+    : totalGB >= 1024
+    ? `${(totalGB / 1024).toFixed(0)} TB`
+    : `${totalGB} GB`;
+
+  // Provide a minimum visual sliver (1.5%) so user sees that storage contains data
+  const visualPercentage =
+    propStorage?.visualPercentage ??
+    (usedBytes > 0 ? Math.max(1.5, Math.min(100, rawRatio)) : 0);
+
+  const breakdown = propStorage?.breakdown || {
+    imagesBytes: 0,
+    formattedImages: "0 KB",
+    videosBytes: 0,
+    formattedVideos: "0 KB",
+    documentsBytes: 0,
+    formattedDocuments: "0 KB",
+    otherBytes: 0,
+    formattedOther: "0 KB",
   };
 
   const handleFileChange = (e) => {
@@ -61,6 +100,16 @@ const DashboardSidebar = ({
     { id: "shared", label: "Shared with me", icon: Users },
     { id: "trash", label: "Trash", icon: Trash2 },
   ];
+
+  // Dynamic progress bar color matching quota threshold
+  const progressBarColor =
+    plan === "enterprise"
+      ? "bg-purple-600"
+      : usedPercentage > 90
+      ? "bg-rose-500"
+      : usedPercentage > 75
+      ? "bg-amber-500"
+      : "bg-[#1a73e8]";
 
   return (
     <aside className="w-64 shrink-0 bg-[#faf8ff] dark:bg-[#0b1329] border-r border-slate-200 dark:border-slate-800 p-4 flex flex-col justify-between h-[calc(100vh-4rem)] overflow-hidden select-none sticky top-16">
@@ -126,34 +175,96 @@ const DashboardSidebar = ({
                 : "Cloud Storage"}
             </span>
           </div>
-          <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-            {effectiveStorage.usedPercentage}% {effectiveStorage.isUnlimited ? "alloc" : "used"}
+          <span
+            className={`text-[11px] font-semibold ${
+              usedPercentage > 90
+                ? "text-rose-600 dark:text-rose-400"
+                : usedPercentage > 75
+                ? "text-amber-600 dark:text-amber-400"
+                : "text-emerald-600 dark:text-emerald-400"
+            }`}
+          >
+            {formattedPercent} {isUnlimited ? "alloc" : "used"}
           </span>
         </div>
 
         <div>
           <div className="flex justify-between items-baseline mb-1.5">
             <span className="text-base font-bold text-slate-900 dark:text-white">
-              {effectiveStorage.usedGB >= 1024
-                ? `${(effectiveStorage.usedGB / 1024).toFixed(1)} TB`
-                : `${effectiveStorage.usedGB} GB`}
+              {formattedUsed}
             </span>
             <span className="text-xs text-slate-500">
-              {effectiveStorage.isUnlimited
-                ? "of Unlimited VPC"
-                : effectiveStorage.totalGB >= 1024
-                ? `of ${(effectiveStorage.totalGB / 1024).toFixed(0)} TB`
-                : `of ${effectiveStorage.totalGB} GB`}
+              {isUnlimited ? "of Unlimited VPC" : `of ${formattedTotal}`}
             </span>
           </div>
+
+          {/* Real-time Visual Progress Bar */}
           <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden flex">
             <div
-              className={`h-full rounded-full transition-all duration-300 ${
-                plan === "enterprise" ? "bg-purple-600" : "bg-[#1a73e8]"
-              }`}
-              style={{ width: `${effectiveStorage.usedPercentage}%` }}
+              className={`h-full rounded-full transition-all duration-500 ease-out ${progressBarColor}`}
+              style={{ width: `${visualPercentage}%` }}
             />
           </div>
+        </div>
+
+        {/* Collapsible Storage Breakdown Toggle */}
+        <div className="pt-0.5">
+          <button
+            type="button"
+            onClick={() => setShowBreakdown(!showBreakdown)}
+            className="w-full text-[11px] font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 flex items-center justify-between py-1 transition-colors"
+          >
+            <span className="flex items-center gap-1">
+              <HardDrive className="w-3 h-3" />
+              <span>Storage Details</span>
+            </span>
+            {showBreakdown ? (
+              <ChevronUp className="w-3.5 h-3.5" />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5" />
+            )}
+          </button>
+
+          {showBreakdown && (
+            <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-700/60 space-y-1.5 text-xs animate-in fade-in duration-200">
+              <div className="flex items-center justify-between text-slate-600 dark:text-slate-300">
+                <span className="flex items-center gap-1.5 text-[11px]">
+                  <ImageIcon className="w-3 h-3 text-blue-500" />
+                  <span>Images</span>
+                </span>
+                <span className="font-mono text-[11px] font-medium">
+                  {breakdown.formattedImages}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between text-slate-600 dark:text-slate-300">
+                <span className="flex items-center gap-1.5 text-[11px]">
+                  <VideoIcon className="w-3 h-3 text-purple-500" />
+                  <span>Videos</span>
+                </span>
+                <span className="font-mono text-[11px] font-medium">
+                  {breakdown.formattedVideos}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between text-slate-600 dark:text-slate-300">
+                <span className="flex items-center gap-1.5 text-[11px]">
+                  <FileText className="w-3 h-3 text-amber-500" />
+                  <span>Documents</span>
+                </span>
+                <span className="font-mono text-[11px] font-medium">
+                  {breakdown.formattedDocuments}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between text-slate-400 dark:text-slate-500 pt-1 border-t border-dashed border-slate-200 dark:border-slate-700/50">
+                <span className="text-[10px]">Free Space</span>
+                <span className="font-mono text-[10px]">
+                  {formatStorageBytes(Math.max(0, totalLimitBytes - usedBytes))}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         {plan === "enterprise" ? (
@@ -170,7 +281,7 @@ const DashboardSidebar = ({
             className="w-full pt-1 text-xs font-semibold text-[#1a73e8] hover:text-[#1557bf] flex items-center justify-center gap-1 transition-colors hover:underline"
           >
             <span>
-              Pro Cloud ({effectiveStorage.totalGB >= 1024 ? `${(effectiveStorage.totalGB / 1024).toFixed(0)} TB` : `${effectiveStorage.totalGB} GB`} Active)
+              Pro Cloud ({totalGB >= 1024 ? `${(totalGB / 1024).toFixed(0)} TB` : `${totalGB} GB`} Active)
             </span>
             <ArrowRight className="w-3 h-3" />
           </Link>

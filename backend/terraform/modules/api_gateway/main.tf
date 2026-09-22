@@ -83,6 +83,15 @@ resource "aws_apigatewayv2_route" "get_file_by_id" {
   authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
 }
 
+# 4. DELETE /files/{fileId} -> Delete File Record & S3 Asset
+resource "aws_apigatewayv2_route" "delete_file_by_id" {
+  api_id             = aws_apigatewayv2_api.http_api.id
+  route_key          = "DELETE /files/{fileId}"
+  target             = "integrations/${aws_apigatewayv2_integration.files_api.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
 # ------------------------------------------------------------------------------
 # Stage ($default with Auto-Deploy)
 # ------------------------------------------------------------------------------

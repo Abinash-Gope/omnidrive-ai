@@ -120,10 +120,18 @@ resource "aws_iam_role_policy" "files_api" {
       },
       {
         Effect   = "Allow"
-        Action   = ["dynamodb:Query", "dynamodb:GetItem"]
+        Action   = ["dynamodb:Query", "dynamodb:GetItem", "dynamodb:DeleteItem"]
         Resource = [
           var.dynamodb_table_arn,
           "${var.dynamodb_table_arn}/index/*"
+        ]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["s3:DeleteObject", "s3:GetObject"]
+        Resource = [
+          "${var.raw_bucket_arn}/*",
+          "${var.processed_bucket_arn}/*"
         ]
       }
     ]

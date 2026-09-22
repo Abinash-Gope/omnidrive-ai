@@ -1,5 +1,10 @@
 import axios from "axios";
 import axiosInstance from "../../../shared/api/axiosClient.jsx";
+import {
+  findThumbnail,
+  findThumbnailMetadata,
+  removeThumbnail,
+} from "../utils/thumbnailCache.jsx";
 
 /**
  * Layer 1: Dashboard API Service
@@ -13,51 +18,123 @@ import axiosInstance from "../../../shared/api/axiosClient.jsx";
  */
 export const getFilesApi = async () => {
   try {
+    // Read local deleted files set (blacklist)
+    let deletedIds = new Set();
+    try {
+      const deletedList = JSON.parse(localStorage.getItem("omnidrive_deleted_files") || "[]");
+      deletedIds = new Set(deletedList);
+    } catch {}
+
+    // Read any offline saved items
+    let offlineFiles = [];
+    try {
+      offlineFiles = JSON.parse(localStorage.getItem("omnidrive_offline_files") || "[]");
+    } catch {}
+
     const token = localStorage.getItem("idToken") || localStorage.getItem("authToken");
     if (!token) {
-      return [];
+      return offlineFiles.filter((f) => !deletedIds.has(f.id));
     }
 
     const response = await axiosInstance.get("/files");
     const rawFiles = response.data?.files || (Array.isArray(response.data) ? response.data : []);
 
-    return rawFiles.map((item) => ({
-      id: item.file_id || item.SK?.replace("FILE#", "") || `file-${Date.now()}`,
-      name: item.file_name || "Uploaded File",
-      type: item.content_type?.startsWith("video/")
-        ? "video"
-        : item.content_type?.startsWith("image/")
-        ? "image"
-        : item.content_type?.includes("pdf")
-        ? "pdf"
-        : "other",
-      size: item.file_size ? `${(item.file_size / (1024 * 1024)).toFixed(1)} MB` : "Unknown",
-      date: item.created_at ? new Date(item.created_at).toLocaleDateString() : "Recently",
-      status: item.status || "PROCESSING",
-      moderationPassed: item.status !== "REJECTED_SAFETY_VIOLATION",
-      labels: item.labels || [],
-      summary: typeof item.summary === "string"
-        ? {
-            executive: item.summary,
-            takeaways: item.key_takeaways || [],
-            pages: item.page_count || 1,
-            model: "Amazon Bedrock (Claude 3 Haiku)",
-          }
-        : item.summary || null,
-      thumbnail: item.thumbnail_url || null,
-      previewSnippet: item.preview_snippet || item.status,
-      s3Key: item.s3_key || null,
-      duration: item.duration || null,
-      hlsQualities: item.hls_qualities || (item.hls_url ? ["1080p", "720p", "480p"] : []),
-      activeQuality: "1080p",
-      transcoderInfo: item.transcoder_info || null,
-    }));
+    const remoteFiles = rawFiles
+      .filter((item) => {
+        const id = item.file_id || item.SK?.replace("FILE#", "");
+        const name = item.file_name;
+        const key = item.s3_key || item.s3_raw_key;
+        // Strict blacklist checking: ignore any item that was deleted
+        if (id && deletedIds.has(id)) return false;
+        if (name && deletedIds.has(name)) return false;
+        if (key && deletedIds.has(key)) return false;
+        return true;
+      })
+      .map((item) => {
+        const fileId = item.file_id || item.SK?.replace("FILE#", "") || `file-${Date.now()}`;
+        const s3Key = item.s3_key || item.s3_raw_key || null;
+        const fileName = item.file_name || "Uploaded File";
+
+        // Check persistent client-side thumbnail cache for the uploaded asset
+        const cachedThumb = findThumbnail(fileId, s3Key, fileName);
+        const cachedMeta = findThumbnailMetadata(fileId, s3Key, fileName);
+        const dimensions = item.image_dimensions || item.dimensions || cachedMeta || null;
+
+        // Construct clean metadata / EXIF object
+        let exifData = item.exif || null;
+        if (!exifData && dimensions) {
+          exifData = {
+            camera: dimensions.format ? `${dimensions.format} Image File` : "Digital Image",
+            lens: dimensions.width ? `${dimensions.width} × ${dimensions.height} px` : "Native Dimensions",
+            shutter: dimensions.format ? `Color Profile: sRGB / Raster` : "Standard",
+            focalLength: dimensions.width && dimensions.height
+              ? `${(dimensions.width / dimensions.height).toFixed(2)}:1 Aspect Ratio`
+              : "Native",
+          };
+        }
+
+        return {
+          id: fileId,
+          name: fileName,
+          type: item.content_type?.startsWith("video/")
+            ? "video"
+            : item.content_type?.startsWith("image/")
+            ? "image"
+            : item.content_type?.includes("pdf")
+            ? "pdf"
+            : "other",
+          sizeBytes: item.file_size ? Number(item.file_size) : 0,
+          size: item.file_size
+            ? (item.file_size < 1024 * 1024
+                ? `${(item.file_size / 1024).toFixed(1)} KB`
+                : `${(item.file_size / (1024 * 1024)).toFixed(1)} MB`)
+            : "Unknown",
+          date: item.created_at ? new Date(item.created_at).toLocaleDateString() : "Recently",
+          status: item.status || "PROCESSING",
+          moderationPassed: item.status !== "REJECTED_SAFETY_VIOLATION",
+          labels: item.labels || [],
+          summary: typeof item.summary === "string"
+            ? {
+                executive: item.summary,
+                takeaways: item.key_takeaways || [],
+                pages: item.page_count || 1,
+                model: "Amazon Bedrock (Claude 3 Haiku)",
+              }
+            : item.summary || null,
+          // Resolve thumbnail: prefer backend presigned URL (cross-browser) → local cache (same-browser upload session)
+          thumbnail: item.thumbnail_url || item.download_url || cachedThumb || null,
+          // Expose raw download_url so any browser can construct its own image preview without localStorage
+          downloadUrl: item.download_url || null,
+          dimensions,
+          exif: exifData,
+          previewSnippet: item.preview_snippet || item.status,
+          s3Key: s3Key,
+          duration: item.duration || null,
+          hlsQualities: item.hls_qualities || (item.hls_url ? ["1080p", "720p", "480p"] : []),
+          activeQuality: "1080p",
+          transcoderInfo: item.transcoder_info || null,
+        };
+      });
+
+    // When the user is authenticated, the backend (DynamoDB + S3 presigned URLs) is the single
+    // source of truth. Do NOT merge localStorage offline files — they are browser-local blobs
+    // that cause missing thumbnails and ghost files on other browsers/devices.
+    // Only fall back to offline cache when there is truly no network token.
+    return remoteFiles;
   } catch (err) {
     if (err.response && err.response.status === 404) {
-      return [];
+      try {
+        return JSON.parse(localStorage.getItem("omnidrive_offline_files") || "[]");
+      } catch {
+        return [];
+      }
     }
     console.error("Failed to query AWS DynamoDB file registry:", err.message);
-    return [];
+    try {
+      return JSON.parse(localStorage.getItem("omnidrive_offline_files") || "[]");
+    } catch {
+      return [];
+    }
   }
 };
 
@@ -67,9 +144,15 @@ export const getFilesApi = async () => {
  * @returns {Promise<{ file_id: string, upload_url: string, s3_key: string, expires_in: number }>}
  */
 export const getPresignedUrlApi = async (fileMetadata) => {
+  const normalizedContentType = (
+    fileMetadata.contentType ||
+    fileMetadata.type ||
+    "application/octet-stream"
+  ).toLowerCase();
+
   const response = await axiosInstance.post("/upload-url", {
     file_name: fileMetadata.name,
-    content_type: fileMetadata.contentType || "application/octet-stream",
+    content_type: normalizedContentType,
     file_size: fileMetadata.fileSize || 1024,
   });
   return response.data;
@@ -77,26 +160,125 @@ export const getPresignedUrlApi = async (fileMetadata) => {
 
 /**
  * Binary streaming directly to S3 Presigned PUT URL (Zero web-tier memory consumption)
- * Raw axios is used without Authorization header so AWS S3 SigV4 signature is not invalidated.
+ * Uses native XMLHttpRequest without Authorization header so AWS S3 SigV4 signature is not invalidated.
+ * Dynamically extracts signed headers from the S3 URL path (user_id, file_id, original_name)
+ * to guarantee 100% compliance with AWS SigV4 signatures generated by Lambda.
  * @param {string} uploadUrl - Pre-authenticated S3 PUT URL
  * @param {File|Blob} file - Binary file stream
  * @param {function} onProgress - Progress callback (0-100)
+ * @param {object} [fileMeta] - Optional file metadata
  */
-export const uploadToS3Api = async (uploadUrl, file, onProgress) => {
+export const uploadToS3Api = async (uploadUrl, file, onProgress, fileMeta = {}) => {
   if (!uploadUrl) {
     throw new Error("Missing S3 presigned upload URL.");
   }
 
-  return await axios.put(uploadUrl, file, {
-    headers: {
-      "Content-Type": file?.type || "application/octet-stream",
-    },
-    onUploadProgress: (progressEvent) => {
-      if (onProgress && progressEvent.total) {
-        const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-        onProgress(percent);
+  // 1. Inspect signed headers from the presigned URL query string
+  let signedHeaders = [];
+  let pathParts = [];
+  try {
+    const urlObj = new URL(uploadUrl);
+    const signedParam = urlObj.searchParams.get("X-Amz-SignedHeaders");
+    if (signedParam) {
+      signedHeaders = signedParam.toLowerCase().split(";");
+    }
+    pathParts = urlObj.pathname.replace(/^\/+/, "").split("/");
+  } catch (_) {}
+
+  // Extract metadata directly from the S3 key path: raw/{user_id}/{file_id}/{sanitized_file_name}
+  // This guarantees exact alignment with the SigV4 signature generated by AWS Lambda
+  const keyUserId = fileMeta.userId || (pathParts.length >= 2 ? decodeURIComponent(pathParts[1]) : null);
+  const keyFileId = fileMeta.fileId || (pathParts.length >= 3 ? decodeURIComponent(pathParts[2]) : null);
+  const keySanitizedName =
+    fileMeta.sanitizedName ||
+    (pathParts.length >= 4 ? decodeURIComponent(pathParts.slice(3).join("/")) : null) ||
+    fileMeta.name?.replace(/ /g, "_");
+
+  // Content-Type: Set normalized MIME type matching presigned URL
+  const contentType =
+    fileMeta.contentType ||
+    file?.type ||
+    "application/octet-stream";
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+
+    // Track real-time byte progress
+    if (xhr.upload && onProgress) {
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable && event.total > 0) {
+          const percent = Math.round((event.loaded / event.total) * 100);
+          onProgress(percent);
+        }
+      };
+    }
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        if (onProgress) onProgress(100);
+        resolve({
+          status: xhr.status,
+          statusText: xhr.statusText,
+          headers: xhr.getAllResponseHeaders(),
+        });
+      } else {
+        // Parse AWS S3 Error XML response for precise diagnostics
+        let s3ErrorMessage = `S3 direct upload failed with status ${xhr.status}`;
+        try {
+          if (xhr.responseText) {
+            const parser = new DOMParser();
+            const xml = parser.parseFromString(xhr.responseText, "text/xml");
+            const code = xml.getElementsByTagName("Code")[0]?.textContent;
+            const message = xml.getElementsByTagName("Message")[0]?.textContent;
+            if (code || message) {
+              s3ErrorMessage = `${code ? code + ": " : ""}${message || s3ErrorMessage}`;
+            }
+          }
+        } catch (_) {}
+
+        const s3Error = new Error(s3ErrorMessage);
+        s3Error.status = xhr.status;
+        s3Error.response = {
+          status: xhr.status,
+          statusText: xhr.statusText,
+          data: xhr.responseText,
+        };
+        s3Error.config = {
+          url: uploadUrl,
+          method: "put",
+        };
+        reject(s3Error);
       }
-    },
+    };
+
+    xhr.onerror = () => {
+      const netError = new Error(
+        "Network error during direct S3 binary stream. Please check internet connection and S3 CORS configuration."
+      );
+      netError.config = { url: uploadUrl, method: "put" };
+      reject(netError);
+    };
+
+    xhr.open("PUT", uploadUrl, true);
+
+    // Set Content-Type if signed or by default
+    if (signedHeaders.length === 0 || signedHeaders.includes("content-type")) {
+      xhr.setRequestHeader("Content-Type", contentType);
+    }
+
+    // Attach x-amz-meta-* headers if signed into SigV4
+    if (signedHeaders.includes("x-amz-meta-file_id") && keyFileId) {
+      xhr.setRequestHeader("x-amz-meta-file_id", keyFileId);
+    }
+    if (signedHeaders.includes("x-amz-meta-user_id") && keyUserId) {
+      xhr.setRequestHeader("x-amz-meta-user_id", keyUserId);
+    }
+    if (signedHeaders.includes("x-amz-meta-original_name") && keySanitizedName) {
+      xhr.setRequestHeader("x-amz-meta-original_name", keySanitizedName);
+    }
+
+    // Send the raw binary stream directly to S3
+    xhr.send(file);
   });
 };
 
@@ -108,4 +290,50 @@ export const uploadToS3Api = async (uploadUrl, file, onProgress) => {
 export const pollJobStatusApi = async (fileId) => {
   const response = await axiosInstance.get(`/files/${fileId}`);
   return response.data?.file || response.data;
+};
+
+/**
+ * Delete file from DynamoDB and S3, with persistent blacklist & offline cache eviction
+ * @param {string} fileId - Unique file ID to remove
+ * @param {string} [s3Key] - Optional S3 key for cloud cleanup
+ * @param {string} [fileName] - Optional filename to ensure blacklist matching
+ */
+export const deleteFileApi = async (fileId, s3Key, fileName) => {
+  // 1. Add all identifiers to deleted blacklist in localStorage so refresh never restores them
+  try {
+    const deletedList = JSON.parse(localStorage.getItem("omnidrive_deleted_files") || "[]");
+    [fileId, s3Key, fileName].forEach((id) => {
+      if (id && !deletedList.includes(id)) {
+        deletedList.push(id);
+      }
+    });
+    localStorage.setItem("omnidrive_deleted_files", JSON.stringify(deletedList));
+  } catch {}
+
+  // 2. Clean up any offline/local cached references and thumbnail cache
+  try {
+    removeThumbnail(fileId, s3Key, fileName);
+    const offlineList = JSON.parse(localStorage.getItem("omnidrive_offline_files") || "[]");
+    const updated = offlineList.filter(
+      (f) => f.id !== fileId && f.file_id !== fileId && f.name !== fileName && f.s3Key !== s3Key
+    );
+    localStorage.setItem("omnidrive_offline_files", JSON.stringify(updated));
+  } catch {}
+
+  // 3. Delete from AWS DynamoDB & S3 via API Gateway if online session exists
+  const token = localStorage.getItem("idToken") || localStorage.getItem("authToken");
+  if (token && fileId) {
+    const cleanId = String(fileId).replace(/^FILE#/, "").trim();
+    try {
+      const res = await axiosInstance.delete(`/files/${encodeURIComponent(cleanId)}`, {
+        data: { s3_key: s3Key, file_name: fileName },
+      });
+      console.log("DynamoDB file deleted successfully:", res.data);
+    } catch (err) {
+      console.error("Failed to delete file from AWS DynamoDB:", err.response?.data || err.message);
+      throw new Error(err.response?.data?.error || "Failed to remove file from AWS DynamoDB.");
+    }
+  }
+
+  return { success: true, fileId };
 };

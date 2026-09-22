@@ -130,9 +130,11 @@ const PipelineDrawer = ({ pipeline, onClose }) => {
             <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900/60 text-xs text-rose-800 dark:text-rose-200 flex items-start gap-2">
               <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
               <div>
-                <strong className="block font-semibold">Flagged by Amazon Rekognition</strong>
+                <strong className="block font-semibold">
+                  {pipeline.errorTitle || "Upload / Pipeline Error"}
+                </strong>
                 <p className="text-[11px] text-rose-700 dark:text-rose-300 mt-0.5">
-                  {errorMessage || "Explicit content detected. Asset quarantined into isolated vault."}
+                  {errorMessage || "Operation failed. Please check AWS configuration."}
                 </p>
               </div>
             </div>

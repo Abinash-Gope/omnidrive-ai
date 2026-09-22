@@ -81,12 +81,20 @@ const VideoPlayerModal = ({ file, isOpen, onClose, onChangeQuality }) => {
         </div>
 
         {/* Video Player Viewport */}
-        <div className="relative aspect-video bg-black flex items-center justify-center overflow-hidden group">
-          <img
-            src={file.thumbnail || "https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?auto=format&fit=crop&w=1200&q=80"}
-            alt={file.name}
-            className={`w-full h-full object-cover transition-opacity duration-300 ${isPlaying ? "opacity-90" : "opacity-60"}`}
-          />
+        <div className="relative aspect-video bg-slate-950 flex items-center justify-center overflow-hidden group">
+          {file.thumbnail ? (
+            <img
+              src={file.thumbnail}
+              alt={file.name}
+              className={`w-full h-full object-cover transition-opacity duration-300 ${isPlaying ? "opacity-90" : "opacity-60"}`}
+            />
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-950 to-black flex items-center justify-center">
+              <div className="w-20 h-20 rounded-2xl bg-slate-900/80 border border-slate-800 flex items-center justify-center text-blue-400">
+                <Film className="w-10 h-10 stroke-[1.5]" />
+              </div>
+            </div>
+          )}
 
           {/* Center Play/Pause Overlay Button */}
           <button

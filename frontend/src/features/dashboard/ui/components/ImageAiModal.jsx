@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { useDispatch } from "react-redux";
 import {
   X,
   Camera,
@@ -8,13 +9,78 @@ import {
   Sliders,
   Info,
   Layers,
+  Loader2,
 } from "lucide-react";
+import { pollJobStatusApi } from "../../api/dashboardApi.jsx";
+import { updateFileStatus } from "../../state/dashboardSlice.jsx";
+import { findThumbnail } from "../../utils/thumbnailCache.jsx";
 
 const ImageAiModal = ({ file, isOpen, onClose }) => {
+  const dispatch = useDispatch();
+  const [isPolling, setIsPolling] = useState(false);
+
+  const fileId = file?.id || file?.file_id;
+  const labels = file?.labels || [];
+  const exif = file?.exif || null;
+
+  // Real-time automatic poller: if labels are empty, poll AWS DynamoDB every 2s
+  // so the user never has to manually refresh the page
+  // IMPORTANT: Must be called unconditionally before any early return to adhere to React Rules of Hooks
+  useEffect(() => {
+    if (!isOpen || !file || file.type !== "image" || (labels && labels.length > 0)) {
+      setIsPolling(false);
+      return;
+    }
+    if (!fileId) return;
+
+    let isMounted = true;
+    setIsPolling(true);
+    let attempts = 0;
+    const maxAttempts = 15; // up to 30s
+
+    const timer = setInterval(async () => {
+      attempts += 1;
+      try {
+        const remoteData = await pollJobStatusApi(fileId);
+        if (!isMounted) return;
+
+        if (remoteData && remoteData.labels && remoteData.labels.length > 0) {
+          dispatch(
+            updateFileStatus({
+              fileId: fileId,
+              status: remoteData.status || "COMPLETED",
+              labels: remoteData.labels,
+              dimensions: remoteData.image_dimensions || remoteData.dimensions,
+            })
+          );
+          setIsPolling(false);
+          clearInterval(timer);
+        } else if (attempts >= maxAttempts) {
+          setIsPolling(false);
+          clearInterval(timer);
+        }
+      } catch (err) {
+        if (attempts >= maxAttempts) {
+          setIsPolling(false);
+          clearInterval(timer);
+        }
+      }
+    }, 2000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(timer);
+    };
+  }, [isOpen, fileId, file?.type, labels.length, dispatch]);
+
   if (!isOpen || !file || file.type !== "image") return null;
 
-  const labels = file.labels || [];
-  const exif = file.exif || null;
+  const displayImage =
+    file.thumbnail ||
+    file.thumbnail_url ||
+    file.downloadUrl ||
+    file.download_url ||
+    findThumbnail(file.id || file.file_id, file.s3Key || file.s3_key, file.name);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
@@ -50,12 +116,31 @@ const ImageAiModal = ({ file, isOpen, onClose }) => {
         {/* Content Body: Left Image / Right AI telemetry */}
         <div className="flex-1 grid grid-cols-1 md:grid-cols-2 overflow-y-auto">
           {/* Left: High-Res Image Viewport */}
-          <div className="relative bg-slate-950 flex items-center justify-center p-4 min-h-[300px]">
-            <img
-              src={file.thumbnail || "https://images.unsplash.com/photo-1503899036084-c55cdd92da26?auto=format&fit=crop&w=1200&q=80"}
-              alt={file.name}
-              className="max-h-[420px] w-auto object-contain rounded-xl shadow-lg"
-            />
+          <div className="relative bg-slate-950 flex items-center justify-center p-4 min-h-[320px]">
+            {displayImage ? (
+              <img
+                src={displayImage}
+                alt={file.name}
+                className="max-h-[420px] w-auto object-contain rounded-xl shadow-lg"
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center p-8 text-center text-slate-400">
+                <div className="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center mb-3 text-emerald-400">
+                  <Camera className="w-8 h-8 stroke-[1.5]" />
+                </div>
+                <h4 className="text-sm font-semibold text-slate-200 truncate max-w-[280px]">
+                  {file.name}
+                </h4>
+                <p className="text-xs text-slate-500 mt-1">
+                  {file.size} • {file.dimensions?.format || "PNG/JPEG"} Ingested Asset
+                </p>
+                <div className="mt-3 px-2.5 py-1 rounded-md bg-slate-900 border border-slate-800 text-[11px] font-mono text-slate-400">
+                  {file.dimensions?.width && file.dimensions?.height
+                    ? `${file.dimensions.width} × ${file.dimensions.height} px`
+                    : "Direct S3 Ingestion"}
+                </div>
+              </div>
+            )}
             <div className="absolute top-6 left-6 px-3 py-1 rounded-full bg-black/70 backdrop-blur-md text-emerald-400 text-xs font-semibold flex items-center gap-1.5 border border-emerald-500/20">
               <ShieldCheck className="w-3.5 h-3.5" />
               <span>Moderation Passed (99.9% Safe)</span>
@@ -78,9 +163,21 @@ const ImageAiModal = ({ file, isOpen, onClose }) => {
 
               <div className="space-y-2">
                 {labels.length === 0 ? (
-                  <div className="p-4 text-center rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs text-slate-500">
-                    Rekognition Vision AI labels will appear here once processed.
-                  </div>
+                  isPolling ? (
+                    <div className="p-6 text-center rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40 text-xs text-emerald-800 dark:text-emerald-300 space-y-2 animate-pulse">
+                      <div className="flex items-center justify-center gap-2 font-semibold">
+                        <Loader2 className="w-4 h-4 animate-spin text-emerald-600 dark:text-emerald-400" />
+                        <span>AWS Rekognition Vision AI Analyzing...</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        Extracting object tags and visual features in cloud. Labels will appear automatically without refresh.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="p-4 text-center rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs text-slate-500">
+                      Rekognition Vision AI labels will appear here once processed.
+                    </div>
+                  )
                 ) : (
                   labels.map((lbl, idx) => (
                     <div

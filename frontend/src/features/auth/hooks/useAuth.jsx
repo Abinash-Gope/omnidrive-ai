@@ -107,6 +107,17 @@ export const useAuth = () => {
    * Handle User Registration
    */
   const handleRegister = async (formData) => {
+    if (!formData.termsAccepted) {
+      const err = new Error("You must agree to the Terms of Service & Privacy Policy to proceed.");
+      dispatch(
+        setToast({
+          type: "error",
+          message: err.message,
+        })
+      );
+      throw err;
+    }
+
     try {
       const data = await registerApi(formData);
       dispatch(closeModal());
