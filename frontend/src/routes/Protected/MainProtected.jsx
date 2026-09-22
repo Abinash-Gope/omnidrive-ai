@@ -58,17 +58,21 @@ const MainProtected = () => {
 
           {/* Main Area Skeleton */}
           <main className="flex-1 overflow-y-auto p-6 lg:p-8 space-y-6">
-            <div className="space-y-2">
-              <Skeleton className="h-8 w-44 rounded-xl" />
-              <Skeleton className="h-3.5 w-96 max-w-full rounded-md" />
+            {/* Header: Title & View Mode Buttons */}
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-8 w-36 rounded-xl" />
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-9 w-9 rounded-xl" />
+                <Skeleton className="h-9 w-9 rounded-xl" />
+              </div>
             </div>
 
-            {/* Dropzone Skeleton */}
-            <div className="h-36 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 flex items-center justify-center">
-              <div className="flex flex-col items-center gap-2">
-                <SkeletonCircle size="w-12 h-12" />
-                <Skeleton className="h-4 w-48 rounded-md" />
-              </div>
+            {/* Filter Category Pills Skeleton */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              <Skeleton className="h-8 w-24 rounded-full" />
+              <Skeleton className="h-8 w-32 rounded-full" />
+              <Skeleton className="h-8 w-36 rounded-full" />
+              <Skeleton className="h-8 w-40 rounded-full" />
             </div>
 
             {/* File Grid Skeleton */}

@@ -27,6 +27,7 @@ const PdfPreview = ({
   objectFit = "contain",
   onPageCount,
   onError,
+  onLoadingChange,
 }) => {
   const canvasRef = useRef(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -41,6 +42,7 @@ const PdfPreview = ({
 
     const renderPage = async () => {
       setIsLoading(true);
+      if (onLoadingChange) onLoadingChange(true);
       setError(null);
 
       try {
@@ -72,12 +74,16 @@ const PdfPreview = ({
         renderTask = page.render({ canvasContext: ctx, viewport });
         await renderTask.promise;
 
-        if (!cancelled) setIsLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+          if (onLoadingChange) onLoadingChange(false);
+        }
       } catch (err) {
         if (err?.name === "RenderingCancelledException") return;
         if (!cancelled) {
           setError(err.message || "Failed to render PDF");
           setIsLoading(false);
+          if (onLoadingChange) onLoadingChange(false);
           if (onError) onError(err);
         }
       }

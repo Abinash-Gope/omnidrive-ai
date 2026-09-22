@@ -18,38 +18,15 @@ import {
  */
 export const getFilesApi = async () => {
   try {
-    // Read local deleted files set (blacklist)
-    let deletedIds = new Set();
-    try {
-      const deletedList = JSON.parse(localStorage.getItem("omnidrive_deleted_files") || "[]");
-      deletedIds = new Set(deletedList);
-    } catch {}
-
-    // Read any offline saved items
-    let offlineFiles = [];
-    try {
-      offlineFiles = JSON.parse(localStorage.getItem("omnidrive_offline_files") || "[]");
-    } catch {}
-
     const token = localStorage.getItem("idToken") || localStorage.getItem("authToken");
     if (!token) {
-      return offlineFiles.filter((f) => !deletedIds.has(f.id));
+      return [];
     }
 
     const response = await axiosInstance.get("/files");
     const rawFiles = response.data?.files || (Array.isArray(response.data) ? response.data : []);
 
     const remoteFiles = rawFiles
-      .filter((item) => {
-        const id = item.file_id || item.SK?.replace("FILE#", "");
-        const name = item.file_name;
-        const key = item.s3_key || item.s3_raw_key;
-        // Strict blacklist checking: ignore any item that was deleted
-        if (id && deletedIds.has(id)) return false;
-        if (name && deletedIds.has(name)) return false;
-        if (key && deletedIds.has(key)) return false;
-        return true;
-      })
       .map((item) => {
         const fileId = item.file_id || item.SK?.replace("FILE#", "") || `file-${Date.now()}`;
         const s3Key = item.s3_key || item.s3_raw_key || null;
@@ -101,7 +78,7 @@ export const getFilesApi = async () => {
             ? {
                 executive: item.summary,
                 takeaways: item.key_takeaways || [],
-                pages: item.page_count || 1,
+                pages: item.page_count || null,
                 model: "OmniDrive Neural Engine",
               }
             : item.summary || null,
@@ -117,7 +94,7 @@ export const getFilesApi = async () => {
           exif: exifData,
           previewSnippet: item.preview_snippet || item.status,
           s3Key: s3Key,
-          duration: item.duration || "03:40",
+          duration: item.duration || null,
           hlsQualities: item.hls_qualities || ["1080p", "720p", "480p"],
           activeQuality: "720p",
           transcoderInfo: item.transcoder_info || null,
@@ -131,18 +108,10 @@ export const getFilesApi = async () => {
     return remoteFiles;
   } catch (err) {
     if (err.response && err.response.status === 404) {
-      try {
-        return JSON.parse(localStorage.getItem("omnidrive_offline_files") || "[]");
-      } catch {
-        return [];
-      }
-    }
-    console.error("Failed to query AWS DynamoDB file registry:", err.message);
-    try {
-      return JSON.parse(localStorage.getItem("omnidrive_offline_files") || "[]");
-    } catch {
       return [];
     }
+    console.error("Failed to query AWS DynamoDB file registry:", err.message);
+    return [];
   }
 };
 
@@ -301,34 +270,18 @@ export const pollJobStatusApi = async (fileId) => {
 };
 
 /**
- * Delete file from DynamoDB and S3, with persistent blacklist & offline cache eviction
+ * Delete file from DynamoDB and S3
  * @param {string} fileId - Unique file ID to remove
  * @param {string} [s3Key] - Optional S3 key for cloud cleanup
- * @param {string} [fileName] - Optional filename to ensure blacklist matching
+ * @param {string} [fileName] - Optional filename
  */
 export const deleteFileApi = async (fileId, s3Key, fileName) => {
-  // 1. Add all identifiers to deleted blacklist in localStorage so refresh never restores them
-  try {
-    const deletedList = JSON.parse(localStorage.getItem("omnidrive_deleted_files") || "[]");
-    [fileId, s3Key, fileName].forEach((id) => {
-      if (id && !deletedList.includes(id)) {
-        deletedList.push(id);
-      }
-    });
-    localStorage.setItem("omnidrive_deleted_files", JSON.stringify(deletedList));
-  } catch {}
-
-  // 2. Clean up any offline/local cached references and thumbnail cache
+  // Clean thumbnail cache if available
   try {
     removeThumbnail(fileId, s3Key, fileName);
-    const offlineList = JSON.parse(localStorage.getItem("omnidrive_offline_files") || "[]");
-    const updated = offlineList.filter(
-      (f) => f.id !== fileId && f.file_id !== fileId && f.name !== fileName && f.s3Key !== s3Key
-    );
-    localStorage.setItem("omnidrive_offline_files", JSON.stringify(updated));
   } catch {}
 
-  // 3. Delete from AWS DynamoDB & S3 via API Gateway if online session exists
+  // Delete directly from AWS DynamoDB & S3 via API Gateway
   const token = localStorage.getItem("idToken") || localStorage.getItem("authToken");
   if (token && fileId) {
     const cleanId = String(fileId).replace(/^FILE#/, "").trim();

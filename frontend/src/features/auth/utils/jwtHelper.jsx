@@ -82,11 +82,29 @@ export const formatUserFromClaims = (claims, rawToken) => {
   if (!claims) return null;
 
   const email = claims.email || claims["cognito:username"] || "user@omnidrive.ai";
-  const name = claims.name || claims.given_name || email.split("@")[0] || "OmniDrive User";
+  const rawName = claims.name || claims.given_name || email.split("@")[0] || "OmniDrive User";
   const sub = claims.sub || claims.username || `user-${Date.now()}`;
 
+  // Parse display name and cloud preferences encoded in the cloud attribute
+  let cleanName = rawName;
+  let cloudPreferences = { starred: [], trash: [] };
+
+  if (typeof rawName === "string" && rawName.includes("::")) {
+    const parts = rawName.split("::");
+    cleanName = parts[0].trim() || email.split("@")[0];
+    try {
+      const parsed = JSON.parse(parts.slice(1).join("::"));
+      if (parsed && typeof parsed === "object") {
+        cloudPreferences = {
+          starred: Array.isArray(parsed.starred) ? parsed.starred : [],
+          trash: Array.isArray(parsed.trash) ? parsed.trash : [],
+        };
+      }
+    } catch {}
+  }
+
   // Avatar initials
-  const initials = name
+  const initials = cleanName
     .split(" ")
     .map((n) => n[0])
     .join("")
@@ -98,12 +116,13 @@ export const formatUserFromClaims = (claims, rawToken) => {
   return {
     id: sub,
     sub,
-    name,
+    name: cleanName,
     email,
     avatar: initials || "OD",
     plan: storedPlan,
     role: storedPlan === "enterprise" ? "Enterprise VPC Admin" : storedPlan === "pro" ? "Pro Cloud Creator" : "Sandbox Developer",
     emailVerified: claims.email_verified || false,
+    cloudPreferences,
     rawClaims: claims,
   };
 };

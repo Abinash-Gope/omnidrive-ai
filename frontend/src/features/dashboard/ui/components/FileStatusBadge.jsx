@@ -12,11 +12,20 @@ const FileStatusBadge = ({ file }) => {
     );
   }
 
+  if (file.status === "PROCESSING" || file.status === "PENDING") {
+    return (
+      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800 flex items-center gap-1">
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+        Processing
+      </span>
+    );
+  }
+
   if (file.type === "video") {
     const quality = file.activeQuality || (plan === "free" ? "720p" : "1080p");
     return (
       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-        {quality} HLS
+        {file.hlsUrl ? `${quality} HLS` : "Video"}
       </span>
     );
   }
@@ -33,9 +42,17 @@ const FileStatusBadge = ({ file }) => {
     );
   }
 
+  if (file.type === "pdf") {
+    return (
+      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+        {file.summary ? "Summary Ready" : "Document"}
+      </span>
+    );
+  }
+
   return (
-    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-      Summary Ready
+    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+      {file.type?.toUpperCase() || "File"}
     </span>
   );
 };

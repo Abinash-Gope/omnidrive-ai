@@ -210,7 +210,7 @@ const FileGrid = ({
           {/* Table Header */}
           <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-500 uppercase tracking-wider">
             <span className="flex-1">Name</span>
-            <span className="hidden sm:inline px-4 w-36 text-left">Pipeline Status</span>
+            <span className="hidden sm:inline px-4 w-36 text-left">Status</span>
             <span className="w-16 text-right">Size</span>
             <span className="w-20 text-right hidden md:inline">Modified</span>
             <span className="w-8"></span>

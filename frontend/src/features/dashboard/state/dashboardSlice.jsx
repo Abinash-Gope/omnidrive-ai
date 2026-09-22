@@ -1,41 +1,11 @@
 import { createSlice } from "@reduxjs/toolkit";
 import { calculateStorageFromFiles } from "../utils/storageHelper.jsx";
 
-// LocalStorage persistence helpers for Starred and Trashed files
-const loadStoredStarredIds = () => {
-  try {
-    const raw = localStorage.getItem("omnidrive_starred_files");
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-};
-
-const saveStoredStarredIds = (ids) => {
-  try {
-    localStorage.setItem("omnidrive_starred_files", JSON.stringify(ids));
-  } catch {}
-};
-
-const loadStoredTrashFiles = () => {
-  try {
-    const raw = localStorage.getItem("omnidrive_trashed_files");
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-};
-
-const saveStoredTrashFiles = (files) => {
-  try {
-    localStorage.setItem("omnidrive_trashed_files", JSON.stringify(files));
-  } catch {}
-};
-
 const initialState = {
   files: [],
-  trashFiles: loadStoredTrashFiles(),
-  starredIds: loadStoredStarredIds(),
+  trashFiles: [],
+  starredIds: [],
+  cloudTrashIds: [],
   quarantinedFiles: [],
   selectedFile: null,
   activeTab: "my-files", // 'my-files' | 'recent' | 'starred' | 'shared' | 'trash' | 'videos' | 'documents' | 'photos'
@@ -90,9 +60,38 @@ export const dashboardSlice = createSlice({
   name: "dashboard",
   initialState,
   reducers: {
+    setCloudState: (state, action) => {
+      const { starredIds = [], trashIds = [] } = action.payload || {};
+      state.starredIds = starredIds;
+      state.cloudTrashIds = trashIds;
+
+      const trashSet = new Set(trashIds);
+      const starredSet = new Set(starredIds);
+
+      // Re-apply to active files
+      state.files = state.files.map((f) => ({
+        ...f,
+        isStarred: starredSet.has(f.id || f.file_id),
+      }));
+
+      // Move any files that match cloudTrashIds into trashFiles
+      if (trashIds.length > 0 && state.files.length > 0) {
+        const toTrash = state.files.filter((f) => trashSet.has(f.id || f.file_id));
+        if (toTrash.length > 0) {
+          state.files = state.files.filter((f) => !trashSet.has(f.id || f.file_id));
+          state.trashFiles = [
+            ...toTrash.map((t) => ({ ...t, inTrash: true })),
+            ...state.trashFiles.filter((tf) => !toTrash.some((t) => (t.id || t.file_id) === (tf.id || tf.file_id))),
+          ];
+        }
+      }
+    },
     setFiles: (state, action) => {
       const all = action.payload || [];
-      const trashIdSet = new Set((state.trashFiles || []).map((t) => t.id || t.file_id));
+      const trashIdSet = new Set([
+        ...(state.trashFiles || []).map((t) => t.id || t.file_id),
+        ...(state.cloudTrashIds || []),
+      ]);
       const starredIdSet = new Set(state.starredIds || []);
 
       const validFiles = all
@@ -102,6 +101,15 @@ export const dashboardSlice = createSlice({
           ...f,
           isStarred: starredIdSet.has(f.id || f.file_id),
         }));
+
+      // Populate trashFiles from cloud files that are in trashIdSet
+      const trashedFromRemote = all
+        .filter((f) => f.status !== "REJECTED_SAFETY_VIOLATION" && trashIdSet.has(f.id || f.file_id))
+        .map((f) => ({ ...f, inTrash: true }));
+
+      const existingTrashIds = new Set(state.trashFiles.map((t) => t.id || t.file_id));
+      const newTrashItems = trashedFromRemote.filter((t) => !existingTrashIds.has(t.id || t.file_id));
+      state.trashFiles = [...state.trashFiles, ...newTrashItems];
 
       state.files = validFiles;
       state.quarantinedFiles = all.filter((f) => f.status === "REJECTED_SAFETY_VIOLATION");
@@ -261,7 +269,6 @@ export const dashboardSlice = createSlice({
       } else {
         state.starredIds.push(fileId);
       }
-      saveStoredStarredIds(state.starredIds);
 
       // Update in active files
       const targetFile = state.files.find((f) => f.id === fileId || f.file_id === fileId);
@@ -283,7 +290,9 @@ export const dashboardSlice = createSlice({
           trashedAt: new Date().toISOString(),
         };
         state.trashFiles = [trashedItem, ...state.trashFiles.filter((t) => t.id !== fileId && t.file_id !== fileId)];
-        saveStoredTrashFiles(state.trashFiles);
+        if (!state.cloudTrashIds.includes(fileId)) {
+          state.cloudTrashIds.push(fileId);
+        }
         state.storage = calculateStorageFromFiles(state.files, state.storage?.totalGB || 15.0);
       }
     },
@@ -292,7 +301,7 @@ export const dashboardSlice = createSlice({
       const fileToRestore = state.trashFiles.find((f) => f.id === fileId || f.file_id === fileId);
       if (fileToRestore) {
         state.trashFiles = state.trashFiles.filter((f) => f.id !== fileId && f.file_id !== fileId);
-        saveStoredTrashFiles(state.trashFiles);
+        state.cloudTrashIds = state.cloudTrashIds.filter((id) => id !== fileId);
         const restoredItem = {
           ...fileToRestore,
           inTrash: false,
@@ -306,19 +315,21 @@ export const dashboardSlice = createSlice({
     permanentDeleteFile: (state, action) => {
       const fileId = action.payload;
       state.trashFiles = state.trashFiles.filter((f) => f.id !== fileId && f.file_id !== fileId);
+      state.cloudTrashIds = state.cloudTrashIds.filter((id) => id !== fileId);
+      state.starredIds = state.starredIds.filter((id) => id !== fileId);
       state.files = state.files.filter((f) => f.id !== fileId && f.file_id !== fileId);
       state.quarantinedFiles = state.quarantinedFiles.filter((f) => f.id !== fileId && f.file_id !== fileId);
-      saveStoredTrashFiles(state.trashFiles);
       state.storage = calculateStorageFromFiles(state.files, state.storage?.totalGB || 15.0);
     },
     emptyTrash: (state) => {
       state.trashFiles = [];
-      saveStoredTrashFiles([]);
+      state.cloudTrashIds = [];
     },
   },
 });
 
 export const {
+  setCloudState,
   setFiles,
   setLoading,
   setError,

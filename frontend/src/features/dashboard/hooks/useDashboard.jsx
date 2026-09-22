@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
+  setCloudState,
   setFiles,
   setLoading,
   setError,
@@ -39,6 +40,10 @@ import {
   findThumbnail,
   findThumbnailMetadata,
 } from "../utils/thumbnailCache.jsx";
+import {
+  fetchCloudPreferences,
+  saveCloudPreferences,
+} from "../../auth/api/cloudPreferencesService.jsx";
 
 /**
  * Layer 2: useDashboard Custom Hook
@@ -46,10 +51,12 @@ import {
  */
 export const useDashboard = () => {
   const dispatch = useDispatch();
+  const authUser = useSelector((state) => state.auth?.user);
   const {
     files,
     trashFiles,
     starredIds,
+    cloudTrashIds,
     quarantinedFiles,
     activeTab,
     filterType,
@@ -62,10 +69,47 @@ export const useDashboard = () => {
     previewModal,
   } = useSelector((state) => state.dashboard || {});
 
-  // Load initial files on mount
+  // Load cloud preferences and initial files on mount
   useEffect(() => {
-    loadFiles();
-  }, []);
+    // One-time cleanup of legacy local storage keys to guarantee no local persistence
+    try {
+      localStorage.removeItem("omnidrive_starred_files");
+      localStorage.removeItem("omnidrive_trashed_files");
+      localStorage.removeItem("omnidrive_deleted_files");
+      localStorage.removeItem("omnidrive_offline_files");
+    } catch {}
+
+    const init = async () => {
+      try {
+        const prefs = await fetchCloudPreferences();
+        if (prefs) {
+          dispatch(
+            setCloudState({
+              starredIds: prefs.starred || [],
+              trashIds: prefs.trash || [],
+            })
+          );
+        }
+      } catch (err) {
+        console.warn("Could not fetch cloud preferences on dashboard mount:", err);
+      }
+      loadFiles();
+    };
+
+    init();
+  }, [dispatch]);
+
+  // Sync immediately when authenticated user claims provide cloud preferences
+  useEffect(() => {
+    if (authUser?.cloudPreferences) {
+      dispatch(
+        setCloudState({
+          starredIds: authUser.cloudPreferences.starred || [],
+          trashIds: authUser.cloudPreferences.trash || [],
+        })
+      );
+    }
+  }, [authUser?.cloudPreferences, dispatch]);
 
   // Intelligent background poller: polls DynamoDB whenever any file is pending Rekognition analysis
   // so Rekognition Vision AI labels and dimensions appear automatically in real-time without user refresh
@@ -308,22 +352,36 @@ export const useDashboard = () => {
   const handleClosePreview = () => dispatch(closePreviewModal());
   const handleChangeQuality = (quality) => dispatch(updateVideoQuality(quality));
 
-  // Toggle star handler
-  const handleToggleStar = (fileOrId) => {
+  // Toggle star handler (persisted in AWS Cognito Cloud)
+  const handleToggleStar = async (fileOrId) => {
     const fileId = typeof fileOrId === "object" ? fileOrId.id || fileOrId.file_id : fileOrId;
     if (!fileId) return;
+
     dispatch(toggleStar(fileId));
-    const wasStarred = starredIds && starredIds.includes(fileId);
+    const wasStarred = (starredIds || []).includes(fileId);
     dispatch(
       setToast({
         type: "info",
         message: wasStarred ? "Removed from Starred." : "Added to Starred.",
       })
     );
+
+    const updatedStarred = wasStarred
+      ? (starredIds || []).filter((id) => id !== fileId)
+      : [...(starredIds || []), fileId];
+
+    try {
+      await saveCloudPreferences({
+        starred: updatedStarred,
+        trash: cloudTrashIds || [],
+      });
+    } catch (err) {
+      console.warn("Failed to persist star preference to AWS Cloud:", err);
+    }
   };
 
-  // Soft-delete to Trash
-  const handleMoveToTrash = (file) => {
+  // Soft-delete to Trash (persisted in AWS Cognito Cloud)
+  const handleMoveToTrash = async (file) => {
     if (!file) return;
     const fileId = file.id || file.file_id;
     dispatch(moveToTrash(fileId));
@@ -333,10 +391,20 @@ export const useDashboard = () => {
         message: `"${file.name}" moved to Trash.`,
       })
     );
+
+    const updatedTrash = Array.from(new Set([...(cloudTrashIds || []), fileId]));
+    try {
+      await saveCloudPreferences({
+        starred: starredIds || [],
+        trash: updatedTrash,
+      });
+    } catch (err) {
+      console.warn("Failed to persist trash state to AWS Cloud:", err);
+    }
   };
 
-  // Restore from Trash back to active files
-  const handleRestoreFile = (file) => {
+  // Restore from Trash back to active files (persisted in AWS Cognito Cloud)
+  const handleRestoreFile = async (file) => {
     if (!file) return;
     const fileId = file.id || file.file_id;
     dispatch(restoreFromTrash(fileId));
@@ -346,9 +414,19 @@ export const useDashboard = () => {
         message: `"${file.name}" restored to My Files.`,
       })
     );
+
+    const updatedTrash = (cloudTrashIds || []).filter((id) => id !== fileId);
+    try {
+      await saveCloudPreferences({
+        starred: starredIds || [],
+        trash: updatedTrash,
+      });
+    } catch (err) {
+      console.warn("Failed to persist restored state to AWS Cloud:", err);
+    }
   };
 
-  // Permanent Delete File Handler (AWS S3 & DynamoDB purge)
+  // Permanent Delete File Handler (AWS S3 & DynamoDB purge + Cloud preference cleanup)
   const handlePermanentDelete = async (file) => {
     if (!file) return;
     const fileId = file.id || file.file_id;
@@ -359,8 +437,18 @@ export const useDashboard = () => {
       // Optimistically remove from state & trash
       dispatch(permanentDeleteFile(fileId));
 
-      // Call API / clear offline storage and blacklist from refresh
+      // Call API to remove from DynamoDB and S3
       await deleteFileApi(fileId, s3Key, fileName);
+
+      // Clean up cloud preference references
+      const updatedTrash = (cloudTrashIds || []).filter((id) => id !== fileId);
+      const updatedStarred = (starredIds || []).filter((id) => id !== fileId);
+      try {
+        await saveCloudPreferences({
+          starred: updatedStarred,
+          trash: updatedTrash,
+        });
+      } catch {}
 
       dispatch(
         setToast({
@@ -379,7 +467,7 @@ export const useDashboard = () => {
     }
   };
 
-  // Bulk Empty Trash
+  // Bulk Empty Trash (AWS S3 & DynamoDB purge + Cloud preference cleanup)
   const handleEmptyTrash = async () => {
     const items = [...(trashFiles || [])];
     if (items.length === 0) return;
@@ -391,6 +479,16 @@ export const useDashboard = () => {
         message: `Trash emptied (${items.length} items permanently deleted).`,
       })
     );
+
+    // Clean up cloud preferences
+    try {
+      await saveCloudPreferences({
+        starred: starredIds || [],
+        trash: [],
+      });
+    } catch (err) {
+      console.warn("Failed to clear trash cloud preferences:", err);
+    }
 
     // Concurrently purge from S3 & DynamoDB
     for (const f of items) {

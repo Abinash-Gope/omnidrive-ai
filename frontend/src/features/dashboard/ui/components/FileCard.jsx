@@ -32,7 +32,8 @@ const FileCard = ({
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isCardHovered, setIsCardHovered] = useState(false);
-  const [realPageCount, setRealPageCount] = useState(file.pages || file.summary?.pages || null);
+  const [realPageCount, setRealPageCount] = useState(null);
+  const [isPdfLoading, setIsPdfLoading] = useState(file.type === "pdf");
   const menuRef = useRef(null);
 
   const isInTrash = activeTab === "trash" || Boolean(file.inTrash);
@@ -92,7 +93,7 @@ const FileCard = ({
               {file.name}
             </div>
             <div className="text-xs text-slate-400 truncate flex items-center gap-2">
-              <span>{file.previewSnippet || "AWS Serverless Pipeline Ready"}</span>
+              {file.previewSnippet && <span>{file.previewSnippet}</span>}
             </div>
           </div>
         </div>
@@ -114,11 +115,10 @@ const FileCard = ({
                   e.stopPropagation();
                   if (onToggleStar) onToggleStar(file);
                 }}
-                className={`p-1.5 rounded-lg transition-colors ${
-                  file.isStarred
+                className={`p-1.5 rounded-lg transition-colors ${file.isStarred
                     ? "text-amber-500 hover:text-amber-600 bg-amber-50/70 dark:bg-amber-950/40"
                     : "text-slate-400 hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-slate-700"
-                }`}
+                  }`}
                 title={file.isStarred ? "Starred" : "Star file"}
               >
                 <Star className={`w-4 h-4 ${file.isStarred ? "fill-amber-400" : ""}`} />
@@ -191,10 +191,12 @@ const FileCard = ({
       onClick={() => onOpenPreview(file)}
       onMouseEnter={() => setIsCardHovered(true)}
       onMouseLeave={() => setIsCardHovered(false)}
-      className="group relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-[#1a73e8]/50 dark:hover:border-blue-500/50 rounded-2xl overflow-hidden shadow-xs hover:shadow-xl transition-all duration-300 flex flex-col cursor-pointer"
+      className={`group relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-[#1a73e8]/50 dark:hover:border-blue-500/50 rounded-2xl shadow-xs hover:shadow-xl transition-all duration-300 flex flex-col cursor-pointer ${
+        isMenuOpen ? "z-30" : "z-10"
+      }`}
     >
       {/* Thumbnail / Visual Viewport */}
-      <div className="relative aspect-video w-full bg-slate-100 dark:bg-slate-800/80 overflow-hidden flex items-center justify-center">
+      <div className="relative aspect-video w-full bg-slate-100 dark:bg-slate-800/80 overflow-hidden rounded-t-2xl flex items-center justify-center">
         {isVideo ? (
           <VideoPreview file={file} isHovered={isCardHovered} />
         ) : isPdf && file.downloadUrl ? (
@@ -208,6 +210,7 @@ const FileCard = ({
               fitParent={true}
               objectFit="cover"
               onPageCount={setRealPageCount}
+              onLoadingChange={setIsPdfLoading}
             />
             {/* Subtle bottom shadow vignette for smooth transition and badge contrast */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
@@ -238,13 +241,13 @@ const FileCard = ({
           <FileStatusBadge file={file} />
         </div>
 
-        {/* PDF Pages Badge */}
-        {isPdf && (
-          <div className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-md bg-purple-950/80 text-purple-200 text-[11px] font-medium flex items-center gap-1 backdrop-blur-xs shadow-xs pointer-events-none">
+        {/* PDF Pages Badge — only shown once loaded with verified count */}
+        {isPdf && !isPdfLoading && realPageCount && (
+          <div className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-md bg-purple-950/80 text-purple-200 text-[11px] font-medium flex items-center gap-1 backdrop-blur-xs shadow-xs pointer-events-none animate-fadeIn">
             <Layers className="w-3 h-3 text-purple-400" />
             <span>
-              {realPageCount || file.pages || file.summary?.pages || 1}{" "}
-              {(realPageCount || file.pages || file.summary?.pages || 1) === 1 ? "page" : "pages"}
+              {realPageCount}{" "}
+              {realPageCount === 1 ? "page" : "pages"}
             </span>
           </div>
         )}
@@ -281,11 +284,10 @@ const FileCard = ({
                     e.stopPropagation();
                     if (onToggleStar) onToggleStar(file);
                   }}
-                  className={`p-1 rounded-md transition-colors ${
-                    file.isStarred
+                  className={`p-1 rounded-md transition-colors ${file.isStarred
                       ? "text-amber-500 hover:text-amber-600"
                       : "text-slate-300 dark:text-slate-600 hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-                  }`}
+                    }`}
                   title={file.isStarred ? "Starred" : "Star file"}
                 >
                   <Star className={`w-4 h-4 ${file.isStarred ? "fill-amber-400" : ""}`} />
@@ -307,7 +309,7 @@ const FileCard = ({
                 {/* Context Dropdown Menu */}
                 {isMenuOpen && (
                   <div
-                    className="absolute right-0 top-full mt-1 w-44 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl py-1 z-30 animate-fadeIn text-xs"
+                    className="absolute right-0 top-full mt-1.5 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl py-1.5 z-50 animate-fadeIn text-xs"
                     onClick={(e) => e.stopPropagation()}
                   >
                     {!isInTrash && (
@@ -394,17 +396,25 @@ const FileCard = ({
                   </span>
                 ))}
               </div>
-            ) : isImage ? (
+            ) : isImage && file.status === "PROCESSING" ? (
               <div className="flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="truncate">Rekognition Vision AI analyzing...</span>
+                <span className="truncate">Vision AI analyzing labels...</span>
               </div>
             ) : null}
 
             {isVideo && (
               <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#1a73e8]" />
-                <span className="truncate">HLS multi-bitrate .m3u8 ready</span>
+                <span className="truncate">
+                  {file.hlsUrl
+                    ? "HLS multi-bitrate .m3u8 ready"
+                    : file.status === "PROCESSING"
+                    ? "Video transcoding in progress..."
+                    : file.dimensions?.width && file.dimensions?.height
+                    ? `${file.dimensions.width}×${file.dimensions.height} · MP4 video`
+                    : "MP4 video stream ready"}
+                </span>
               </div>
             )}
 

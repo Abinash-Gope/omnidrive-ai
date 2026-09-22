@@ -223,13 +223,13 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
       ? {
           executive: file.summary,
           takeaways: file.takeaways || [],
-          pages: file.pages || 1,
+          pages: file.pages || null,
           model: "OmniDrive Neural Engine",
         }
       : {
           executive: file.summary.executive || file.summary.summary || "",
           takeaways: file.summary.takeaways || file.summary.key_takeaways || [],
-          pages: file.summary.pages || file.summary.page_count || file.pages || 1,
+          pages: file.summary.pages || file.summary.page_count || file.pages || null,
           model: "OmniDrive Neural Engine",
         }
     : null;
@@ -537,10 +537,13 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
                       </div>
                       <div className="flex flex-col items-end gap-1">
                         <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white dark:bg-slate-800 text-purple-700 dark:text-purple-300 shadow-xs border border-purple-100 dark:border-purple-800">Verified AI</span>
-                        <span className="text-[10px] font-mono text-purple-500 dark:text-purple-400">
-                          <Layers className="inline w-3 h-3 mr-0.5" />
-                          {totalPages || file.pages || summary?.pages || 1} {(totalPages || file.pages || summary?.pages || 1) === 1 ? "page" : "pages"}
-                        </span>
+                        {(totalPages || file.pages || summary?.pages) && (
+                          <span className="text-[10px] font-mono text-purple-500 dark:text-purple-400">
+                            <Layers className="inline w-3 h-3 mr-0.5" />
+                            {totalPages || file.pages || summary?.pages}{" "}
+                            {(totalPages || file.pages || summary?.pages) === 1 ? "page" : "pages"}
+                          </span>
+                        )}
                       </div>
                     </div>
 

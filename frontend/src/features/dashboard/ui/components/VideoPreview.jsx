@@ -2,6 +2,22 @@ import React, { useState, useRef, useEffect } from "react";
 import { Film, Play } from "lucide-react";
 
 /**
+ * Format raw seconds into MM:SS (or HH:MM:SS) string
+ */
+const formatSeconds = (sec) => {
+  if (!sec || isNaN(sec) || !isFinite(sec) || sec <= 0) return null;
+  const totalSecs = Math.round(sec);
+  const hours = Math.floor(totalSecs / 3600);
+  const mins = Math.floor((totalSecs % 3600) / 60);
+  const remainingSecs = totalSecs % 60;
+
+  if (hours > 0) {
+    return `${hours}:${mins < 10 ? "0" : ""}${mins}:${remainingSecs < 10 ? "0" : ""}${remainingSecs}`;
+  }
+  return `${mins < 10 ? "0" : ""}${mins}:${remainingSecs < 10 ? "0" : ""}${remainingSecs}`;
+};
+
+/**
  * VideoPreview Component
  * Renders video thumbnail for grid cards and list views.
  * Handles instant cached image thumbnail, native video frame extraction (#t=0.5),
@@ -10,6 +26,13 @@ import { Film, Play } from "lucide-react";
 const VideoPreview = ({ file, isCompact = false, isHovered = false }) => {
   const [hasError, setHasError] = useState(false);
   const [isVideoLoaded, setIsVideoLoaded] = useState(false);
+  const [realDuration, setRealDuration] = useState(() => {
+    if (typeof file.duration === "number") return formatSeconds(file.duration);
+    if (typeof file.duration === "string" && file.duration !== "03:40" && file.duration.includes(":")) {
+      return file.duration;
+    }
+    return null;
+  });
   const videoRef = useRef(null);
 
   // Check if thumbnail is a valid image URL or base64 dataUrl (not a raw mp4 video)
@@ -21,6 +44,14 @@ const VideoPreview = ({ file, isCompact = false, isHovered = false }) => {
       /\.(jpe?g|png|webp|gif)(\?.*)?$/i.test(file.thumbnail));
 
   const videoSourceUrl = file.downloadUrl || (file.thumbnail && file.thumbnail.endsWith(".mp4") ? file.thumbnail : null);
+
+  const handleMetadata = (e) => {
+    const sec = e.target?.duration;
+    const formatted = formatSeconds(sec);
+    if (formatted) {
+      setRealDuration(formatted);
+    }
+  };
 
   // Play muted short preview on hover (grid view only)
   useEffect(() => {
@@ -102,22 +133,35 @@ const VideoPreview = ({ file, isCompact = false, isHovered = false }) => {
           loop
           playsInline
           onLoadedData={() => setIsVideoLoaded(true)}
+          onLoadedMetadata={handleMetadata}
           onError={() => setHasError(true)}
           className="w-full h-full object-cover pointer-events-none transition-transform duration-500 group-hover:scale-105"
         />
       ) : (
-        /* 3. Sleek OmniDrive Fallback Placeholder (Never Broken [?]) */
+        /* 3. Sleek OmniDrive Fallback Placeholder */
         <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-slate-950 to-blue-950/40 p-4 text-center">
           <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-[#1a73e8] dark:text-blue-400 flex items-center justify-center mb-2 shadow-inner">
             <Film className="w-6 h-6 stroke-[1.5]" />
           </div>
           <span className="text-[11px] font-mono text-slate-300 font-medium tracking-wide">
-            {file.activeQuality || "720p"} HLS Video
+            {file.name || "Video Stream"}
           </span>
           <span className="text-[10px] text-slate-400 font-mono mt-0.5">
-            OmniDrive Media Stream
+            {file.status === "PROCESSING" ? "Transcoding..." : "Video Media"}
           </span>
         </div>
+      )}
+
+      {/* Background metadata probe for accurate real duration when displaying image thumbnail */}
+      {videoSourceUrl && !realDuration && (
+        <video
+          src={videoSourceUrl}
+          preload="metadata"
+          muted
+          playsInline
+          className="hidden"
+          onLoadedMetadata={handleMetadata}
+        />
       )}
 
       {/* Center Hover Play Button with Glassmorphism */}
@@ -127,11 +171,13 @@ const VideoPreview = ({ file, isCompact = false, isHovered = false }) => {
         </div>
       </div>
 
-      {/* Floating Bottom-Right Video Duration Tag */}
-      <div className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-md bg-black/80 backdrop-blur-xs text-white text-[11px] font-mono font-medium flex items-center gap-1.5 border border-white/10 shadow-xs pointer-events-none">
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-        <span>{file.duration || "03:40"}</span>
-      </div>
+      {/* Floating Bottom-Right Video Duration Tag — only show real duration, never fake fallback */}
+      {realDuration && (
+        <div className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-md bg-black/80 backdrop-blur-xs text-white text-[11px] font-mono font-medium flex items-center gap-1.5 border border-white/10 shadow-xs pointer-events-none animate-fadeIn">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span>{realDuration}</span>
+        </div>
+      )}
     </div>
   );
 };

@@ -12,7 +12,7 @@ export const FileGridSkeleton = ({ viewMode = "grid", count = 8 }) => {
         {/* Table Header Placeholder */}
         <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-500 uppercase tracking-wider">
           <span className="flex-1">Name</span>
-          <span className="hidden sm:inline px-4 w-36 text-left">Pipeline Status</span>
+          <span className="hidden sm:inline px-4 w-36 text-left">Status</span>
           <span className="w-16 text-right">Size</span>
           <span className="w-20 text-right hidden md:inline">Modified</span>
           <span className="w-8"></span>
@@ -76,11 +76,8 @@ export const FileGridSkeleton = ({ viewMode = "grid", count = 8 }) => {
             </div>
 
             <div className="pt-2 border-t border-slate-100 dark:border-slate-800/60 flex items-center justify-between">
-              <Skeleton className="h-5 w-20 rounded-full" />
-              <div className="flex items-center gap-2">
-                <Skeleton className="h-3 w-10 rounded-md" />
-                <Skeleton className="h-3 w-12 rounded-md" />
-              </div>
+              <Skeleton className="h-3.5 w-12 rounded-md" />
+              <Skeleton className="h-3 w-16 rounded-md" />
             </div>
           </div>
         </div>
