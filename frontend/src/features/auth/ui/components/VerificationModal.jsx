@@ -109,16 +109,19 @@ const VerificationModal = () => {
   };
 
   return (
-    <ModalWrapper isOpen={isOpen} onClose={handleClose} maxWidth="max-w-md" padding="p-5 sm:p-6">
+    <ModalWrapper isOpen={isOpen} onClose={handleClose} maxWidth="max-w-lg" padding="p-5 sm:p-6 md:p-7">
+      {/* Ambient Top Glow */}
+      <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-80 h-24 bg-gradient-to-b from-blue-500/15 via-indigo-500/10 to-transparent blur-3xl pointer-events-none" />
+
       {/* Header */}
-      <div className="text-center mb-4">
-        <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/60 text-[#1a73e8] dark:text-blue-400 flex items-center justify-center mx-auto mb-3 shadow-sm ring-4 ring-blue-50/50 dark:ring-blue-900/20">
+      <div className="text-center mb-4 relative">
+        <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/60 text-[#1a73e8] dark:text-blue-400 flex items-center justify-center mx-auto mb-2.5 shadow-sm ring-4 ring-blue-50/50 dark:ring-blue-900/20">
           <Mail className="w-6 h-6" />
         </div>
-        <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+        <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
           Verify Your Email
         </h2>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xs mx-auto">
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
           We sent a 6-digit confirmation code to{" "}
           <span className="font-semibold text-slate-700 dark:text-slate-200">
             {email || "your registered email"}
@@ -127,7 +130,7 @@ const VerificationModal = () => {
       </div>
 
       {error && (
-        <div className="mb-3 p-2.5 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 text-xs">
+        <div className="mb-3 p-2.5 rounded-xl bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 text-xs">
           {error}
         </div>
       )}
@@ -135,7 +138,7 @@ const VerificationModal = () => {
       {/* Code Input Form */}
       <form onSubmit={handleVerify} className="space-y-4">
         <div>
-          <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1 text-center uppercase tracking-wider">
+          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 text-center uppercase tracking-wider">
             6-Digit Verification Code
           </label>
           <div className="relative max-w-xs mx-auto">
@@ -151,7 +154,7 @@ const VerificationModal = () => {
                   setError(null);
                 }
               }}
-              className="w-full text-center tracking-[0.6em] text-2xl font-mono font-bold py-3 px-4 rounded-xl border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#1a73e8] focus:border-[#1a73e8]"
+              className="w-full text-center tracking-[0.5em] text-2xl font-mono font-bold py-2.5 px-4 rounded-xl border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#1a73e8] focus:border-[#1a73e8]"
               placeholder="••••••"
             />
           </div>
@@ -161,14 +164,14 @@ const VerificationModal = () => {
         <button
           type="submit"
           disabled={isSubmitting || code.length < 4}
-          className="w-full py-2.5 rounded-xl bg-[#1a73e8] hover:bg-[#1557bf] disabled:opacity-50 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-sm hover:shadow transition-all active:scale-95"
+          className="w-full py-2.5 sm:py-3 rounded-xl bg-gradient-to-r from-[#1a73e8] via-blue-600 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 disabled:opacity-50 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md shadow-blue-500/20 hover:shadow-blue-500/35 transition-all active:scale-[0.99] cursor-pointer"
         >
           {isSubmitting ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
+            <Loader2 className="w-5 h-5 animate-spin" />
           ) : (
             <>
               <span>Verify & Launch Workspace</span>
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-5 h-5" />
             </>
           )}
         </button>

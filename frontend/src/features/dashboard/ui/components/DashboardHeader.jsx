@@ -1,8 +1,9 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { Search, LayoutGrid, List, LogOut, X, Bell } from "lucide-react";
+import { Search, LayoutGrid, List, LogOut, X, Bell, Sun, Moon, Laptop } from "lucide-react";
 import OmniDriveLogo from "../../../../shared/ui/components/OmniDriveLogo.jsx";
 import useAuth from "../../../auth/hooks/useAuth.jsx";
+import useTheme from "../../../../shared/hooks/useTheme.jsx";
 
 const DashboardHeader = ({
   searchQuery,
@@ -12,6 +13,7 @@ const DashboardHeader = ({
   onResetFilter,
 }) => {
   const { user, plan, planDetails, handleLogout } = useAuth();
+  const { theme, isDark, toggleTheme } = useTheme();
 
   return (
     <header className="h-16 px-4 sm:px-6 flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a] sticky top-0 z-30 transition-colors">
@@ -67,6 +69,19 @@ const DashboardHeader = ({
           className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors"
         >
           {viewMode === "grid" ? <List className="w-5 h-5" /> : <LayoutGrid className="w-5 h-5" />}
+        </button>
+
+        {/* Quick Theme Toggle */}
+        <button
+          onClick={toggleTheme}
+          title={isDark ? "Switch to Light mode" : "Switch to Dark mode"}
+          className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
+        >
+          {isDark ? (
+            <Sun className="w-5 h-5 text-amber-400 hover:rotate-45 transition-transform duration-300" />
+          ) : (
+            <Moon className="w-5 h-5 text-slate-600 hover:-rotate-12 transition-transform duration-300" />
+          )}
         </button>
 
         {/* Notification Bell */}

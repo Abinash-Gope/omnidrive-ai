@@ -8,10 +8,13 @@ import {
   ShieldCheck,
   Zap,
   LayoutDashboard,
+  Sun,
+  Moon,
 } from "lucide-react";
 import OmniDriveLogo from "../../../../shared/ui/components/OmniDriveLogo.jsx";
 import { usePublicPages } from "../../hooks/usePublicPages.jsx";
 import { useAuthContext } from "../../../auth/context/AuthContext.jsx";
+import useTheme from "../../../../shared/hooks/useTheme.jsx";
 
 const navItems = [
   { label: "Overview", path: "/" },
@@ -24,6 +27,7 @@ const navItems = [
 const PublicNavbar = () => {
   const { isAuthenticated, handleOpenLogin, handleOpenRegister } = usePublicPages();
   const { loginWithGoogle } = useAuthContext();
+  const { isDark, toggleTheme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
@@ -33,15 +37,9 @@ const PublicNavbar = () => {
         <div className="flex items-center gap-8">
           <Link to="/" className="flex items-center gap-2.5 group">
             <OmniDriveLogo size="md" animate={true} />
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-xl tracking-tight text-slate-900 dark:text-white">
-                OmniDrive<span className="text-[#1a73e8]">AI</span>
-              </span>
-              <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Free 15GB
-              </span>
-            </div>
+            <span className="font-bold text-xl tracking-tight text-slate-900 dark:text-white">
+              OmniDrive<span className="text-[#1a73e8]">AI</span>
+            </span>
           </Link>
 
           {/* Center Navigation Links */}
@@ -67,6 +65,21 @@ const PublicNavbar = () => {
 
         {/* Right Action CTAs */}
         <div className="flex items-center gap-3">
+          {/* Quick Theme Toggle */}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            title={isDark ? "Switch to Light theme" : "Switch to Dark theme"}
+            aria-label="Toggle visual theme"
+            className="p-2 rounded-full text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800 transition-colors cursor-pointer"
+          >
+            {isDark ? (
+              <Sun className="w-5 h-5 text-amber-400 hover:rotate-45 transition-transform duration-300" />
+            ) : (
+              <Moon className="w-5 h-5 text-slate-600 hover:-rotate-12 transition-transform duration-300" />
+            )}
+          </button>
+
           {isAuthenticated ? (
             <Link
               to="/dashboard"
@@ -129,6 +142,17 @@ const PublicNavbar = () => {
               {item.label}
             </NavLink>
           ))}
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between px-2 py-1">
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Theme</span>
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200"
+            >
+              {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
+              <span>{isDark ? "Dark" : "Light"}</span>
+            </button>
+          </div>
           <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-2">
             {!isAuthenticated && (
               <button

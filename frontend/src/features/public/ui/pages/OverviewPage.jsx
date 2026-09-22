@@ -9,8 +9,6 @@ import {
   ArrowRight,
   CheckCircle2,
   Server,
-  Play,
-  Sparkles,
 } from "lucide-react";
 import usePublicPages from "../../hooks/usePublicPages.jsx";
 
@@ -24,11 +22,6 @@ const OverviewPage = () => {
         {/* Glow ambient background effect */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-gradient-to-tr from-blue-400/15 via-indigo-400/10 to-transparent blur-3xl pointer-events-none rounded-full" />
 
-        {/* Live Feature Chip */}
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold bg-[#eaedff] text-[#005bbf] dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800 mb-8 animate-fadeIn">
-          <Sparkles className="w-3.5 h-3.5 text-[#1a73e8]" />
-          <span>Decoupled AWS Serverless AI & 1080p HLS Media Streaming</span>
-        </div>
 
         {/* Main Headline */}
         <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-slate-900 dark:text-white max-w-4xl leading-[1.15]">
@@ -70,13 +63,6 @@ const OverviewPage = () => {
             </button>
           )}
 
-          <Link
-            to="/dashboard"
-            className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-semibold border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/60 shadow-xs transition-all"
-          >
-            <Play className="w-4 h-4 text-[#1a73e8] fill-current" />
-            <span>Launch Live Sandbox</span>
-          </Link>
         </div>
 
         {/* Platform Technology Bar */}

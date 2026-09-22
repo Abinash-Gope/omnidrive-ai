@@ -1,7 +1,8 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// https://vitejs.dev/config/
+// Vite configuration for OmniDrive AI SPA
+// Explicitly reloaded for Tailwind class-based dark mode
 export default defineConfig({
   plugins: [react()],
   define: {

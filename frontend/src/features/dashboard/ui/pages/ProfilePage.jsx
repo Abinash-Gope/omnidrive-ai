@@ -19,11 +19,15 @@ import {
   Cpu,
   Radio,
   ExternalLink,
+  Sun,
+  Moon,
+  Monitor,
 } from "lucide-react";
 import useAuth from "../../../auth/hooks/useAuth.jsx";
 import { setToast } from "../../../../shared/state/uiSlice.jsx";
 import { useDispatch } from "react-redux";
 import { PLANS, getPlanDetails } from "../../../../shared/config/plans.jsx";
+import useTheme from "../../../../shared/hooks/useTheme.jsx";
 
 const ProfilePage = () => {
   const navigate = useNavigate();
@@ -36,6 +40,7 @@ const ProfilePage = () => {
     handleUpdatePlan,
     handleOpenEnterpriseContact,
   } = useAuth();
+  const { theme, isDark, changeTheme, toggleTheme } = useTheme();
 
   const [activeTab, setActiveTab] = useState("general");
   const [formData, setFormData] = useState({
@@ -116,6 +121,22 @@ const ProfilePage = () => {
 
         {/* Right: Notification & Actions */}
         <div className="flex items-center gap-3">
+          {/* Quick Theme Toggle */}
+          <button
+            onClick={() => {
+              const next = toggleTheme();
+              dispatch(setToast({ type: "info", message: `Theme switched to ${next} mode.` }));
+            }}
+            title={isDark ? "Switch to Light mode" : "Switch to Dark mode"}
+            className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
+          >
+            {isDark ? (
+              <Sun className="w-5 h-5 text-amber-400 hover:rotate-45 transition-transform duration-300" />
+            ) : (
+              <Moon className="w-5 h-5 text-slate-600 hover:-rotate-12 transition-transform duration-300" />
+            )}
+          </button>
+
           <button
             title="Notifications"
             className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors relative"
@@ -530,6 +551,138 @@ const ProfilePage = () => {
                       <option>DD/MM/YYYY</option>
                     </select>
                   </div>
+                </div>
+              </div>
+
+              {/* Theme & Appearance Card */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 space-y-5 shadow-xs">
+                <div className="border-b border-slate-100 dark:border-slate-800 pb-3 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <Sun className="w-4 h-4 text-amber-500 dark:hidden" />
+                      <Moon className="w-4 h-4 text-blue-400 hidden dark:block" />
+                      <span>Theme &amp; Appearance</span>
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Select your preferred workspace theme or synchronize automatically with your device.
+                    </p>
+                  </div>
+                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-950/60 text-[#1a73e8] dark:text-blue-400 border border-blue-200/80 dark:border-blue-800 capitalize">
+                    Active: {theme}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {/* Light Mode Card */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      changeTheme("light");
+                      dispatch(setToast({ type: "info", message: "Theme switched to Light mode." }));
+                    }}
+                    className={`p-4 rounded-2xl border text-left transition-all relative flex flex-col justify-between cursor-pointer ${
+                      theme === "light"
+                        ? "border-[#1a73e8] bg-blue-50/50 dark:bg-blue-950/30 ring-2 ring-[#1a73e8]/30 shadow-xs"
+                        : "border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40"
+                    }`}
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-200/60 dark:border-amber-800/60">
+                          <Sun className="w-5 h-5" />
+                        </div>
+                        {theme === "light" && (
+                          <span className="w-5 h-5 rounded-full bg-[#1a73e8] text-white flex items-center justify-center">
+                            <Check className="w-3 h-3" />
+                          </span>
+                        )}
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-900 dark:text-white">Light Mode</h4>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                          Crisp, bright daytime contrast
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[11px] font-semibold text-slate-400">
+                      <span>Light</span>
+                      <span className="w-2.5 h-2.5 rounded-full bg-slate-200 border border-slate-300" />
+                    </div>
+                  </button>
+
+                  {/* Dark Mode Card */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      changeTheme("dark");
+                      dispatch(setToast({ type: "info", message: "Theme switched to Dark mode." }));
+                    }}
+                    className={`p-4 rounded-2xl border text-left transition-all relative flex flex-col justify-between cursor-pointer ${
+                      theme === "dark"
+                        ? "border-[#1a73e8] bg-blue-50/50 dark:bg-blue-950/30 ring-2 ring-[#1a73e8]/30 shadow-xs"
+                        : "border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40"
+                    }`}
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-[#1a73e8] dark:text-blue-400 flex items-center justify-center border border-blue-200/60 dark:border-blue-800/60">
+                          <Moon className="w-5 h-5" />
+                        </div>
+                        {theme === "dark" && (
+                          <span className="w-5 h-5 rounded-full bg-[#1a73e8] text-white flex items-center justify-center">
+                            <Check className="w-3 h-3" />
+                          </span>
+                        )}
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-900 dark:text-white">Dark Mode</h4>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                          Sleek low-glare deep navy palette
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[11px] font-semibold text-slate-400">
+                      <span>Dark</span>
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#060b19] border border-slate-700" />
+                    </div>
+                  </button>
+
+                  {/* System Mode Card */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      changeTheme("system");
+                      dispatch(setToast({ type: "info", message: "Theme set to follow System OS preferences." }));
+                    }}
+                    className={`p-4 rounded-2xl border text-left transition-all relative flex flex-col justify-between cursor-pointer ${
+                      theme === "system"
+                        ? "border-[#1a73e8] bg-blue-50/50 dark:bg-blue-950/30 ring-2 ring-[#1a73e8]/30 shadow-xs"
+                        : "border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40"
+                    }`}
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="w-9 h-9 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-200/60 dark:border-purple-800/60">
+                          <Laptop className="w-5 h-5" />
+                        </div>
+                        {theme === "system" && (
+                          <span className="w-5 h-5 rounded-full bg-[#1a73e8] text-white flex items-center justify-center">
+                            <Check className="w-3 h-3" />
+                          </span>
+                        )}
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-900 dark:text-white">System Default</h4>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                          Automatically synchronizes with your device OS
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[11px] font-semibold text-slate-400">
+                      <span>Auto-Sync</span>
+                      <span className="w-2.5 h-2.5 rounded-full bg-gradient-to-r from-amber-400 to-indigo-600" />
+                    </div>
+                  </button>
                 </div>
               </div>
             </div>
