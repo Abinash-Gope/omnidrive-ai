@@ -58,7 +58,7 @@ const FileCard = ({ file, onOpenPreview, onDeleteFile, viewMode = "grid" }) => {
             {(file.thumbnail || file.downloadUrl) && !isPdf ? (
               <img src={file.thumbnail || file.downloadUrl} alt={file.name} className="w-full h-full object-cover" />
             ) : isPdf && file.downloadUrl ? (
-              <PdfPreview url={file.downloadUrl} pageNumber={1} scale={0.15} className="w-full h-full" />
+              <PdfPreview url={file.downloadUrl} pageNumber={1} scale={0.15} className="w-full h-full" fitParent={true} />
             ) : (
               getFileIcon()
             )}
@@ -132,6 +132,7 @@ const FileCard = ({ file, onOpenPreview, onDeleteFile, viewMode = "grid" }) => {
               pageNumber={1}
               scale={0.6}
               className="w-full h-full"
+              fitParent={true}
             />
           </div>
         ) : (

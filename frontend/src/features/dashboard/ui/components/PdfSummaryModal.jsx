@@ -92,7 +92,7 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
   const [copied, setCopied] = useState(false);
   const [pageNumber, setPageNumber] = useState(1);
   const [totalPages, setTotalPages] = useState(null);
-  const [scale, setScale] = useState(1.4);
+  const [scale, setScale] = useState(1.0);
 
   // Right panel tabs: "summary" | "chat"
   const [activeTab, setActiveTab] = useState("summary");
@@ -106,6 +106,59 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
   const [extractError, setExtractError] = useState(null);
   const chatEndRef = useRef(null);
   const inputRef = useRef(null);
+
+  // PDF viewer container & free-movement drag state
+  const viewerContainerRef = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartPos = useRef({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 });
+
+  // When reset to 100% or below, center and reset scroll; when zooming in, center view
+  useEffect(() => {
+    if (scale <= 1.0 && viewerContainerRef.current) {
+      viewerContainerRef.current.scrollLeft = 0;
+      viewerContainerRef.current.scrollTop = 0;
+    } else if (scale > 1.0 && viewerContainerRef.current) {
+      const el = viewerContainerRef.current;
+      setTimeout(() => {
+        if (el) {
+          el.scrollLeft = Math.max(0, (el.scrollWidth - el.clientWidth) / 2);
+        }
+      }, 50);
+    }
+  }, [scale]);
+
+  const handlePointerDown = (e) => {
+    if (scale <= 1.0 || !viewerContainerRef.current) return;
+    if (e.button !== 0) return; // Primary left click only
+    setIsDragging(true);
+    dragStartPos.current = {
+      x: e.clientX,
+      y: e.clientY,
+      scrollLeft: viewerContainerRef.current.scrollLeft,
+      scrollTop: viewerContainerRef.current.scrollTop,
+    };
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {}
+  };
+
+  const handlePointerMove = (e) => {
+    if (!isDragging || scale <= 1.0 || !viewerContainerRef.current) return;
+    e.preventDefault();
+    const dx = e.clientX - dragStartPos.current.x;
+    const dy = e.clientY - dragStartPos.current.y;
+    viewerContainerRef.current.scrollLeft = dragStartPos.current.scrollLeft - dx;
+    viewerContainerRef.current.scrollTop = dragStartPos.current.scrollTop - dy;
+  };
+
+  const handlePointerUp = (e) => {
+    if (isDragging) {
+      setIsDragging(false);
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {}
+    }
+  };
 
   // Scroll chat to bottom on new message
   useEffect(() => {
@@ -322,22 +375,71 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
                   <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
-              <div className="flex items-center gap-1">
-                <button onClick={zoomOut} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+              <div className="flex items-center gap-1.5">
+                {scale > 1.0 && (
+                  <span className="hidden sm:inline-flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-full font-medium mr-1 animate-in fade-in">
+                    ✋ Drag to move
+                  </span>
+                )}
+                <button
+                  onClick={zoomOut}
+                  disabled={scale <= 0.5}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  title="Zoom Out"
+                >
                   <ZoomOut className="w-4 h-4" />
                 </button>
-                <span className="text-xs font-mono text-slate-500 w-12 text-center">{Math.round(scale * 100)}%</span>
-                <button onClick={zoomIn} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                <button
+                  onClick={() => setScale(1.0)}
+                  title="Click to reset to 100%"
+                  className="text-xs font-mono text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 w-12 text-center transition-colors cursor-pointer"
+                >
+                  {Math.round(scale * 100)}%
+                </button>
+                <button
+                  onClick={zoomIn}
+                  disabled={scale >= 3.0}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  title="Zoom In"
+                >
                   <ZoomIn className="w-4 h-4" />
                 </button>
               </div>
             </div>
 
-            {/* PDF Canvas */}
-            <div className="flex-1 overflow-auto flex items-start justify-center p-4 min-h-0">
+            {/* PDF Canvas Container */}
+            <div
+              ref={viewerContainerRef}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerUp}
+              className={`flex-1 overflow-auto min-h-0 select-none ${
+                scale > 1.0
+                  ? isDragging
+                    ? "cursor-grabbing"
+                    : "cursor-grab"
+                  : "cursor-default"
+              }`}
+            >
               {pdfUrl ? (
-                <div className="shadow-2xl rounded-lg overflow-hidden border border-slate-300 dark:border-slate-700 bg-white">
-                  <PdfPreview url={pdfUrl} pageNumber={pageNumber} scale={scale} onPageCount={setTotalPages} />
+                <div
+                  className={`min-w-full min-h-full flex p-6 box-border ${
+                    scale <= 1.0 ? "items-center justify-center" : "w-fit"
+                  }`}
+                >
+                  <div
+                    className={`shrink-0 shadow-2xl rounded-lg overflow-hidden border border-slate-300 dark:border-slate-700 bg-white transition-shadow ${
+                      scale <= 1.0 ? "max-w-full max-h-full" : "m-auto"
+                    } ${isDragging ? "pointer-events-none shadow-blue-500/20" : ""}`}
+                  >
+                    <PdfPreview
+                      url={pdfUrl}
+                      pageNumber={pageNumber}
+                      scale={scale}
+                      onPageCount={setTotalPages}
+                    />
+                  </div>
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-400">

@@ -23,6 +23,7 @@ const PdfPreview = ({
   pageNumber = 1,
   scale = 1.5,
   className = "",
+  fitParent = false,
   onPageCount,
   onError,
 }) => {
@@ -35,6 +36,7 @@ const PdfPreview = ({
 
     let cancelled = false;
     let pdfDoc = null;
+    let renderTask = null;
 
     const renderPage = async () => {
       setIsLoading(true);
@@ -66,10 +68,12 @@ const PdfPreview = ({
         canvas.width = viewport.width;
         canvas.height = viewport.height;
 
-        await page.render({ canvasContext: ctx, viewport }).promise;
+        renderTask = page.render({ canvasContext: ctx, viewport });
+        await renderTask.promise;
 
         if (!cancelled) setIsLoading(false);
       } catch (err) {
+        if (err?.name === "RenderingCancelledException") return;
         if (!cancelled) {
           setError(err.message || "Failed to render PDF");
           setIsLoading(false);
@@ -82,15 +86,28 @@ const PdfPreview = ({
 
     return () => {
       cancelled = true;
-      if (pdfDoc) pdfDoc.destroy();
+      if (renderTask) {
+        try {
+          renderTask.cancel();
+        } catch {}
+      }
+      if (pdfDoc) {
+        try {
+          pdfDoc.destroy();
+        } catch {}
+      }
     };
   }, [url, pageNumber, scale]);
 
   return (
-    <div className={`relative flex items-center justify-center bg-slate-100 dark:bg-slate-800 ${className}`}>
+    <div
+      className={`relative flex items-center justify-center bg-slate-100 dark:bg-slate-800 ${
+        fitParent ? "w-full h-full" : scale <= 1.0 ? "max-w-full" : "w-fit"
+      } ${className}`}
+    >
       {/* Loading shimmer */}
       {isLoading && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 animate-pulse">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 animate-pulse z-10 bg-slate-100/80 dark:bg-slate-800/80">
           <div className="w-8 h-10 rounded bg-slate-300 dark:bg-slate-700" />
           <div className="space-y-1.5 w-2/3">
             <div className="h-2 rounded bg-slate-300 dark:bg-slate-700" />
@@ -111,8 +128,14 @@ const PdfPreview = ({
       {/* The actual rendered canvas */}
       <canvas
         ref={canvasRef}
-        className={`max-w-full transition-opacity duration-300 ${isLoading || error ? "opacity-0" : "opacity-100"}`}
-        style={{ display: "block" }}
+        className={`${
+          fitParent ? "max-w-full max-h-full object-contain" : ""
+        } transition-opacity duration-300 ${isLoading || error ? "opacity-0" : "opacity-100"}`}
+        style={{
+          display: "block",
+          maxWidth: !fitParent && scale <= 1.0 ? "100%" : undefined,
+          height: !fitParent && scale <= 1.0 ? "auto" : undefined,
+        }}
       />
     </div>
   );
