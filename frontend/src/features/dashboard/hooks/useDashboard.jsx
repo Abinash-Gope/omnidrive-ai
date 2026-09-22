@@ -119,7 +119,7 @@ export const useDashboard = () => {
     // Instant client-side thumbnail generation
     let thumbData = null;
     try {
-      if (inferredType === "image") {
+      if (inferredType === "image" || inferredType === "video") {
         thumbData = await generateThumbnail(file);
       }
     } catch (thumbErr) {

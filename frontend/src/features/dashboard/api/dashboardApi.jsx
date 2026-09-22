@@ -73,14 +73,18 @@ export const getFilesApi = async () => {
           };
         }
 
+        const isVideo = item.content_type?.startsWith("video/") || (fileName && fileName.endsWith(".mp4"));
+        const isImage = item.content_type?.startsWith("image/") || (fileName && /\.(jpe?g|png|webp|gif)$/i.test(fileName));
+        const isPdf = item.content_type?.includes("pdf") || (fileName && fileName.endsWith(".pdf"));
+
         return {
           id: fileId,
           name: fileName,
-          type: item.content_type?.startsWith("video/")
+          type: isVideo
             ? "video"
-            : item.content_type?.startsWith("image/")
+            : isImage
             ? "image"
-            : item.content_type?.includes("pdf")
+            : isPdf
             ? "pdf"
             : "other",
           sizeBytes: item.file_size ? Number(item.file_size) : 0,
@@ -98,20 +102,24 @@ export const getFilesApi = async () => {
                 executive: item.summary,
                 takeaways: item.key_takeaways || [],
                 pages: item.page_count || 1,
-                model: "Amazon Bedrock (Claude 3 Haiku)",
+                model: "OmniDrive Neural Engine",
               }
             : item.summary || null,
-          // Resolve thumbnail: prefer backend presigned URL (cross-browser) → local cache (same-browser upload session)
-          thumbnail: item.thumbnail_url || item.download_url || cachedThumb || null,
-          // Expose raw download_url so any browser can construct its own image preview without localStorage
+          // Resolve thumbnail: for images prefer thumbnail_url -> download_url -> cachedThumb.
+          // For videos, NEVER set raw .mp4 download_url as thumbnail (it breaks <img> tags).
+          thumbnail: isVideo
+            ? (item.thumbnail_url || cachedThumb || null)
+            : (item.thumbnail_url || item.download_url || cachedThumb || null),
+          // Expose raw download_url so players and preview components can stream directly
           downloadUrl: item.download_url || null,
+          hlsUrl: item.hls_master_url || item.hls_url || null,
           dimensions,
           exif: exifData,
           previewSnippet: item.preview_snippet || item.status,
           s3Key: s3Key,
-          duration: item.duration || null,
-          hlsQualities: item.hls_qualities || (item.hls_url ? ["1080p", "720p", "480p"] : []),
-          activeQuality: "1080p",
+          duration: item.duration || "03:40",
+          hlsQualities: item.hls_qualities || ["1080p", "720p", "480p"],
+          activeQuality: "720p",
           transcoderInfo: item.transcoder_info || null,
         };
       });

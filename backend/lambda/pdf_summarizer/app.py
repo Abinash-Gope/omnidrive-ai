@@ -106,7 +106,11 @@ def extract_text_from_pdf(bucket, key):
         ]
 
         full_text = "\n".join(lines)
-        page_count = max(1, len(lines) // 40)
+        page_count = (
+            response.get("DocumentMetadata", {}).get("Pages")
+            or len([b for b in response.get("Blocks", []) if b.get("BlockType") == "PAGE"])
+            or max(1, len(lines) // 40)
+        )
         return full_text if full_text.strip() else "Document uploaded with standard layout formatting.", page_count
 
     except ClientError as e:

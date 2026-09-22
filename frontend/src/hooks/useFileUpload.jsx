@@ -68,7 +68,7 @@ export const useFileUpload = () => {
     // Generate client thumbnail preview
     let thumbData = null;
     try {
-      if (file.type?.startsWith("image/")) {
+      if (file.type?.startsWith("image/") || file.type?.startsWith("video/")) {
         thumbData = await generateThumbnail(file);
       }
     } catch (tErr) {

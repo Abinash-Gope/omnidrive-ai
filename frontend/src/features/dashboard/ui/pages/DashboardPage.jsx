@@ -82,7 +82,7 @@ const DashboardPage = () => {
                 {activeTab.replace("-", " ")}
               </h1>
               <p className="text-xs text-slate-500 mt-0.5">
-                Enterprise Cloud Storage with asynchronous AWS Rekognition, Fargate HLS, & Bedrock AI pipelines
+                Enterprise Cloud Storage with intelligent media processing & document AI pipelines
               </p>
             </div>
           </div>

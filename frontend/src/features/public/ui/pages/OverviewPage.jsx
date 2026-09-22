@@ -47,7 +47,7 @@ const OverviewPage = () => {
         {/* Subhead */}
         <p className="mt-6 text-lg sm:text-xl text-slate-600 dark:text-slate-300 max-w-2xl leading-relaxed">
           Upload files directly to Amazon S3 via presigned URLs. Automatically transcode adaptive HLS
-          video on ARM64 Fargate, extract Rekognition vision tags, and summarize PDFs with Claude 3.
+          video on ARM64 Fargate, extract Rekognition vision tags, and summarize documents with generative AI.
         </p>
 
         {/* Call to Actions */}
@@ -119,7 +119,7 @@ const OverviewPage = () => {
           <div className="flex items-center gap-2 sm:px-4 py-1 sm:py-0">
             <Zap className="w-3.5 h-3.5 text-amber-500 shrink-0" />
             <span className="text-slate-500 shrink-0">AI:</span>
-            <span className="font-bold text-slate-900 dark:text-white">Rekognition + Bedrock Claude 3</span>
+            <span className="font-bold text-slate-900 dark:text-white">Vision AI + Document Intelligence</span>
           </div>
           <div className="flex items-center gap-2 sm:pl-4 py-1 sm:py-0">
             <Server className="w-3.5 h-3.5 text-blue-500 shrink-0" />
@@ -197,14 +197,14 @@ const OverviewPage = () => {
                 <FileText className="w-6 h-6" />
               </div>
               <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300 mb-2">
-                Claude 3 + Textract
+                Neural Document AI
               </span>
               <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">
                 GenAI PDF Summaries
               </h3>
               <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mb-4">
-                Documents are OCR-parsed via Textract and synthesized into bullet takeaways and executive
-                summaries with Amazon Bedrock.
+                Documents are OCR-parsed and synthesized into bullet takeaways and executive
+                summaries with advanced neural intelligence.
               </p>
               <Link
                 to="/features"

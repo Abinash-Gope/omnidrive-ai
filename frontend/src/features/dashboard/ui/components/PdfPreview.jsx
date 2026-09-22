@@ -24,6 +24,7 @@ const PdfPreview = ({
   scale = 1.5,
   className = "",
   fitParent = false,
+  objectFit = "contain",
   onPageCount,
   onError,
 }) => {
@@ -101,8 +102,10 @@ const PdfPreview = ({
 
   return (
     <div
-      className={`relative flex items-center justify-center bg-slate-100 dark:bg-slate-800 ${
-        fitParent ? "w-full h-full" : scale <= 1.0 ? "max-w-full" : "w-fit"
+      className={`relative flex items-center justify-center ${
+        objectFit === "cover" ? "bg-white dark:bg-slate-900" : "bg-slate-100 dark:bg-slate-800"
+      } ${
+        fitParent ? "w-full h-full overflow-hidden" : scale <= 1.0 ? "max-w-full" : "w-fit"
       } ${className}`}
     >
       {/* Loading shimmer */}
@@ -129,7 +132,11 @@ const PdfPreview = ({
       <canvas
         ref={canvasRef}
         className={`${
-          fitParent ? "max-w-full max-h-full object-contain" : ""
+          fitParent
+            ? objectFit === "cover"
+              ? "w-full h-full object-cover object-top"
+              : "max-w-full max-h-full object-contain"
+            : ""
         } transition-opacity duration-300 ${isLoading || error ? "opacity-0" : "opacity-100"}`}
         style={{
           display: "block",

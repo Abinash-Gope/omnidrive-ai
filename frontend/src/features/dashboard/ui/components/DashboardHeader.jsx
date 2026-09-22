@@ -46,7 +46,7 @@ const DashboardHeader = ({
             type="text"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Search files, AI labels (e.g. Urban), OCR text, or Bedrock summaries..."
+            placeholder="Search files, AI labels (e.g. Urban), OCR text, or document summaries..."
             className="w-full pl-10 pr-10 py-2 rounded-full bg-[#f1f5f9] dark:bg-slate-800/80 hover:bg-[#e2e8f0] dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1a73e8] border border-transparent focus:border-transparent text-sm text-slate-900 dark:text-white transition-colors placeholder:text-slate-400"
           />
           {searchQuery && (

@@ -26,7 +26,87 @@ export const generateThumbnail = (file, maxWidth = 800, maxHeight = 600, quality
       return reject(new Error("Invalid file passed to generateThumbnail"));
     }
 
-    // Only process image files
+    // Handle video files by extracting a representative frame at 0.5s
+    if (file.type?.startsWith("video/")) {
+      const video = document.createElement("video");
+      const blobUrl = URL.createObjectURL(file);
+      video.preload = "metadata";
+      video.muted = true;
+      video.playsInline = true;
+      video.crossOrigin = "anonymous";
+      video.src = blobUrl;
+
+      let hasResolved = false;
+      const cleanup = () => {
+        try {
+          URL.revokeObjectURL(blobUrl);
+          video.src = "";
+          video.load();
+        } catch (_) {}
+      };
+
+      video.onloadeddata = () => {
+        const targetTime = Math.min(0.5, (video.duration || 1) * 0.1);
+        video.currentTime = targetTime;
+      };
+
+      video.onseeked = () => {
+        if (hasResolved) return;
+        hasResolved = true;
+
+        try {
+          let width = video.videoWidth || 640;
+          let height = video.videoHeight || 360;
+          const origWidth = width;
+          const origHeight = height;
+
+          if (width > maxWidth || height > maxHeight) {
+            const ratio = Math.min(maxWidth / width, maxHeight / height);
+            width = Math.round(width * ratio);
+            height = Math.round(height * ratio);
+          }
+
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(video, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL("image/jpeg", quality);
+            cleanup();
+            return resolve({
+              dataUrl,
+              width: origWidth,
+              height: origHeight,
+              format: "JPEG",
+              duration: video.duration,
+            });
+          }
+        } catch (e) {
+          console.warn("Video thumbnail capture failed:", e);
+        }
+        cleanup();
+        resolve(null);
+      };
+
+      video.onerror = () => {
+        cleanup();
+        resolve(null);
+      };
+
+      // Fallback timer if video cannot decode
+      setTimeout(() => {
+        if (!hasResolved) {
+          hasResolved = true;
+          cleanup();
+          resolve(null);
+        }
+      }, 4000);
+
+      return;
+    }
+
+    // Only process image files for the image reader pipeline
     if (!file.type?.startsWith("image/")) {
       return resolve(null);
     }

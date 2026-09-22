@@ -24,6 +24,8 @@ import {
 } from "lucide-react";
 import PdfPreview from "./PdfPreview.jsx";
 import { extractPdfText, askPdfQuestion } from "../../utils/pdfChatService.jsx";
+import { useDispatch } from "react-redux";
+import { updateFileStatus } from "../../state/dashboardSlice.jsx";
 
 // ─── Chat message bubble ───────────────────────────────────────────────────────
 const ChatBubble = ({ msg }) => {
@@ -88,11 +90,31 @@ const SUGGESTIONS = [
 
 // ─── Main Modal ────────────────────────────────────────────────────────────────
 const PdfSummaryModal = ({ file, isOpen, onClose }) => {
+  const dispatch = useDispatch();
+
   // PDF viewer state
   const [copied, setCopied] = useState(false);
   const [pageNumber, setPageNumber] = useState(1);
   const [totalPages, setTotalPages] = useState(null);
   const [scale, setScale] = useState(1.0);
+
+  const handlePageCount = (count) => {
+    if (!count) return;
+    setTotalPages(count);
+    const fileId = file?.id || file?.file_id;
+    if (fileId) {
+      dispatch(
+        updateFileStatus({
+          fileId,
+          pages: count,
+          summary: {
+            ...(typeof file.summary === "object" ? file.summary : {}),
+            pages: count,
+          },
+        })
+      );
+    }
+  };
 
   // Right panel tabs: "summary" | "chat"
   const [activeTab, setActiveTab] = useState("summary");
@@ -202,13 +224,13 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
           executive: file.summary,
           takeaways: file.takeaways || [],
           pages: file.pages || 1,
-          model: "Amazon Bedrock (Anthropic Claude 3 Haiku)",
+          model: "OmniDrive Neural Engine",
         }
       : {
           executive: file.summary.executive || file.summary.summary || "",
           takeaways: file.summary.takeaways || file.summary.key_takeaways || [],
           pages: file.summary.pages || file.summary.page_count || file.pages || 1,
-          model: file.summary.model || "Amazon Bedrock (Anthropic Claude 3 Haiku)",
+          model: "OmniDrive Neural Engine",
         }
     : null;
 
@@ -309,7 +331,7 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
                 {file.name}
               </h3>
               <p className="text-[11px] text-slate-500 flex items-center gap-1.5">
-                <span>Textract OCR · Bedrock Claude 3 · NVIDIA NIM</span>
+                <span className="font-medium text-slate-600 dark:text-slate-400">Document Intelligence</span>
                 {totalPages && (
                   <>
                     <span>·</span>
@@ -437,7 +459,7 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
                       url={pdfUrl}
                       pageNumber={pageNumber}
                       scale={scale}
-                      onPageCount={setTotalPages}
+                      onPageCount={handlePageCount}
                     />
                   </div>
                 </div>
@@ -492,11 +514,11 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
                     </div>
                     <h4 className="text-sm font-bold text-slate-900 dark:text-white">AI Summary In Progress</h4>
                     <p className="text-xs text-slate-500 max-w-xs mt-2 leading-relaxed">
-                      Amazon Textract is extracting text. Claude 3 Haiku will synthesize your executive brief and key takeaways.
+                      Analyzing document structure and synthesizing your executive brief and key takeaways.
                     </p>
                     <div className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 text-xs font-medium">
                       <Sparkles className="w-3.5 h-3.5" />
-                      <span>Textract OCR · Bedrock Pipeline</span>
+                      <span>OmniDrive AI Pipeline</span>
                     </div>
                   </div>
                 ) : (
@@ -514,12 +536,11 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-1">
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white dark:bg-slate-800 text-purple-700 dark:text-purple-300 shadow-xs border border-purple-100 dark:border-purple-800">Textract OCR</span>
-                        {summary.pages && (
-                          <span className="text-[10px] font-mono text-purple-500 dark:text-purple-400">
-                            <Layers className="inline w-3 h-3 mr-0.5" />{summary.pages} pages
-                          </span>
-                        )}
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white dark:bg-slate-800 text-purple-700 dark:text-purple-300 shadow-xs border border-purple-100 dark:border-purple-800">Verified AI</span>
+                        <span className="text-[10px] font-mono text-purple-500 dark:text-purple-400">
+                          <Layers className="inline w-3 h-3 mr-0.5" />
+                          {totalPages || file.pages || summary?.pages || 1} {(totalPages || file.pages || summary?.pages || 1) === 1 ? "page" : "pages"}
+                        </span>
                       </div>
                     </div>
 
@@ -650,7 +671,7 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
                     </button>
                   </div>
                   <p className="text-[10px] text-slate-400 mt-1.5 text-center">
-                    Powered by NVIDIA NIM · answers from document
+                    AI Document Assistant · answers from document content
                   </p>
                 </div>
               </div>

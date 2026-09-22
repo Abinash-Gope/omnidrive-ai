@@ -165,7 +165,7 @@ const ProfilePage = () => {
       extraTokens: 500000,
       extraDocs: 2500,
       price: "$12/mo",
-      description: "Claude 3 Haiku high-throughput token allowance for PDF OCR and synthesis.",
+      description: "High-throughput neural token allowance for document OCR and executive synthesis.",
       tag: "AI Starter",
     },
     {
@@ -1207,7 +1207,7 @@ const ProfilePage = () => {
                       {formatSize(docBytes)}
                     </span>
                     <span className="block text-[11px] text-slate-400 mt-0.5">
-                      {plan === "enterprise" ? "Customer KMS Vector Store" : "Textract OCR & Claude 3"}
+                      {plan === "enterprise" ? "Customer KMS Vector Store" : "Neural OCR & Document AI"}
                     </span>
                   </div>
                 </div>
@@ -1295,7 +1295,7 @@ const ProfilePage = () => {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-slate-900 dark:text-white">
-                          Amazon Bedrock (Claude 3 Haiku)
+                          OmniDrive Neural Engine (Document AI)
                         </span>
                         {effectiveExtraTokens > 0 && (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/60 dark:text-purple-300">
@@ -1462,7 +1462,7 @@ const ProfilePage = () => {
                         <span>AI Inference &amp; Compute Boosters</span>
                       </span>
                       <span className="text-xs text-slate-400">
-                        Claude 3 • Rekognition • Fargate
+                        Neural AI • Vision AI • Cloud Transcoding
                       </span>
                     </div>
 
@@ -1730,7 +1730,7 @@ const ProfilePage = () => {
                     <span>Pro Cloud Capacity Boosters</span>
                   </h3>
                   <p className="text-xs text-slate-500 mt-1">
-                    Add high-speed AWS S3 storage and Claude 3 AI tokens to your active subscription.
+                    Add high-speed AWS S3 storage and AI compute tokens to your active subscription.
                   </p>
                 </div>
                 <button

@@ -1,6 +1,9 @@
 import React from "react";
+import useAuth from "../../../auth/hooks/useAuth.jsx";
 
 const FileStatusBadge = ({ file }) => {
+  const { plan } = useAuth();
+
   if (file.status === "QUARANTINED") {
     return (
       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
@@ -10,9 +13,10 @@ const FileStatusBadge = ({ file }) => {
   }
 
   if (file.type === "video") {
+    const quality = file.activeQuality || (plan === "free" ? "720p" : "1080p");
     return (
       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-        1080p HLS
+        {quality} HLS
       </span>
     );
   }
@@ -31,7 +35,7 @@ const FileStatusBadge = ({ file }) => {
 
   return (
     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-      Claude 3 Ready
+      Summary Ready
     </span>
   );
 };

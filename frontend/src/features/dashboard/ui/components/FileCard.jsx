@@ -15,10 +15,18 @@ import {
 } from "lucide-react";
 import FileStatusBadge from "./FileStatusBadge.jsx";
 import PdfPreview from "./PdfPreview.jsx";
+import VideoPreview from "./VideoPreview.jsx";
 
 const FileCard = ({ file, onOpenPreview, onDeleteFile, viewMode = "grid" }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isCardHovered, setIsCardHovered] = useState(false);
+  const [realPageCount, setRealPageCount] = useState(file.pages || file.summary?.pages || null);
   const menuRef = useRef(null);
+
+  useEffect(() => {
+    if (file.pages) setRealPageCount(file.pages);
+    else if (file.summary?.pages) setRealPageCount(file.summary.pages);
+  }, [file.pages, file.summary?.pages]);
 
   const isVideo = file.type === "video";
   const isImage = file.type === "image";
@@ -55,10 +63,12 @@ const FileCard = ({ file, onOpenPreview, onDeleteFile, viewMode = "grid" }) => {
         {/* Left: Icon & Name */}
         <div className="flex items-center gap-3.5 min-w-0 flex-1">
           <div className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform overflow-hidden">
-            {(file.thumbnail || file.downloadUrl) && !isPdf ? (
-              <img src={file.thumbnail || file.downloadUrl} alt={file.name} className="w-full h-full object-cover" />
+            {isVideo ? (
+              <VideoPreview file={file} isCompact={true} />
             ) : isPdf && file.downloadUrl ? (
-              <PdfPreview url={file.downloadUrl} pageNumber={1} scale={0.15} className="w-full h-full" fitParent={true} />
+              <PdfPreview url={file.downloadUrl} pageNumber={1} scale={0.5} className="w-full h-full" fitParent={true} objectFit="cover" onPageCount={setRealPageCount} />
+            ) : (file.thumbnail || file.downloadUrl) && !isPdf ? (
+              <img src={file.thumbnail || file.downloadUrl} alt={file.name} className="w-full h-full object-cover" />
             ) : (
               getFileIcon()
             )}
@@ -113,28 +123,36 @@ const FileCard = ({ file, onOpenPreview, onDeleteFile, viewMode = "grid" }) => {
   return (
     <div
       onClick={() => onOpenPreview(file)}
+      onMouseEnter={() => setIsCardHovered(true)}
+      onMouseLeave={() => setIsCardHovered(false)}
       className="group relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-[#1a73e8]/50 dark:hover:border-blue-500/50 rounded-2xl overflow-hidden shadow-xs hover:shadow-xl transition-all duration-300 flex flex-col cursor-pointer"
     >
       {/* Thumbnail / Visual Viewport */}
       <div className="relative aspect-video w-full bg-slate-100 dark:bg-slate-800/80 overflow-hidden flex items-center justify-center">
-        {(file.thumbnail || file.downloadUrl) && !isPdf ? (
+        {isVideo ? (
+          <VideoPreview file={file} isHovered={isCardHovered} />
+        ) : isPdf && file.downloadUrl ? (
+          /* Live PDF page-1 canvas thumbnail */
+          <div className="w-full h-full relative overflow-hidden bg-white dark:bg-slate-900 group-hover:scale-105 transition-transform duration-500">
+            <PdfPreview
+              url={file.downloadUrl}
+              pageNumber={1}
+              scale={1.5}
+              className="w-full h-full"
+              fitParent={true}
+              objectFit="cover"
+              onPageCount={setRealPageCount}
+            />
+            {/* Subtle bottom shadow vignette for smooth transition and badge contrast */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
+          </div>
+        ) : (file.thumbnail || file.downloadUrl) ? (
           <img
             src={file.thumbnail || file.downloadUrl}
             alt={file.name}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             loading="lazy"
           />
-        ) : isPdf && file.downloadUrl ? (
-          /* Live PDF page-1 canvas thumbnail */
-          <div className="w-full h-full">
-            <PdfPreview
-              url={file.downloadUrl}
-              pageNumber={1}
-              scale={0.6}
-              className="w-full h-full"
-              fitParent={true}
-            />
-          </div>
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 text-slate-400">
             {getFileIcon()}
@@ -144,41 +162,39 @@ const FileCard = ({ file, onOpenPreview, onDeleteFile, viewMode = "grid" }) => {
           </div>
         )}
 
-        {/* Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+        {/* Gradient Overlay for non-video */}
+        {!isVideo && !isPdf && (
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+        )}
 
         {/* Top Floating Badge */}
         <div className="absolute top-2.5 left-2.5 z-10">
           <FileStatusBadge file={file} />
         </div>
 
-        {/* Video Duration / PDF Pages Badge */}
-        {isVideo && file.duration && (
-          <div className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-md bg-black/75 text-white text-[11px] font-mono font-medium flex items-center gap-1 backdrop-blur-xs">
-            <Play className="w-3 h-3 fill-current text-[#1a73e8]" />
-            <span>{file.duration}</span>
+        {/* PDF Pages Badge */}
+        {isPdf && (
+          <div className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-md bg-purple-950/80 text-purple-200 text-[11px] font-medium flex items-center gap-1 backdrop-blur-xs shadow-xs pointer-events-none">
+            <Layers className="w-3 h-3 text-purple-400" />
+            <span>
+              {realPageCount || file.pages || file.summary?.pages || 1}{" "}
+              {(realPageCount || file.pages || file.summary?.pages || 1) === 1 ? "page" : "pages"}
+            </span>
           </div>
         )}
 
-        {isPdf && file.pages && (
-          <div className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-md bg-purple-950/80 text-purple-200 text-[11px] font-medium flex items-center gap-1 backdrop-blur-xs">
-            <Layers className="w-3 h-3" />
-            <span>{file.pages} pages</span>
+        {/* Hover Action Center Button for non-video (VideoPreview already has its own responsive play badge) */}
+        {!isVideo && (
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 transform scale-90 group-hover:scale-100 pointer-events-none">
+            <div className="w-12 h-12 rounded-full bg-white/95 dark:bg-slate-900/95 text-[#1a73e8] shadow-lg flex items-center justify-center backdrop-blur-md">
+              {isImage ? (
+                <Sparkles className="w-6 h-6 text-emerald-500" />
+              ) : (
+                <FileText className="w-6 h-6 text-purple-500" />
+              )}
+            </div>
           </div>
         )}
-
-        {/* Hover Action Center Play/View Button */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 transform scale-90 group-hover:scale-100">
-          <div className="w-12 h-12 rounded-full bg-white/95 dark:bg-slate-900/95 text-[#1a73e8] shadow-lg flex items-center justify-center backdrop-blur-md">
-            {isVideo ? (
-              <Play className="w-6 h-6 fill-current translate-x-0.5" />
-            ) : isImage ? (
-              <Sparkles className="w-6 h-6 text-emerald-500" />
-            ) : (
-              <FileText className="w-6 h-6 text-purple-500" />
-            )}
-          </div>
-        </div>
       </div>
 
       {/* Card Content Footer */}

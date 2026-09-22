@@ -32,7 +32,7 @@ const EnterpriseContactModal = () => {
     deploymentModel: "Dedicated AWS VPC",
     expectedStorage: "10 TB - 100 TB",
     requirements: ["byok", "zeroRetention"],
-    notes: "We require private S3 ingestion with zero customer data retention for Bedrock Claude 3 pipelines.",
+    notes: "We require private S3 ingestion with zero customer data retention for AI document pipelines.",
   });
 
   const handleClose = () => {

@@ -47,9 +47,9 @@ const PipelineDrawer = ({ pipeline, onClose }) => {
             : "ECS Fargate FFmpeg Transcode"
           : file?.type === "pdf"
           ? plan === "enterprise"
-            ? "Bedrock Claude 3 (Zero-Retention VPC)"
-            : "Bedrock Claude 3 Summarizer"
-          : "Rekognition Vision AI Tagging",
+            ? "OmniDrive Neural Engine (Zero-Retention VPC)"
+            : "OmniDrive Document Intelligence"
+          : "Vision AI Object Tagging",
       subtitle:
         file?.type === "video"
           ? plan === "enterprise"
@@ -58,7 +58,7 @@ const PipelineDrawer = ({ pipeline, onClose }) => {
             ? "Priority Graviton3 worker generating HLS renditions"
             : "ARM64 Spot worker generating 720p HLS .m3u8"
           : file?.type === "pdf"
-          ? "Textract OCR + Bedrock Claude 3 inference"
+          ? "Neural OCR & Executive Document Synthesis"
           : "Deep learning label & EXIF extraction",
       icon: Cpu,
     },

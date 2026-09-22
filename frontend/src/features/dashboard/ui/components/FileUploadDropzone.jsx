@@ -64,7 +64,7 @@ const FileUploadDropzone = ({ onUploadFile }) => {
               <Sparkles className="w-3.5 h-3.5 text-amber-500" />
             </h4>
             <p className="text-xs text-slate-500 mt-0.5">
-              Direct S3 presigned upload with AWS Rekognition safety, FFmpeg HLS transcoding, and Claude 3 summarization
+              Direct cloud upload with intelligent vision safety, video transcoding, and AI document summarization
             </p>
           </div>
         </div>

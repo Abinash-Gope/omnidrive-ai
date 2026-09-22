@@ -173,12 +173,29 @@ export const dashboardSlice = createSlice({
       };
     },
     updateVideoQuality: (state, action) => {
-      const { fileId, quality } = action.payload;
-      const file = state.files.find((f) => f.id === fileId);
+      let fileId = null;
+      let quality = null;
+      if (typeof action.payload === "string") {
+        quality = action.payload;
+        fileId = state.previewModal.file?.id || state.previewModal.file?.file_id;
+      } else if (action.payload) {
+        fileId = action.payload.fileId;
+        quality = action.payload.quality;
+      }
+      if (!quality) return;
+
+      const file = state.files.find(
+        (f) => (f.id && f.id === fileId) || (f.file_id && f.file_id === fileId)
+      );
       if (file) {
         file.activeQuality = quality;
       }
-      if (state.previewModal.file && state.previewModal.file.id === fileId) {
+      if (
+        state.previewModal.file &&
+        (!fileId ||
+          state.previewModal.file.id === fileId ||
+          state.previewModal.file.file_id === fileId)
+      ) {
         state.previewModal.file.activeQuality = quality;
       }
     },

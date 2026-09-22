@@ -155,15 +155,14 @@ const FeaturesPage = () => {
           <div className="space-y-4">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-600 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
               <FileText className="w-3.5 h-3.5" />
-              <span>Amazon Bedrock + Textract</span>
+              <span>OmniDrive Neural Document AI</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
               GenAI Executive Summaries & Takeaways
             </h2>
             <p className="text-slate-600 dark:text-slate-300 text-sm sm:text-base leading-relaxed">
-              Don't read 50-page reports manually. Amazon Textract extracts clean text from PDFs and
-              scans, sending structured context to Bedrock Claude 3 to generate instant executive
-              summaries and key action bullets.
+              Don't read 50-page reports manually. Automated intelligence extracts clean context from PDFs and
+              scans, generating instant executive summaries and key action bullets.
             </p>
             <ul className="space-y-2.5 pt-2 text-sm text-slate-700 dark:text-slate-200">
               <li className="flex items-center gap-2">
@@ -172,14 +171,14 @@ const FeaturesPage = () => {
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>Stateless Bedrock requests: your data is never retained for training</span>
+                <span>Stateless enterprise requests: your data is never retained for training</span>
               </li>
             </ul>
           </div>
           <div className="bg-purple-50/60 dark:bg-purple-950/30 rounded-2xl p-6 border border-purple-200 dark:border-purple-800/60 text-slate-800 dark:text-purple-100 text-sm space-y-3">
             <div className="flex items-center gap-2 font-bold text-purple-700 dark:text-purple-300">
               <Sparkles className="w-4 h-4" />
-              <span>Bedrock Claude 3 Generated Summary</span>
+              <span>OmniDrive Neural Executive Summary</span>
             </div>
             <p className="italic text-xs text-slate-600 dark:text-slate-300">
               "This proposal details the transition from a monolithic REST architecture to a decoupled

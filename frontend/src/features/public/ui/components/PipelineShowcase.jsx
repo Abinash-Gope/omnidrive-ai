@@ -42,13 +42,13 @@ const showcaseTabs = [
   },
   {
     id: "document",
-    label: "Claude 3 PDF AI",
-    shortLabel: "Bedrock AI",
+    label: "Neural PDF AI",
+    shortLabel: "Neural AI",
     icon: FileText,
-    tag: "Claude 3",
+    tag: "Neural AI",
     fileName: "q3_cloud_infrastructure_audit.pdf",
     fileSize: "4.2 MB (48 pages)",
-    service: "Amazon Bedrock + Textract",
+    service: "OmniDrive Neural Pipeline",
     duration: "1.2s synthesis",
   },
   {
@@ -214,7 +214,7 @@ const PipelineShowcase = () => {
                   Async Worker Compute
                 </div>
                 <div className="text-[11px] text-purple-600 dark:text-purple-400 font-mono mt-0.5">
-                  {activeTab === "video" ? "Graviton3 ARM64 Fargate" : activeTab === "document" ? "Bedrock Claude 3" : "Rekognition Vision"}
+                  {activeTab === "video" ? "Graviton3 ARM64 Fargate" : activeTab === "document" ? "OmniDrive Neural Engine" : "Rekognition Vision"}
                 </div>
               </div>
 
@@ -370,7 +370,7 @@ const PipelineShowcase = () => {
                     <div className="flex items-center gap-2">
                       <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                       <span className="text-xs font-mono uppercase tracking-wider text-purple-600 dark:text-purple-400 font-bold">
-                        Amazon Bedrock Claude 3 Synthesis
+                        OmniDrive Neural Document Synthesis
                       </span>
                     </div>
                     <span className="text-xs px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-950/70 dark:text-purple-300 font-mono">
