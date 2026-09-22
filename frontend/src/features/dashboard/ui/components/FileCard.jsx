@@ -14,6 +14,7 @@ import {
   Trash2,
 } from "lucide-react";
 import FileStatusBadge from "./FileStatusBadge.jsx";
+import PdfPreview from "./PdfPreview.jsx";
 
 const FileCard = ({ file, onOpenPreview, onDeleteFile, viewMode = "grid" }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -54,8 +55,10 @@ const FileCard = ({ file, onOpenPreview, onDeleteFile, viewMode = "grid" }) => {
         {/* Left: Icon & Name */}
         <div className="flex items-center gap-3.5 min-w-0 flex-1">
           <div className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform overflow-hidden">
-            {(file.thumbnail || file.downloadUrl) ? (
+            {(file.thumbnail || file.downloadUrl) && !isPdf ? (
               <img src={file.thumbnail || file.downloadUrl} alt={file.name} className="w-full h-full object-cover" />
+            ) : isPdf && file.downloadUrl ? (
+              <PdfPreview url={file.downloadUrl} pageNumber={1} scale={0.15} className="w-full h-full" />
             ) : (
               getFileIcon()
             )}
@@ -114,13 +117,23 @@ const FileCard = ({ file, onOpenPreview, onDeleteFile, viewMode = "grid" }) => {
     >
       {/* Thumbnail / Visual Viewport */}
       <div className="relative aspect-video w-full bg-slate-100 dark:bg-slate-800/80 overflow-hidden flex items-center justify-center">
-        {(file.thumbnail || file.downloadUrl) ? (
+        {(file.thumbnail || file.downloadUrl) && !isPdf ? (
           <img
             src={file.thumbnail || file.downloadUrl}
             alt={file.name}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             loading="lazy"
           />
+        ) : isPdf && file.downloadUrl ? (
+          /* Live PDF page-1 canvas thumbnail */
+          <div className="w-full h-full">
+            <PdfPreview
+              url={file.downloadUrl}
+              pageNumber={1}
+              scale={0.6}
+              className="w-full h-full"
+            />
+          </div>
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 text-slate-400">
             {getFileIcon()}
