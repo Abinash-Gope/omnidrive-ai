@@ -91,9 +91,10 @@ resource "aws_lambda_function" "presigned_url" {
 
   environment {
     variables = {
-      RAW_BUCKET_NAME        = var.raw_bucket_name
-      DYNAMODB_TABLE_NAME    = var.dynamodb_table_name
-      URL_EXPIRATION_SECONDS = "300"
+      RAW_BUCKET_NAME         = var.raw_bucket_name
+      DYNAMODB_TABLE_NAME     = var.dynamodb_table_name
+      URL_EXPIRATION_SECONDS  = "300"
+      USE_ACCELERATE_ENDPOINT = "true"
     }
   }
 }

@@ -83,6 +83,38 @@ class TestPresignedUrlLambda(unittest.TestCase):
         self.assertEqual(saved_item["PK"], "USER#user-12345")
         self.assertEqual(saved_item["status"], "PENDING_UPLOAD")
 
+    def test_s3_transfer_acceleration_client_config(self):
+        """Verify that get_s3_client initializes with Transfer Acceleration enabled."""
+        client_acc = presigned_app.get_s3_client(use_accelerate=True)
+        self.assertTrue(client_acc.meta.config.s3.get("use_accelerate_endpoint"))
+
+        client_std = presigned_app.get_s3_client(use_accelerate=False)
+        self.assertFalse(client_std.meta.config.s3.get("use_accelerate_endpoint"))
+
+    def test_s3_transfer_acceleration_presigned_url_format(self):
+        """Verify that SigV4 presigned URL generated with accelerate endpoint targets s3-accelerate.amazonaws.com."""
+        from botocore.config import Config
+        import boto3
+
+        acc_client = boto3.client(
+            "s3",
+            region_name="us-east-1",
+            aws_access_key_id="mock_key",
+            aws_secret_access_key="mock_secret",
+            config=Config(s3={"use_accelerate_endpoint": True})
+        )
+        url = acc_client.generate_presigned_url(
+            ClientMethod="put_object",
+            Params={
+                "Bucket": "omnidrive-test-bucket",
+                "Key": "raw/user-1/file-1/document.pdf",
+                "ContentType": "application/pdf"
+            },
+            ExpiresIn=300
+        )
+        self.assertIn("omnidrive-test-bucket.s3-accelerate.amazonaws.com", url)
+        self.assertIn("raw/user-1/file-1/document.pdf", url)
+
 
 class TestFilesApiLambda(unittest.TestCase):
     def test_missing_sub_returns_401(self):

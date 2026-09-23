@@ -43,6 +43,12 @@ resource "aws_s3_bucket_notification" "raw_eventbridge" {
   eventbridge = true
 }
 
+# Enable S3 Transfer Acceleration on raw bucket for edge-routed fast uploads
+resource "aws_s3_bucket_accelerate_configuration" "raw" {
+  bucket = aws_s3_bucket.raw.id
+  status = "Enabled"
+}
+
 # --- PROCESSED ASSETS S3 BUCKET ---
 resource "aws_s3_bucket" "processed" {
   bucket        = "${var.project_name}-processed-${var.environment}-${random_id.bucket_suffix.hex}"

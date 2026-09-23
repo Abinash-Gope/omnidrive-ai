@@ -20,19 +20,27 @@ import re
 import uuid
 from datetime import datetime, timezone
 import boto3
+from botocore.config import Config
 from botocore.exceptions import ClientError
 
 # Logger setup
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-# AWS SDK clients
-s3_client = boto3.client("s3")
-dynamodb = boto3.resource("dynamodb")
-
 # Environment configuration
 RAW_BUCKET_NAME = os.environ.get("RAW_BUCKET_NAME", "omnidrive-ai-raw-dev")
 DYNAMODB_TABLE_NAME = os.environ.get("DYNAMODB_TABLE_NAME", "OmniDrive_Registry")
+URL_EXPIRATION_SECONDS = int(os.environ.get("URL_EXPIRATION_SECONDS", "300"))  # 5 minutes
+USE_ACCELERATE_ENDPOINT = os.environ.get("USE_ACCELERATE_ENDPOINT", "true").lower() in ("true", "1", "yes")
+
+# AWS SDK clients
+def get_s3_client(use_accelerate=None):
+    """Factory helper to construct S3 client with optional Transfer Acceleration."""
+    accelerate = USE_ACCELERATE_ENDPOINT if use_accelerate is None else bool(use_accelerate)
+    return boto3.client("s3", config=Config(s3={"use_accelerate_endpoint": accelerate}))
+
+s3_client = get_s3_client()
+dynamodb = boto3.resource("dynamodb")
 URL_EXPIRATION_SECONDS = int(os.environ.get("URL_EXPIRATION_SECONDS", "300"))  # 5 minutes
 
 CORS_HEADERS = {

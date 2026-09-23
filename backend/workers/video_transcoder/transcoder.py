@@ -150,10 +150,12 @@ def run_ffmpeg_hls(input_path, output_dir):
         "-map", "0:v:0", "-map", "0:a:0?", "-b:v:1", "2200k", "-s:v:1", "1280x720", "-b:a:1", "128k",
         # Variant 2: 480p
         "-map", "0:v:0", "-map", "0:a:0?", "-b:v:2", "800k", "-s:v:2", "854x480", "-b:a:2", "96k",
-        # HLS options
+        # HLS options & keyframe GOP alignment for smooth seeking & adaptive streaming
         "-c:v", "libx264", "-c:a", "aac",
+        "-preset", "fast",
+        "-g", "60", "-keyint_min", "60", "-sc_threshold", "0",
         "-f", "hls",
-        "-hls_time", "6",
+        "-hls_time", "4",
         "-hls_playlist_type", "vod",
         "-hls_segment_filename", os.path.join(output_dir, "v%v_segment_%03d.ts"),
         "-master_pl_name", "master.m3u8",
