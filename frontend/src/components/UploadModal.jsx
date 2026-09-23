@@ -182,6 +182,7 @@ const UploadModal = ({ isOpen, onClose, onUploadComplete, stagedFiles, onClearSt
   const lastStagedFilesRef = useRef(null);
   const addMoreInputRef = useRef(null);
   const dropZoneInputRef = useRef(null);
+  const dragCounterRef = useRef(0);
 
   const {
     filesQueue,
@@ -234,6 +235,7 @@ const UploadModal = ({ isOpen, onClose, onUploadComplete, stagedFiles, onClearSt
       clearQueue();
       resetUpload();
       setIsDragOver(false);
+      dragCounterRef.current = 0;
       setRejectedNames([]);
       setIsStartingUpload(false);
       isStartingRef.current = false;
@@ -263,21 +265,40 @@ const UploadModal = ({ isOpen, onClose, onUploadComplete, stagedFiles, onClearSt
 
   // ── Event Handlers ─────────────────────────────────────────────────────
 
+  const handleDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current += 1;
+    if (phase !== "uploading" && !isStartingUpload) {
+      setIsDragOver(true);
+    }
+  };
+
   const handleDragOver = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (phase !== "uploading" && !isStartingUpload) setIsDragOver(true);
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = "copy";
+    }
+    if (phase !== "uploading" && !isStartingUpload && !isDragOver) {
+      setIsDragOver(true);
+    }
   };
 
   const handleDragLeave = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragOver(false);
+    dragCounterRef.current -= 1;
+    if (dragCounterRef.current <= 0) {
+      dragCounterRef.current = 0;
+      setIsDragOver(false);
+    }
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    dragCounterRef.current = 0;
     setIsDragOver(false);
     if (phase === "uploading" || isStartingUpload) return;
     const files = Array.from(e.dataTransfer?.files || []);
@@ -322,6 +343,8 @@ const UploadModal = ({ isOpen, onClose, onUploadComplete, stagedFiles, onClearSt
   };
 
   const handleClose = () => {
+    dragCounterRef.current = 0;
+    setIsDragOver(false);
     resetUpload();
     onClose();
   };
@@ -347,16 +370,20 @@ const UploadModal = ({ isOpen, onClose, onUploadComplete, stagedFiles, onClearSt
       <div
         className="relative w-full max-w-lg bg-white dark:bg-[#0f172a] rounded-3xl shadow-2xl border border-slate-200/80 dark:border-slate-800 p-6 sm:p-8 z-10"
         onClick={(e) => e.stopPropagation()}
+        onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        {/* Drag-over overlay inside modal */}
-        {isDragOver && (
-          <div className="absolute inset-0 z-20 rounded-3xl bg-blue-500/10 border-2 border-blue-400 border-dashed flex items-center justify-center pointer-events-none">
+        {/* Drag-over overlay inside modal: Only active when files are already staged/in list */}
+        {isDragOver && phase !== "empty" && (
+          <div className="absolute inset-0 z-30 rounded-3xl bg-white/95 dark:bg-[#0f172a]/95 backdrop-blur-md border-2 border-[#1a73e8] border-dashed flex items-center justify-center pointer-events-none transition-all duration-200 animate-in fade-in">
             <div className="text-center">
-              <UploadCloud className="w-10 h-10 text-[#1a73e8] mx-auto mb-2 animate-bounce" />
-              <p className="text-sm font-bold text-[#1a73e8]">Drop files here</p>
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-blue-50 dark:bg-blue-950/80 text-[#1a73e8] dark:text-blue-400 flex items-center justify-center mb-3 shadow-md">
+                <UploadCloud className="w-7 h-7 stroke-[2] animate-bounce" />
+              </div>
+              <p className="text-sm font-bold text-[#1a73e8]">Drop files to add to queue</p>
+              <p className="text-xs text-slate-400 mt-1">Supports MP4, MOV, JPG, PNG, PDF</p>
             </div>
           </div>
         )}
@@ -413,21 +440,43 @@ const UploadModal = ({ isOpen, onClose, onUploadComplete, stagedFiles, onClearSt
           {phase === "empty" && (
             <div
               onClick={() => dropZoneInputRef.current?.click()}
-              className={`rounded-2xl border-2 border-dashed p-8 text-center cursor-pointer transition-all duration-200 ${
+              className={`rounded-2xl border-2 border-dashed p-8 text-center cursor-pointer transition-all duration-200 select-none ${
                 isDragOver
-                  ? "border-[#1a73e8] bg-blue-50/70 dark:bg-blue-950/30 scale-[1.01]"
+                  ? "border-[#1a73e8] bg-blue-50/90 dark:bg-blue-950/60 scale-[1.02] shadow-xl shadow-blue-500/10"
                   : "border-slate-200 dark:border-slate-800 hover:border-blue-400 dark:hover:border-blue-500 bg-slate-50/50 dark:bg-slate-900/40"
               }`}
             >
-              <div className="w-12 h-12 mx-auto rounded-2xl bg-blue-50 dark:bg-blue-950/80 text-[#1a73e8] dark:text-blue-400 flex items-center justify-center mb-3 shadow-xs">
-                <UploadCloud className="w-6 h-6 stroke-[1.75]" />
+              <div
+                className={`w-14 h-14 mx-auto rounded-2xl flex items-center justify-center mb-3 shadow-xs transition-all duration-200 ${
+                  isDragOver
+                    ? "bg-[#1a73e8] text-white scale-110 shadow-lg shadow-blue-500/30"
+                    : "bg-blue-50 dark:bg-blue-950/80 text-[#1a73e8] dark:text-blue-400"
+                }`}
+              >
+                <UploadCloud
+                  className={`w-7 h-7 stroke-[1.75] transition-transform ${
+                    isDragOver ? "animate-bounce" : ""
+                  }`}
+                />
               </div>
-              <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                Drag and drop your files here, or{" "}
-                <span className="text-[#1a73e8] hover:underline">browse</span>
+              <p
+                className={`text-sm font-bold transition-colors ${
+                  isDragOver ? "text-[#1a73e8]" : "text-slate-800 dark:text-slate-200"
+                }`}
+              >
+                {isDragOver ? (
+                  "Release to drop files here"
+                ) : (
+                  <>
+                    Drag and drop your files here, or{" "}
+                    <span className="text-[#1a73e8] hover:underline">browse</span>
+                  </>
+                )}
               </p>
               <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-                Select multiple files — each goes through the full AWS AI pipeline
+                {isDragOver
+                  ? "Files will be staged for AI processing"
+                  : "Select multiple files — each goes through the full AWS AI pipeline"}
               </p>
               <div className="flex items-center justify-center gap-2 mt-4 pt-3 border-t border-slate-200/60 dark:border-slate-800/80">
                 <span className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-blue-100/70 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200/50 dark:border-blue-800/50">

@@ -13,12 +13,17 @@ const NVIDIA_BASE_URL = rawBaseUrl.includes("integrate.api.nvidia.com")
 
 const MODEL = import.meta.env.VITE_NVIDIA_MODEL || "nvidia/llama-3.1-nemotron-70b-instruct";
 const MAX_EXTRACT_PAGES = 30; // cap to avoid huge context
+const FAST_EXTRACT_PAGES = 10; // pages to extract for fast first summary
 
 /**
  * Extract all readable text from a PDF URL using PDF.js.
  * Returns a plain-text string with page separators.
+ *
+ * @param {string} pdfUrl   URL of the PDF to extract text from
+ * @param {number} maxPages Maximum number of pages to extract (default 30)
+ * @param {Function} onProgress  Optional callback: (currentPage, totalPages) => void
  */
-export const extractPdfText = async (pdfUrl, maxPages = MAX_EXTRACT_PAGES) => {
+export const extractPdfText = async (pdfUrl, maxPages = MAX_EXTRACT_PAGES, onProgress = null) => {
   const loadingTask = pdfjsLib.getDocument({ url: pdfUrl, withCredentials: false });
   const pdfDoc = await loadingTask.promise;
   const numPages = Math.min(pdfDoc.numPages, maxPages);
@@ -31,23 +36,39 @@ export const extractPdfText = async (pdfUrl, maxPages = MAX_EXTRACT_PAGES) => {
     if (pageText.trim()) {
       pages.push(`[Page ${i}]\n${pageText}`);
     }
+    // Fire progress callback so the UI can show "Reading page X / Y"
+    if (typeof onProgress === "function") {
+      onProgress(i, numPages);
+    }
   }
 
   await pdfDoc.destroy();
   return pages.join("\n\n");
 };
 
+// ─── Streaming SSE helpers ──────────────────────────────────────────────────
+
 /**
- * Ask NVIDIA NIM a question about a PDF document.
- * Uses the OpenAI-compatible /chat/completions endpoint.
- *
- * @param {string} question   User's question
- * @param {string} pdfText    Full extracted text of the PDF
- * @param {object} fileMeta   { name, summary } — extra context
- * @param {Array}  history    Previous messages [{ role, text }]
- * @returns {Promise<string>} AI response text
+ * Parse a single SSE line and return the delta text (if any).
+ * Returns null if the line should be skipped.
  */
-export const askPdfQuestion = async (question, pdfText, fileMeta = {}, history = []) => {
+const parseSseDelta = (line) => {
+  if (!line.startsWith("data: ")) return null;
+  const payload = line.slice(6).trim();
+  if (payload === "[DONE]") return null;
+  try {
+    const json = JSON.parse(payload);
+    return json.choices?.[0]?.delta?.content ?? null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Stream a chat completion request and call onChunk(text) for each token.
+ * Returns the full accumulated text when the stream ends.
+ */
+const streamChatCompletion = async (messages, options = {}, onChunk = null) => {
   const apiKey = import.meta.env.VITE_NVIDIA_API_KEY;
   if (!apiKey || apiKey === "your-nvidia-api-key-here") {
     throw new Error(
@@ -55,6 +76,113 @@ export const askPdfQuestion = async (question, pdfText, fileMeta = {}, history =
     );
   }
 
+  let response;
+  try {
+    response = await fetch(`${NVIDIA_BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages,
+        temperature: options.temperature ?? 0.2,
+        top_p: options.top_p ?? 0.7,
+        max_tokens: options.max_tokens ?? 1024,
+        stream: true,
+      }),
+    });
+  } catch (netErr) {
+    throw new Error(
+      `Network request failed: ${netErr.message}. Ensure the Vite dev server is running with proxy.`
+    );
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errorDetail = "";
+    try {
+      const errorJson = JSON.parse(errorText);
+      errorDetail = errorJson.detail || errorJson.message || errorJson.title || "";
+    } catch {}
+
+    if (response.status === 403) {
+      throw new Error(
+        `AI Service Authorization Failed: Your API key is invalid or unauthorized. Please verify your configuration.`
+      );
+    }
+    if (response.status === 410) {
+      throw new Error(
+        `AI Model Notice: ${errorDetail || "The selected AI model is currently unavailable."}`
+      );
+    }
+    throw new Error(errorDetail || `AI Service error (${response.status})`);
+  }
+
+  // Read the SSE stream line by line
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let accumulated = "";
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+
+    // Split on newlines and process complete lines
+    const lines = buffer.split("\n");
+    // Keep the last (potentially incomplete) line in the buffer
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      const delta = parseSseDelta(line.trim());
+      if (delta) {
+        accumulated += delta;
+        if (typeof onChunk === "function") {
+          onChunk(delta, accumulated);
+        }
+      }
+    }
+  }
+
+  // Flush any remaining buffer content
+  if (buffer.trim()) {
+    const delta = parseSseDelta(buffer.trim());
+    if (delta) {
+      accumulated += delta;
+      if (typeof onChunk === "function") {
+        onChunk(delta, accumulated);
+      }
+    }
+  }
+
+  return accumulated;
+};
+
+// ─── Public API ─────────────────────────────────────────────────────────────
+
+/**
+ * Ask NVIDIA NIM a question about a PDF document.
+ * Streams the response token-by-token and calls onChunk(delta, fullSoFar) for each.
+ * Returns the full answer string when complete.
+ *
+ * @param {string}   question   User's question
+ * @param {string}   pdfText    Full extracted text of the PDF
+ * @param {object}   fileMeta   { name, summary } — extra context
+ * @param {Array}    history    Previous messages [{ role, text }]
+ * @param {Function} onChunk    Called with (delta, fullTextSoFar) for each streamed token
+ * @returns {Promise<string>} Full AI response text
+ */
+export const askPdfQuestion = async (
+  question,
+  pdfText,
+  fileMeta = {},
+  history = [],
+  onChunk = null
+) => {
   // System prompt — ground the model in the document without raw file name leaks
   const systemPrompt = `You are an intelligent document assistant for OmniDrive AI.
 You have been provided with the full extracted text of this document.
@@ -70,9 +198,7 @@ ${pdfText || "(No text could be extracted from this document.)"}
 --- DOCUMENT TEXT END ---`;
 
   // Build messages array from conversation history
-  const messages = [
-    { role: "system", content: systemPrompt },
-  ];
+  const messages = [{ role: "system", content: systemPrompt }];
 
   // Inject previous turns (skip loading/error messages)
   for (const msg of history) {
@@ -83,72 +209,22 @@ ${pdfText || "(No text could be extracted from this document.)"}
       });
     }
   }
-
-  // Add the current question
   messages.push({ role: "user", content: question });
 
-  let response;
-  try {
-    response = await fetch(`${NVIDIA_BASE_URL}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages,
-        temperature: 0.2,
-        top_p: 0.7,
-        max_tokens: 1024,
-        stream: false,
-      }),
-    });
-  } catch (netErr) {
-    throw new Error(`Network request failed: ${netErr.message}. Ensure the Vite dev server is running with proxy.`);
-  }
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    let errorDetail = "";
-    try {
-      const errorJson = JSON.parse(errorText);
-      errorDetail = errorJson.detail || errorJson.message || errorJson.title || "";
-    } catch {}
-
-    if (response.status === 403) {
-      throw new Error(
-        `NVIDIA NIM 403 Authorization Failed: Your NVIDIA key requires active credits. Go to build.nvidia.com -> click "Generate API Key" to obtain an active key with 1,000 free credits.`
-      );
-    }
-
-    if (response.status === 410) {
-      throw new Error(
-        `NVIDIA NIM Model Deprecated (410 Gone): ${errorDetail || "The selected model is no longer available on NVIDIA NIM. Use an active model like nvidia/llama-3.1-nemotron-70b-instruct."}`
-      );
-    }
-
-    throw new Error(errorDetail || `NVIDIA NIM API error (${response.status})`);
-  }
-
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error("No response received from NVIDIA NIM.");
-  return content;
+  return streamChatCompletion(messages, { max_tokens: 1024 }, onChunk);
 };
 
 /**
  * Synthesize a real Executive Summary and Key Takeaways from document text using NVIDIA NIM.
- * Returns { executive, takeaways, model }
+ * Streams the JSON response token-by-token and calls:
+ *   - onChunk(delta, fullSoFar)  for each raw streaming token (used to show typing in progress)
+ *   - resolves with { executive, takeaways, model } when the stream is complete
+ *
+ * @param {string}   pdfText   Extracted document text
+ * @param {Function} onChunk   Optional streaming callback (delta, fullSoFar) => void
+ * @returns {Promise<{ executive: string, takeaways: string[], model: string }>}
  */
-export const generateRealPdfSummary = async (pdfText) => {
-  const apiKey = import.meta.env.VITE_NVIDIA_API_KEY;
-  if (!apiKey || apiKey === "your-nvidia-api-key-here") {
-    throw new Error(
-      "NVIDIA API Key is missing. Please add VITE_NVIDIA_API_KEY in frontend/.env"
-    );
-  }
-
+export const generateRealPdfSummary = async (pdfText, onChunk = null) => {
   const systemPrompt = `You are an expert enterprise document intelligence engine for OmniDrive AI.
 Analyze the provided document text and generate a structured executive brief and key takeaways.
 CRITICAL RULES:
@@ -167,62 +243,40 @@ Do NOT include markdown backticks like \`\`\`json, no explanations, only the raw
 
   const userMessage = `Here is the full text of the document:\n\n${(pdfText || "").slice(0, 15000)}`;
 
-  let response;
-  try {
-    response = await fetch(`${NVIDIA_BASE_URL}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userMessage },
-        ],
-        temperature: 0.2,
-        max_tokens: 800,
-        stream: false,
-      }),
-    });
-  } catch (netErr) {
-    throw new Error(`Network request failed: ${netErr.message}`);
-  }
+  const messages = [
+    { role: "system", content: systemPrompt },
+    { role: "user", content: userMessage },
+  ];
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`AI generation failed: ${response.status} ${errorText}`);
-  }
+  const fullContent = await streamChatCompletion(
+    messages,
+    { temperature: 0.2, max_tokens: 800 },
+    onChunk
+  );
 
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content?.trim();
-  if (!content) throw new Error("No response from AI engine.");
-
-  // Parse JSON safely
+  // Parse JSON safely from the accumulated stream output
   let parsed = null;
   try {
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    const jsonMatch = fullContent.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       parsed = JSON.parse(jsonMatch[0]);
     }
   } catch (e) {
-    console.warn("Could not parse JSON from NIM response, falling back to text:", content);
+    console.warn("Could not parse JSON from NIM stream response, falling back to text:", fullContent);
   }
 
   if (parsed && parsed.summary) {
     return {
       executive: parsed.summary,
       takeaways: Array.isArray(parsed.takeaways) ? parsed.takeaways : [],
-      model: "Meta LLaMA 3.2 · Live GenAI",
+      model: "OmniDrive Neural Engine",
     };
   }
 
-  // Fallback if model output is plain text
+  // Fallback if model output is plain text (not JSON)
   return {
-    executive: content.slice(0, 400),
+    executive: fullContent.slice(0, 400),
     takeaways: ["Comprehensive analysis extracted directly from verified document content."],
-    model: "Meta LLaMA 3.2 · Live GenAI",
+    model: "OmniDrive Neural Engine",
   };
 };
-

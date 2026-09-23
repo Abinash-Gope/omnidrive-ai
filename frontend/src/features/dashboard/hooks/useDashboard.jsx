@@ -384,13 +384,20 @@ export const useDashboard = () => {
       sourceList = files.filter((f) => Boolean(f.isShared));
     }
 
-    // Filter by Active Folder if set
+    // Filter by Active Folder if set, or exclude folder items from root My Files view
     const currentFolderId = activeFolderId || activeAlbumId;
     if (currentFolderId) {
       const allFlds = (folders && folders.length > 0) ? folders : albums;
       const targetFolder = (allFlds || []).find((f) => f.id === currentFolderId);
       const folderFileIds = new Set(targetFolder?.fileIds || []);
       sourceList = sourceList.filter((f) => folderFileIds.has(f.id || f.file_id));
+    } else if (activeTab === "my-files" || !activeTab) {
+      // In the dashboard all files page (root view), do not show items that are inside any folder
+      const allFlds = (folders && folders.length > 0) ? folders : albums;
+      const allFolderFileIds = new Set(
+        (allFlds || []).flatMap((f) => f.fileIds || [])
+      );
+      sourceList = sourceList.filter((f) => !allFolderFileIds.has(f.id || f.file_id));
     }
 
     const filtered = sourceList.filter((f) => {
@@ -555,7 +562,10 @@ export const useDashboard = () => {
   })();
 
   // Dynamic tab counts for badges
-  const myFilesCount = files.length;
+  const allFolderFileIds = new Set(
+    ((folders && folders.length > 0 ? folders : albums) || []).flatMap((f) => f.fileIds || [])
+  );
+  const myFilesCount = files.filter((f) => !allFolderFileIds.has(f.id || f.file_id)).length;
   const starredCount = files.filter(
     (f) => f.isStarred || (starredIds && starredIds.includes(f.id || f.file_id))
   ).length;

@@ -42,6 +42,16 @@ export const isPlaceholderSummary = (text) => {
   );
 };
 
+// Sanitize any model name so Meta/LLaMA third-party branding is completely stripped
+export const sanitizeModelName = (name) => {
+  if (!name || typeof name !== "string") return "OmniDrive Neural Engine";
+  const lower = name.toLowerCase();
+  if (lower.includes("meta") || lower.includes("llama")) {
+    return "OmniDrive Neural Engine";
+  }
+  return name;
+};
+
 // Session-based summary cache: persists for the active browser session so AI never re-runs until browser is closed
 export const getSessionSummary = (id) => {
   if (!id) return null;
@@ -50,6 +60,7 @@ export const getSessionSummary = (id) => {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed?.executive && !isPlaceholderSummary(parsed.executive)) {
+        parsed.model = sanitizeModelName(parsed.model);
         return parsed;
       }
     }
@@ -60,10 +71,28 @@ export const getSessionSummary = (id) => {
 export const setSessionSummary = (id, summaryObj) => {
   if (!id || !summaryObj) return;
   try {
-    sessionStorage.setItem(`omnidrive_session_summary_${id}`, JSON.stringify(summaryObj));
+    const cleanObj = {
+      ...summaryObj,
+      model: sanitizeModelName(summaryObj.model),
+    };
+    sessionStorage.setItem(`omnidrive_session_summary_${id}`, JSON.stringify(cleanObj));
   } catch (e) {}
 };
 
+
+// ─── Format live streaming JSON/text for natural preview ─────────────────────
+const formatStreamingPreview = (raw) => {
+  if (!raw) return "";
+  try {
+    // If the model is outputting JSON: {"summary": "...", "takeaways": [...]}
+    const match = raw.match(/"summary"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)/);
+    if (match && match[1]) {
+      return match[1].replace(/\\n/g, "\n").replace(/\\"/g, '"');
+    }
+  } catch {}
+  // Fallback: strip markdown codefence and outer punctuation
+  return raw.replace(/^```(?:json)?\s*/i, "").replace(/^[{\s"]+/, "");
+};
 
 // ─── Chat message bubble ───────────────────────────────────────────────────────
 const ChatBubble = ({ msg }) => {
@@ -192,6 +221,12 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
   const [synthError, setSynthError] = useState(null);
   const [realSummary, setRealSummary] = useState(() => getSessionSummary(fileId));
 
+  // Progressive loading state
+  // extractionProgress: { current: number, total: number } | null
+  const [extractionProgress, setExtractionProgress] = useState(null);
+  // streamingText: partial JSON text coming in token-by-token from NVIDIA NIM
+  const [streamingText, setStreamingText] = useState("");
+
   // When changing document, load session cache and reset viewer state
   useEffect(() => {
     if (!fileId) return;
@@ -199,6 +234,8 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
     setSynthError(null);
     setExtractError(null);
     setIsExtractingText(false);
+    setExtractionProgress(null);
+    setStreamingText("");
     setPageNumber(1);
     setScale(1.0);
     setInputValue("");
@@ -298,28 +335,38 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Auto-extract PDF text when chat tab is first opened
+  // ── Pre-warm: start extracting PDF text as soon as the modal opens ──────────
+  // This runs regardless of which tab is active, so text is ready when needed.
   useEffect(() => {
-    if (activeTab !== "chat" || pdfText !== null || isExtractingText) return;
+    if (!isOpen || !file || !fileId) return;
     const pdfUrl = file?.downloadUrl || file?.download_url;
-    if (!pdfUrl) {
-      setExtractError("No document URL available — cannot extract text for chat.");
-      return;
-    }
+    if (!pdfUrl || pdfText !== null || isExtractingText) return;
+    // Skip extraction if we already have a cached summary and the chat tab isn't active
+    // (avoids burning bandwidth on docs that the user just views)
+    const hasCachedSummary = !!getSessionSummary(fileId);
+    if (hasCachedSummary && activeTab === "summary") return;
+
     setIsExtractingText(true);
     setExtractError(null);
-    extractPdfText(pdfUrl)
+    extractPdfText(pdfUrl, 30, (current, total) => {
+      // Only show extraction progress if we're in summary-generating mode
+      setExtractionProgress((prev) => {
+        if (isSynthesizing) return { current, total };
+        return prev;
+      });
+    })
       .then((text) => {
         setPdfText(text);
         setIsExtractingText(false);
-        // Only set default greeting if messages are empty
+        setExtractionProgress(null);
         setMessages((prev) => (prev && prev.length > 0 ? prev : DEFAULT_GREETING));
       })
       .catch((err) => {
         setExtractError(err.message || "Failed to read document text.");
         setIsExtractingText(false);
+        setExtractionProgress(null);
       });
-  }, [activeTab, pdfText, isExtractingText, file]);
+  }, [isOpen, fileId, file]);
 
   const handleSynthesizeSummary = async (force = false) => {
     const pdfTargetUrl = file?.downloadUrl || file?.download_url || file?.thumbnail_url;
@@ -330,13 +377,29 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
     setIsSynthesizing(true);
     setSynthError(null);
     setRealSummary(null);
+    setStreamingText("");
 
     try {
-      // Always extract fresh text for this document to prevent cross-document contamination
-      const text = await extractPdfText(pdfTargetUrl);
-      setPdfText(text);
+      // ── Phase 1: Extract text with per-page progress ────────────────────
+      let text = pdfText; // reuse pre-warmed text if available
+      if (!text) {
+        setExtractionProgress({ current: 0, total: null });
+        setIsExtractingText(true);
+        text = await extractPdfText(
+          pdfTargetUrl,
+          30,
+          (current, total) => setExtractionProgress({ current, total })
+        );
+        setPdfText(text);
+        setIsExtractingText(false);
+        setExtractionProgress(null);
+      }
 
-      const generated = await generateRealPdfSummary(text);
+      // ── Phase 2: Stream summary tokens from NVIDIA NIM ──────────────────
+      const generated = await generateRealPdfSummary(text, (delta, fullSoFar) => {
+        setStreamingText(fullSoFar);
+      });
+      setStreamingText("");
       setRealSummary(generated);
 
       if (fileId) {
@@ -347,7 +410,7 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
           executive: generated.executive,
           takeaways: generated.takeaways,
           pages: totalPages || file.pages || null,
-          model: generated.model || "Meta LLaMA 3.2 · Live GenAI",
+          model: generated.model || "OmniDrive Neural Engine",
         };
 
         dispatch(
@@ -372,6 +435,9 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
     } catch (err) {
       console.error("Failed to synthesize real AI summary:", err);
       setSynthError(err.message || "AI synthesis failed.");
+      setIsExtractingText(false);
+      setExtractionProgress(null);
+      setStreamingText("");
     } finally {
       setIsSynthesizing(false);
     }
@@ -417,7 +483,7 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
           executive: file.summary.executive || file.summary.summary || "",
           takeaways: file.summary.takeaways || file.summary.key_takeaways || [],
           pages: file.summary.pages || file.summary.page_count || file.pages || null,
-          model: file.summary.model || "OmniDrive Neural Engine",
+          model: sanitizeModelName(file.summary.model),
         }
     : null);
 
@@ -455,7 +521,7 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
   const zoomIn = () => setScale((s) => Math.min(3.0, +(s + 0.2).toFixed(1)));
   const zoomOut = () => setScale((s) => Math.max(0.5, +(s - 0.2).toFixed(1)));
 
-  // ── Chat send ──────────────────────────────────────────────────────────────
+  // ── Chat send (streaming) ──────────────────────────────────────────────────
   const sendMessage = async (text) => {
     const question = (text || inputValue).trim();
     if (!question || isSending) return;
@@ -464,33 +530,45 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
     setIsSending(true);
 
     const userMsg = { role: "user", text: question };
-    const loadingMsg = { role: "model", text: "", loading: true };
+    // Start with an empty model message — we'll stream tokens into it
+    const placeholderMsg = { role: "model", text: "", loading: true };
 
-    setMessages((prev) => [...prev, userMsg, loadingMsg]);
+    setMessages((prev) => [...prev, userMsg, placeholderMsg]);
 
     try {
       const history = messages.filter((m) => !m.loading && !m.error);
       const isPlaceholder = isPlaceholderSummary(summary?.executive);
-      const summaryText = (!isPlaceholder && summary?.executive)
-        ? `Executive Summary: ${summary.executive}`
-        : undefined;
-      const answer = await askPdfQuestion(
+      const summaryText =
+        !isPlaceholder && summary?.executive
+          ? `Executive Summary: ${summary.executive}`
+          : undefined;
+
+      // Stream tokens directly into the last message as they arrive
+      await askPdfQuestion(
         question,
         pdfText || "",
         { summary: summaryText },
-        history
+        history,
+        (_delta, fullSoFar) => {
+          setMessages((prev) =>
+            prev.map((m, i) =>
+              i === prev.length - 1 ? { role: "model", text: fullSoFar, loading: false } : m
+            )
+          );
+        }
       );
 
+      // Ensure loading flag is removed after stream ends
       setMessages((prev) =>
         prev.map((m, i) =>
-          i === prev.length - 1 ? { role: "model", text: answer } : m
+          i === prev.length - 1 ? { ...m, loading: false } : m
         )
       );
     } catch (err) {
       setMessages((prev) =>
         prev.map((m, i) =>
           i === prev.length - 1
-            ? { role: "model", text: err.message || "Failed to get a response from AI assistant.", error: true }
+            ? { role: "model", text: err.message || "Failed to get a response from AI assistant.", error: true, loading: false }
             : m
         )
       );
@@ -702,23 +780,100 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
             {/* ── SUMMARY TAB ── */}
             {activeTab === "summary" && (
               <div className="flex-1 overflow-y-auto p-5 space-y-5">
-                {!summary || isSynthesizing ? (
-                  <div className="py-14 px-4 text-center flex flex-col items-center justify-center border-2 border-dashed border-purple-200 dark:border-purple-800/60 rounded-3xl bg-purple-50/40 dark:bg-purple-950/20 mt-2">
-                    <div className="w-14 h-14 rounded-2xl bg-purple-100 dark:bg-purple-900/60 text-purple-600 dark:text-purple-300 flex items-center justify-center mb-4 animate-pulse">
-                      <Sparkles className="w-7 h-7" />
+                {synthError && !isSynthesizing ? (
+                  <div className="py-10 px-4 text-center flex flex-col items-center justify-center border border-rose-200 dark:border-rose-900/60 rounded-3xl bg-rose-50/40 dark:bg-rose-950/20 mt-2">
+                    <div className="w-12 h-12 rounded-2xl bg-rose-100 dark:bg-rose-900/60 text-rose-600 dark:text-rose-400 flex items-center justify-center mb-3">
+                      <AlertCircle className="w-6 h-6" />
                     </div>
-                    <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                      {isSynthesizing ? "Synthesizing with Generative AI…" : "AI Summary In Progress"}
-                    </h4>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs mt-2 leading-relaxed">
-                      {isSynthesizing
-                        ? "Reading document content and generating a live executive brief and key takeaways with Meta LLaMA 3.2…"
-                        : "Analyzing document structure and synthesizing your executive brief and key takeaways."}
+                    <h4 className="text-sm font-bold text-slate-900 dark:text-white">AI Analysis Notice</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mt-1 leading-relaxed">
+                      {synthError}
                     </p>
-                    <div className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 text-xs font-medium">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Meta LLaMA 3.2 GenAI</span>
+                    <button
+                      onClick={() => handleSynthesizeSummary(true)}
+                      className="mt-4 flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-xs transition-colors"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      Retry AI Analysis
+                    </button>
+                  </div>
+                ) : !summary || isSynthesizing ? (
+                  <div className="mt-2 space-y-4">
+                    {/* ── Phase label ── */}
+                    <div className="flex items-center gap-2 px-1">
+                      <div className="w-7 h-7 rounded-lg bg-purple-100 dark:bg-purple-900/60 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
+                        <Sparkles className="w-4 h-4 animate-pulse" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-800 dark:text-white">
+                          {isExtractingText
+                            ? extractionProgress
+                              ? `Reading page ${extractionProgress.current} of ${extractionProgress.total}…`
+                              : "Reading document…"
+                            : streamingText
+                            ? "Generating summary…"
+                            : "AI Summary In Progress"}
+                        </p>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                          {isExtractingText
+                            ? "Extracting text from PDF pages"
+                            : streamingText
+                            ? "OmniDrive AI is writing your summary"
+                            : "Connecting to OmniDrive AI…"}
+                        </p>
+                      </div>
+                      <div className="ml-auto">
+                        <Loader2 className="w-4 h-4 animate-spin text-purple-500" />
+                      </div>
                     </div>
+
+                    {/* ── Extraction progress bar ── */}
+                    {isExtractingText && extractionProgress?.total && (
+                      <div className="px-1">
+                        <div className="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full transition-all duration-300"
+                            style={{
+                              width: `${Math.round((extractionProgress.current / extractionProgress.total) * 100)}%`,
+                            }}
+                          />
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-1 text-right font-mono">
+                          {Math.round((extractionProgress.current / extractionProgress.total) * 100)}%
+                        </p>
+                      </div>
+                    )}
+
+                    {/* ── Live streaming text preview ── */}
+                    {streamingText && !isExtractingText && (
+                      <div className="p-4 rounded-2xl bg-purple-50/60 dark:bg-purple-950/30 border border-purple-200/80 dark:border-purple-800/60 text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-sans whitespace-pre-wrap animate-in fade-in">
+                        <div className="flex items-center gap-1.5 mb-2 text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider">
+                          <Bot className="w-3.5 h-3.5" /> Live Synthesis
+                        </div>
+                        {formatStreamingPreview(streamingText)}
+                        <span className="inline-block w-1.5 h-3.5 bg-purple-600 ml-1 animate-pulse align-middle rounded-xs" />
+                      </div>
+                    )}
+
+                    {/* ── Skeleton cards ── */}
+                    {!streamingText && (
+                      <>
+                        <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2.5 bg-white dark:bg-slate-800">
+                          <div className="h-3 rounded-full bg-slate-200 dark:bg-slate-700 animate-pulse w-1/3" />
+                          <div className="h-2.5 rounded-full bg-slate-100 dark:bg-slate-700/60 animate-pulse w-full" />
+                          <div className="h-2.5 rounded-full bg-slate-100 dark:bg-slate-700/60 animate-pulse w-5/6" />
+                          <div className="h-2.5 rounded-full bg-slate-100 dark:bg-slate-700/60 animate-pulse w-4/6" />
+                        </div>
+                        <div className="space-y-2">
+                          {[1, 2, 3, 4].map((i) => (
+                            <div key={i} className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+                              <div className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 animate-pulse shrink-0" />
+                              <div className="flex-1 h-2.5 rounded-full bg-slate-100 dark:bg-slate-700/60 animate-pulse" style={{ width: `${70 + i * 5}%` }} />
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </div>
                 ) : (
                   <>
@@ -732,7 +887,7 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
                             Generative AI Extraction <Sparkles className="w-3 h-3 text-amber-500" />
                           </span>
                           <span className="text-[11px] text-purple-700 dark:text-purple-300 font-mono">
-                            {summary.model || "Meta LLaMA 3.2 · Live GenAI"}
+                            {sanitizeModelName(summary.model)}
                           </span>
                         </div>
                       </div>

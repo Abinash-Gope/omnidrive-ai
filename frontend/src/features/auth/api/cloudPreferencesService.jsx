@@ -91,7 +91,7 @@ export const buildSafeCloudPayload = (displayName, { starred = [], trash = [], f
           executive: s.executive.slice(0, 240),
           takeaways: Array.isArray(s.takeaways) ? s.takeaways.slice(0, 3) : [],
           pages: s.pages || null,
-          model: s.model || "Meta LLaMA 3.2",
+          model: s.model || "OmniDrive Neural Engine",
         };
       }
     }

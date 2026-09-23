@@ -10,8 +10,6 @@ import {
   Maximize,
   Minimize,
   Settings,
-  Cpu,
-  Tv,
   Film,
   Check,
   Lock,
@@ -419,11 +417,6 @@ const VideoPlayerModal = ({ file, isOpen, onClose, onChangeQuality }) => {
                 <span>Adaptive HLS Stream</span>
                 <span>•</span>
                 <span className="text-[#1a73e8] font-mono font-medium">{currentQuality}</span>
-                {plan === "free" && (
-                  <span className="px-1.5 py-0.2 rounded text-[10px] bg-slate-800 text-slate-300 font-mono">
-                    Free Tier 720p Max
-                  </span>
-                )}
               </p>
             </div>
           </div>
@@ -703,7 +696,7 @@ const VideoPlayerModal = ({ file, isOpen, onClose, onChangeQuality }) => {
                               )}
                             </div>
                             <div className="text-[10px] text-slate-400 font-mono">
-                              {q.isLocked ? "Clicks will downgrade to 720p" : q.bitrate}
+                              {q.bitrate}
                             </div>
                           </div>
                           {currentQuality === q.value && <Check className="w-4 h-4 text-[#1a73e8]" />}
@@ -725,56 +718,6 @@ const VideoPlayerModal = ({ file, isOpen, onClose, onChangeQuality }) => {
             </div>
           </div>
         </div>
-
-        {/* Technical Transcoder Pipeline Footer (Hidden in Fullscreen) */}
-        {!isFullscreen && (
-          <div className="p-5 bg-slate-950 border-t border-slate-800 grid grid-cols-1 md:grid-cols-3 gap-3.5 text-xs">
-            <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800">
-              <span className="text-[11px] font-semibold text-slate-400 flex items-center gap-1.5 mb-1">
-                <Cpu className="w-3.5 h-3.5 text-[#1a73e8]" />
-                <span>Transcoding Engine</span>
-              </span>
-              <p className="font-mono text-white text-[11px]">
-                {plan === "enterprise"
-                  ? "Dedicated ARM64 Fargate Cluster"
-                  : plan === "pro"
-                  ? "AWS Graviton3 Priority Worker"
-                  : "AWS ECS Fargate ARM64 Spot"}
-              </p>
-              <p className="text-[10px] text-slate-500 mt-0.5">
-                {plan === "enterprise" ? "Private VPC execution" : "FFmpeg 6.1 static binary"}
-              </p>
-            </div>
-
-            <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800">
-              <span className="text-[11px] font-semibold text-slate-400 flex items-center gap-1.5 mb-1">
-                <Tv className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Streaming Format</span>
-              </span>
-              <p className="font-mono text-white text-[11px]">
-                {plan === "enterprise" ? "HLS .m3u8 (BYOK KMS Encrypted)" : "HLS .m3u8 Master Playlist"}
-              </p>
-              <p className="text-[10px] text-slate-500 mt-0.5">6s TS segments with AAC audio</p>
-            </div>
-
-            <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800">
-              <span className="text-[11px] font-semibold text-slate-400 flex items-center gap-1.5 mb-1">
-                <Film className="w-3.5 h-3.5 text-purple-400" />
-                <span>Adaptive Renditions</span>
-              </span>
-              <p className="font-mono text-white text-[11px]">
-                {plan === "enterprise"
-                  ? "4K Cinema • 1080p • 720p"
-                  : plan === "pro"
-                  ? "1080p • 720p • 480p"
-                  : "720p • 480p (Pro: 1080p)"}
-              </p>
-              <p className="text-[10px] text-slate-500 mt-0.5">
-                {plan === "free" ? "Free account locked to 720p max" : "Automated multi-bitrate S3 distribution"}
-              </p>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
