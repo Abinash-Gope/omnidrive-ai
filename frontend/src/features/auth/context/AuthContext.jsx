@@ -6,6 +6,7 @@ import { parseJwt, isTokenExpired, formatUserFromClaims, isSessionWithinSevenDay
 import { loginApi, registerApi, logoutApi, getActiveSessionApi, getOrRenewIdToken } from "../api/authApi.jsx";
 import { loginSuccess, logout as reduxLogout, setLoading as setReduxLoading, loginFailure } from "../state/authSlice.jsx";
 import { setToast } from "../../../shared/state/uiSlice.jsx";
+import { flushPendingActivityToCloud } from "../../dashboard/services/activitySyncService.jsx";
 
 export const AuthContext = createContext(null);
 
@@ -92,6 +93,12 @@ export const AuthProvider = ({ children }) => {
    */
   const logout = useCallback(async () => {
     try {
+      // 1. Immediately flush all buffered local activity & preferences to AWS Cognito Cloud before signing out
+      try {
+        await flushPendingActivityToCloud();
+      } catch (syncErr) {
+        console.warn("Could not flush activity before logout:", syncErr);
+      }
       await logoutApi();
     } catch (err) {
       console.warn("Logout error:", err);

@@ -44,6 +44,14 @@ import {
   fetchCloudPreferences,
   saveCloudPreferences,
 } from "../../auth/api/cloudPreferencesService.jsx";
+import {
+  getLocalPreferences,
+  recordLocalActivity,
+  flushPendingActivityToCloud,
+  initInactivitySyncWatcher,
+  hasPendingSync,
+  getLocalActivity,
+} from "../services/activitySyncService.jsx";
 
 /**
  * Layer 2: useDashboard Custom Hook
@@ -69,26 +77,32 @@ export const useDashboard = () => {
     previewModal,
   } = useSelector((state) => state.dashboard || {});
 
-  // Load cloud preferences and initial files on mount
+  // Load local preferences immediately, initialize 5-min inactivity watcher, and load remote files
   useEffect(() => {
-    // One-time cleanup of legacy local storage keys to guarantee no local persistence
-    try {
-      localStorage.removeItem("omnidrive_starred_files");
-      localStorage.removeItem("omnidrive_trashed_files");
-      localStorage.removeItem("omnidrive_deleted_files");
-      localStorage.removeItem("omnidrive_offline_files");
-    } catch {}
+    // 1. Immediately restore local buffered preferences for 0ms instant UI rendering
+    const localPrefs = getLocalPreferences();
+    if (localPrefs && (localPrefs.starred?.length > 0 || localPrefs.trash?.length > 0)) {
+      dispatch(
+        setCloudState({
+          starredIds: localPrefs.starred || [],
+          trashIds: localPrefs.trash || [],
+        })
+      );
+    }
 
+    // 2. Fetch cloud preferences in background if local is not currently holding unsynced edits
     const init = async () => {
       try {
-        const prefs = await fetchCloudPreferences();
-        if (prefs) {
-          dispatch(
-            setCloudState({
-              starredIds: prefs.starred || [],
-              trashIds: prefs.trash || [],
-            })
-          );
+        if (!hasPendingSync()) {
+          const prefs = await fetchCloudPreferences();
+          if (prefs) {
+            dispatch(
+              setCloudState({
+                starredIds: prefs.starred || [],
+                trashIds: prefs.trash || [],
+              })
+            );
+          }
         }
       } catch (err) {
         console.warn("Could not fetch cloud preferences on dashboard mount:", err);
@@ -97,11 +111,20 @@ export const useDashboard = () => {
     };
 
     init();
+
+    // 3. Initialize 5-minute inactivity & leave watcher (automatically flushes to AWS Cloud)
+    const cleanupInactivityWatcher = initInactivitySyncWatcher(() => {
+      console.log("[Dashboard] Background 5-min inactivity sync completed.");
+    });
+
+    return () => {
+      cleanupInactivityWatcher();
+    };
   }, [dispatch]);
 
-  // Sync immediately when authenticated user claims provide cloud preferences
+  // Sync when authenticated user claims provide cloud preferences (if no pending local edits)
   useEffect(() => {
-    if (authUser?.cloudPreferences) {
+    if (authUser?.cloudPreferences && !hasPendingSync()) {
       dispatch(
         setCloudState({
           starredIds: authUser.cloudPreferences.starred || [],
@@ -352,9 +375,10 @@ export const useDashboard = () => {
   const handleClosePreview = () => dispatch(closePreviewModal());
   const handleChangeQuality = (quality) => dispatch(updateVideoQuality(quality));
 
-  // Toggle star handler (persisted in AWS Cognito Cloud)
-  const handleToggleStar = async (fileOrId) => {
+  // Toggle star handler (buffered locally with 0ms latency, synced on 5-min leave or logout)
+  const handleToggleStar = (fileOrId) => {
     const fileId = typeof fileOrId === "object" ? fileOrId.id || fileOrId.file_id : fileOrId;
+    const fileName = typeof fileOrId === "object" ? fileOrId.name : null;
     if (!fileId) return;
 
     dispatch(toggleStar(fileId));
@@ -370,18 +394,16 @@ export const useDashboard = () => {
       ? (starredIds || []).filter((id) => id !== fileId)
       : [...(starredIds || []), fileId];
 
-    try {
-      await saveCloudPreferences({
-        starred: updatedStarred,
-        trash: cloudTrashIds || [],
-      });
-    } catch (err) {
-      console.warn("Failed to persist star preference to AWS Cloud:", err);
-    }
+    // Store activity & preferences in local buffer with 0ms network latency
+    recordLocalActivity(
+      wasStarred ? "unstar" : "star",
+      { fileId, fileName },
+      { starred: updatedStarred, trash: cloudTrashIds || [] }
+    );
   };
 
-  // Soft-delete to Trash (persisted in AWS Cognito Cloud)
-  const handleMoveToTrash = async (file) => {
+  // Soft-delete to Trash (buffered locally with 0ms latency, synced on 5-min leave or logout)
+  const handleMoveToTrash = (file) => {
     if (!file) return;
     const fileId = file.id || file.file_id;
     dispatch(moveToTrash(fileId));
@@ -393,18 +415,15 @@ export const useDashboard = () => {
     );
 
     const updatedTrash = Array.from(new Set([...(cloudTrashIds || []), fileId]));
-    try {
-      await saveCloudPreferences({
-        starred: starredIds || [],
-        trash: updatedTrash,
-      });
-    } catch (err) {
-      console.warn("Failed to persist trash state to AWS Cloud:", err);
-    }
+    recordLocalActivity(
+      "trash",
+      { fileId, fileName: file.name },
+      { starred: starredIds || [], trash: updatedTrash }
+    );
   };
 
-  // Restore from Trash back to active files (persisted in AWS Cognito Cloud)
-  const handleRestoreFile = async (file) => {
+  // Restore from Trash back to active files (buffered locally with 0ms latency)
+  const handleRestoreFile = (file) => {
     if (!file) return;
     const fileId = file.id || file.file_id;
     dispatch(restoreFromTrash(fileId));
@@ -416,17 +435,14 @@ export const useDashboard = () => {
     );
 
     const updatedTrash = (cloudTrashIds || []).filter((id) => id !== fileId);
-    try {
-      await saveCloudPreferences({
-        starred: starredIds || [],
-        trash: updatedTrash,
-      });
-    } catch (err) {
-      console.warn("Failed to persist restored state to AWS Cloud:", err);
-    }
+    recordLocalActivity(
+      "restore",
+      { fileId, fileName: file.name },
+      { starred: starredIds || [], trash: updatedTrash }
+    );
   };
 
-  // Permanent Delete File Handler (AWS S3 & DynamoDB purge + Cloud preference cleanup)
+  // Permanent Delete File Handler (AWS S3 & DynamoDB purge + local buffer cleanup)
   const handlePermanentDelete = async (file) => {
     if (!file) return;
     const fileId = file.id || file.file_id;
@@ -440,15 +456,14 @@ export const useDashboard = () => {
       // Call API to remove from DynamoDB and S3
       await deleteFileApi(fileId, s3Key, fileName);
 
-      // Clean up cloud preference references
+      // Clean up local preference buffer and record deletion activity
       const updatedTrash = (cloudTrashIds || []).filter((id) => id !== fileId);
       const updatedStarred = (starredIds || []).filter((id) => id !== fileId);
-      try {
-        await saveCloudPreferences({
-          starred: updatedStarred,
-          trash: updatedTrash,
-        });
-      } catch {}
+      recordLocalActivity(
+        "delete",
+        { fileId, fileName },
+        { starred: updatedStarred, trash: updatedTrash }
+      );
 
       dispatch(
         setToast({
@@ -467,7 +482,7 @@ export const useDashboard = () => {
     }
   };
 
-  // Bulk Empty Trash (AWS S3 & DynamoDB purge + Cloud preference cleanup)
+  // Bulk Empty Trash (AWS S3 & DynamoDB purge + local buffer cleanup)
   const handleEmptyTrash = async () => {
     const items = [...(trashFiles || [])];
     if (items.length === 0) return;
@@ -480,15 +495,12 @@ export const useDashboard = () => {
       })
     );
 
-    // Clean up cloud preferences
-    try {
-      await saveCloudPreferences({
-        starred: starredIds || [],
-        trash: [],
-      });
-    } catch (err) {
-      console.warn("Failed to clear trash cloud preferences:", err);
-    }
+    // Update local preference buffer
+    recordLocalActivity(
+      "empty_trash",
+      { count: items.length },
+      { starred: starredIds || [], trash: [] }
+    );
 
     // Concurrently purge from S3 & DynamoDB
     for (const f of items) {
@@ -595,12 +607,16 @@ export const useDashboard = () => {
     reloadFiles: loadFiles,
     handleSelectTab: (tab) => dispatch(setActiveTab(tab)),
     handleSelectFilter: (type) => dispatch(setFilterType(type)),
-    handleSearch: (query) => dispatch(setSearchQuery(query)),
-    handleToggleViewMode: () => dispatch(toggleViewMode()),
-    handleClosePipeline: () => dispatch(closeUploadPipeline()),
-    handleOpenPreview: (file) => dispatch(openPreviewModal(file)),
+    handleOpenPreview: (file) => {
+      dispatch(openPreviewModal(file));
+      if (file) {
+        recordLocalActivity("preview", { fileId: file.id || file.file_id, fileName: file.name });
+      }
+    },
     handleClosePreview: () => dispatch(closePreviewModal()),
     handleChangeQuality: (fileId, quality) => dispatch(updateVideoQuality({ fileId, quality })),
+    flushActivityToCloud: flushPendingActivityToCloud,
+    getLocalActivity,
   };
 };
 
