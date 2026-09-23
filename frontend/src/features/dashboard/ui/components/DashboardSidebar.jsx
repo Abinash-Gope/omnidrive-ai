@@ -31,6 +31,10 @@ const DashboardSidebar = ({
   totalFilesCount = 0,
   tabCounts = {},
   storage: propStorage,
+  albums = [],
+  activeAlbumId = null,
+  onSelectAlbum,
+  onOpenCreateAlbum,
 }) => {
   const fileInputRef = useRef(null);
   const [showBreakdown, setShowBreakdown] = useState(false);
@@ -125,7 +129,7 @@ const DashboardSidebar = ({
 
   return (
     <aside className="w-64 shrink-0 bg-[#faf8ff] dark:bg-[#0b1329] border-r border-slate-200 dark:border-slate-800 p-4 flex flex-col justify-between h-[calc(100vh-4rem)] overflow-hidden select-none sticky top-16">
-      <div className="space-y-6">
+      <div className="space-y-5 overflow-y-auto flex-1 pr-1 custom-scrollbar">
         {/* + New Upload Elevated Button */}
         <div>
           <input
@@ -154,11 +158,14 @@ const DashboardSidebar = ({
         <nav className="space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = activeTab === item.id;
+            const isActive = activeTab === item.id && !activeAlbumId;
             return (
               <button
                 key={item.id}
-                onClick={() => onSelectTab(item.id)}
+                onClick={() => {
+                  if (activeAlbumId && onSelectAlbum) onSelectAlbum(null);
+                  onSelectTab(item.id);
+                }}
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-full text-sm font-medium transition-colors ${
                   isActive
                     ? "bg-[#eaedff] text-[#005bbf] dark:bg-blue-950 dark:text-blue-300 font-semibold"
@@ -184,6 +191,63 @@ const DashboardSidebar = ({
             );
           })}
         </nav>
+
+        {/* Custom Albums Section */}
+        <div className="space-y-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+          <div className="flex items-center justify-between px-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              Albums
+            </span>
+            {onOpenCreateAlbum && (
+              <button
+                type="button"
+                onClick={onOpenCreateAlbum}
+                className="p-1 rounded-md text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
+                title="Create New Album"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          <div className="space-y-1">
+            {albums.length === 0 ? (
+              <button
+                type="button"
+                onClick={onOpenCreateAlbum}
+                className="w-full text-left px-3 py-2 rounded-xl text-xs text-slate-400 hover:text-blue-500 hover:bg-slate-200/40 dark:hover:bg-slate-800/40 transition-colors flex items-center gap-2 border border-dashed border-slate-200 dark:border-slate-800"
+              >
+                <Plus className="w-3.5 h-3.5 text-blue-500" />
+                <span>Create an album</span>
+              </button>
+            ) : (
+              albums.map((album) => {
+                const isActive = activeAlbumId === album.id;
+                const count = album.fileIds ? album.fileIds.length : 0;
+                return (
+                  <button
+                    key={album.id}
+                    type="button"
+                    onClick={() => onSelectAlbum && onSelectAlbum(isActive ? null : album.id)}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                      isActive
+                        ? "bg-[#eaedff] text-[#005bbf] dark:bg-blue-950 dark:text-blue-300 font-semibold shadow-xs"
+                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 truncate">
+                      <Folder className={`w-3.5 h-3.5 shrink-0 ${isActive ? "fill-blue-500 text-blue-500" : "text-slate-400"}`} />
+                      <span className="truncate">{album.name}</span>
+                    </div>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-slate-200/60 dark:bg-slate-800 text-slate-500 shrink-0">
+                      {count}
+                    </span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Bottom AWS Storage Meter Card */}

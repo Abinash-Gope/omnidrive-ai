@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   setCloudState,
@@ -25,6 +25,17 @@ import {
   restoreFromTrash,
   permanentDeleteFile,
   emptyTrash,
+  toggleSelectFile,
+  selectAllFiles,
+  clearSelection,
+  setPhotoViewMode,
+  setPhotoCategory,
+  setActiveTagFilter,
+  setActiveAlbumId,
+  createAlbum,
+  deleteAlbum,
+  addFilesToAlbum,
+  removeFilesFromAlbum,
 } from "../state/dashboardSlice.jsx";
 import { setToast } from "../../../shared/state/uiSlice.jsx";
 import {
@@ -66,6 +77,12 @@ export const useDashboard = () => {
     starredIds,
     cloudTrashIds,
     quarantinedFiles,
+    selectedFileIds = [],
+    albums = [],
+    activeAlbumId = null,
+    activePhotoCategory = "all",
+    activeTagFilter = null,
+    photoViewMode = "cards",
     activeTab,
     filterType,
     searchQuery,
@@ -81,11 +98,17 @@ export const useDashboard = () => {
   useEffect(() => {
     // 1. Immediately restore local buffered preferences for 0ms instant UI rendering
     const localPrefs = getLocalPreferences();
-    if (localPrefs && (localPrefs.starred?.length > 0 || localPrefs.trash?.length > 0)) {
+    if (
+      localPrefs &&
+      (localPrefs.starred?.length > 0 ||
+        localPrefs.trash?.length > 0 ||
+        localPrefs.albums?.length > 0)
+    ) {
       dispatch(
         setCloudState({
           starredIds: localPrefs.starred || [],
           trashIds: localPrefs.trash || [],
+          albums: localPrefs.albums || [],
         })
       );
     }
@@ -100,6 +123,7 @@ export const useDashboard = () => {
               setCloudState({
                 starredIds: prefs.starred || [],
                 trashIds: prefs.trash || [],
+                albums: prefs.albums || [],
               })
             );
           }
@@ -129,6 +153,7 @@ export const useDashboard = () => {
         setCloudState({
           starredIds: authUser.cloudPreferences.starred || [],
           trashIds: authUser.cloudPreferences.trash || [],
+          albums: authUser.cloudPreferences.albums || [],
         })
       );
     }
@@ -342,6 +367,13 @@ export const useDashboard = () => {
       sourceList = files.filter((f) => Boolean(f.isShared));
     }
 
+    // Filter by Active Album if set
+    if (activeAlbumId) {
+      const targetAlbum = (albums || []).find((a) => a.id === activeAlbumId);
+      const albumFileIds = new Set(targetAlbum?.fileIds || []);
+      sourceList = sourceList.filter((f) => albumFileIds.has(f.id || f.file_id));
+    }
+
     return sourceList.filter((f) => {
       const matchesSearch =
         !searchQuery ||
@@ -351,8 +383,62 @@ export const useDashboard = () => {
 
       if (!matchesSearch) return false;
 
-      if (filterType === "all") return true;
-      return f.type === filterType;
+      // Base media type filter
+      if (filterType !== "all" && f.type !== filterType) {
+        return false;
+      }
+
+      // If filtering images, apply smart category & tag filters
+      if (filterType === "image" || f.type === "image") {
+        if (activeTagFilter) {
+          const hasTag =
+            f.labels &&
+            f.labels.some(
+              (l) => (l.name || "").toLowerCase() === activeTagFilter.toLowerCase()
+            );
+          if (!hasTag) return false;
+        }
+
+        if (activePhotoCategory && activePhotoCategory !== "all") {
+          const lbls = f.labels || [];
+          if (activePhotoCategory === "people") {
+            const matches = lbls.some((l) =>
+              /person|face|human|portrait|smile|man|woman|people|girl|boy/i.test(l.name || "")
+            );
+            if (!matches) return false;
+          } else if (activePhotoCategory === "nature") {
+            const matches = lbls.some((l) =>
+              /nature|landscape|sky|plant|tree|flower|water|ocean|mountain|cloud|sunset|sunrise/i.test(
+                l.name || ""
+              )
+            );
+            if (!matches) return false;
+          } else if (activePhotoCategory === "urban") {
+            const matches = lbls.some((l) =>
+              /city|building|architecture|street|house|urban|skyscraper|downtown|bridge/i.test(
+                l.name || ""
+              )
+            );
+            if (!matches) return false;
+          } else if (activePhotoCategory === "documents") {
+            const matches = lbls.some((l) =>
+              /text|paper|document|webpage|screenshot|poster|book|font|diagram|receipt/i.test(
+                l.name || ""
+              )
+            );
+            if (!matches) return false;
+          } else if (activePhotoCategory === "vehicles") {
+            const matches = lbls.some((l) =>
+              /car|vehicle|transportation|automobile|road|highway|airplane|train|boat/i.test(
+                l.name || ""
+              )
+            );
+            if (!matches) return false;
+          }
+        }
+      }
+
+      return true;
     });
   })();
 
@@ -572,6 +658,7 @@ export const useDashboard = () => {
 
   return {
     files: filteredFiles,
+    allFiles: files,
     totalFilesCount: files.length,
     allFilesCount: files.length,
     tabCounts: {
@@ -596,6 +683,12 @@ export const useDashboard = () => {
     error,
     uploadPipeline,
     previewModal,
+    selectedFileIds,
+    albums,
+    activeAlbumId,
+    activePhotoCategory,
+    activeTagFilter,
+    photoViewMode,
     handleUploadFile,
     handleDeleteFile,
     handleMoveToTrash,
@@ -615,6 +708,22 @@ export const useDashboard = () => {
     },
     handleClosePreview: () => dispatch(closePreviewModal()),
     handleChangeQuality: (fileId, quality) => dispatch(updateVideoQuality({ fileId, quality })),
+    handleToggleSelect: (fileOrId) => {
+      const id = typeof fileOrId === "object" ? fileOrId.id || fileOrId.file_id : fileOrId;
+      if (!id) return;
+      dispatch(toggleSelectFile(id));
+    },
+    handleSelectAll: (ids) => dispatch(selectAllFiles(ids)),
+    handleClearSelection: () => dispatch(clearSelection()),
+    handleSetPhotoViewMode: (mode) => dispatch(setPhotoViewMode(mode)),
+    handleSetPhotoCategory: (cat) => dispatch(setPhotoCategory(cat)),
+    handleSetActiveTagFilter: (tag) => dispatch(setActiveTagFilter(tag)),
+    handleSetActiveAlbumId: (id) => dispatch(setActiveAlbumId(id)),
+    handleCreateAlbum: (album) => dispatch(createAlbum(album)),
+    handleDeleteAlbum: (id) => dispatch(deleteAlbum(id)),
+    handleAddFilesToAlbum: ({ albumId, fileIds }) => dispatch(addFilesToAlbum({ albumId, fileIds })),
+    handleRemoveFilesFromAlbum: ({ albumId, fileIds }) =>
+      dispatch(removeFilesFromAlbum({ albumId, fileIds })),
     flushActivityToCloud: flushPendingActivityToCloud,
     getLocalActivity,
   };

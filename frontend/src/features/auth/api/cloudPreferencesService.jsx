@@ -19,16 +19,16 @@ import { userPool } from "../config/cognitoConfig.jsx";
  */
 export const parseCloudNameAttribute = (rawName) => {
   if (!rawName || typeof rawName !== "string") {
-    return { displayName: "OmniDrive User", preferences: { starred: [], trash: [] } };
+    return { displayName: "OmniDrive User", preferences: { starred: [], trash: [], albums: [] } };
   }
 
   if (!rawName.includes("::")) {
-    return { displayName: rawName.trim(), preferences: { starred: [], trash: [] } };
+    return { displayName: rawName.trim(), preferences: { starred: [], trash: [], albums: [] } };
   }
 
   const parts = rawName.split("::");
   const displayName = parts[0].trim() || "OmniDrive User";
-  let preferences = { starred: [], trash: [] };
+  let preferences = { starred: [], trash: [], albums: [] };
 
   try {
     const jsonStr = parts.slice(1).join("::");
@@ -37,6 +37,7 @@ export const parseCloudNameAttribute = (rawName) => {
       preferences = {
         starred: Array.isArray(parsed.starred) ? parsed.starred : [],
         trash: Array.isArray(parsed.trash) ? parsed.trash : [],
+        albums: Array.isArray(parsed.albums) ? parsed.albums : [],
       };
     }
   } catch (err) {
@@ -49,18 +50,18 @@ export const parseCloudNameAttribute = (rawName) => {
 /**
  * Fetch the latest cloud preferences directly from AWS Cognito User Pool.
  *
- * @returns {Promise<{ starred: string[], trash: string[] }>}
+ * @returns {Promise<{ starred: string[], trash: string[], albums: Array<{ id: string, name: string, fileIds: string[], createdAt: string }> }>}
  */
 export const fetchCloudPreferences = () => {
   return new Promise((resolve) => {
     const currentUser = userPool.getCurrentUser();
     if (!currentUser) {
-      return resolve({ starred: [], trash: [] });
+      return resolve({ starred: [], trash: [], albums: [] });
     }
 
     currentUser.getSession((sessionErr, session) => {
       if (sessionErr || !session || !session.isValid()) {
-        return resolve({ starred: [], trash: [] });
+        return resolve({ starred: [], trash: [], albums: [] });
       }
 
       currentUser.getUserAttributes((attrErr, attributes) => {
@@ -81,12 +82,12 @@ export const fetchCloudPreferences = () => {
 };
 
 /**
- * Save updated preferences (Starred and Trashed file IDs) directly to AWS Cognito Cloud.
+ * Save updated preferences (Starred, Trashed file IDs, and Custom Albums) directly to AWS Cognito Cloud.
  *
- * @param {{ starred?: string[], trash?: string[] }} updates
+ * @param {{ starred?: string[], trash?: string[], albums?: Array<{ id: string, name: string, fileIds: string[] }> }} updates
  * @returns {Promise<boolean>} True on success
  */
-export const saveCloudPreferences = async ({ starred = [], trash = [] }) => {
+export const saveCloudPreferences = async ({ starred = [], trash = [], albums = [] }) => {
   return new Promise((resolve) => {
     const currentUser = userPool.getCurrentUser();
     if (!currentUser) {
@@ -106,6 +107,7 @@ export const saveCloudPreferences = async ({ starred = [], trash = [] }) => {
       const prefPayload = JSON.stringify({
         starred: Array.from(new Set(starred)),
         trash: Array.from(new Set(trash)),
+        albums: Array.isArray(albums) ? albums : [],
       });
 
       const combinedValue = `${displayName}::${prefPayload}`;

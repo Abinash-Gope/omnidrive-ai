@@ -89,6 +89,7 @@ export const recordLocalActivity = (actionType, details = {}, preferences = null
         JSON.stringify({
           starred: Array.isArray(preferences.starred) ? preferences.starred : [],
           trash: Array.isArray(preferences.trash) ? preferences.trash : [],
+          albums: Array.isArray(preferences.albums) ? preferences.albums : [],
         })
       );
       localStorage.setItem(SYNC_DIRTY_KEY, "true");
@@ -134,6 +135,7 @@ export const flushPendingActivityToCloud = async () => {
     const success = await saveCloudPreferences({
       starred: pendingPrefs.starred || [],
       trash: pendingPrefs.trash || [],
+      albums: pendingPrefs.albums || [],
     });
 
     if (success) {

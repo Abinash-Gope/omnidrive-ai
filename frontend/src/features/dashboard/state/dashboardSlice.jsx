@@ -8,6 +8,12 @@ const initialState = {
   cloudTrashIds: [],
   quarantinedFiles: [],
   selectedFile: null,
+  selectedFileIds: [],
+  albums: [],
+  activeAlbumId: null,
+  activePhotoCategory: "all", // 'all' | 'people' | 'nature' | 'urban' | 'documents' | 'vehicles'
+  activeTagFilter: null,
+  photoViewMode: "cards", // 'cards' | 'wall'
   activeTab: "my-files", // 'my-files' | 'recent' | 'starred' | 'shared' | 'trash' | 'videos' | 'documents' | 'photos'
   filterType: "all", // 'all' | 'video' | 'image' | 'pdf'
   searchQuery: "",
@@ -61,9 +67,12 @@ export const dashboardSlice = createSlice({
   initialState,
   reducers: {
     setCloudState: (state, action) => {
-      const { starredIds = [], trashIds = [] } = action.payload || {};
+      const { starredIds = [], trashIds = [], albums = [] } = action.payload || {};
       state.starredIds = starredIds;
       state.cloudTrashIds = trashIds;
+      if (Array.isArray(albums)) {
+        state.albums = albums;
+      }
 
       const trashSet = new Set(trashIds);
       const starredSet = new Set(starredIds);
@@ -319,11 +328,75 @@ export const dashboardSlice = createSlice({
       state.starredIds = state.starredIds.filter((id) => id !== fileId);
       state.files = state.files.filter((f) => f.id !== fileId && f.file_id !== fileId);
       state.quarantinedFiles = state.quarantinedFiles.filter((f) => f.id !== fileId && f.file_id !== fileId);
+      state.selectedFileIds = state.selectedFileIds.filter((id) => id !== fileId);
+      // Remove from all albums
+      state.albums.forEach((album) => {
+        album.fileIds = (album.fileIds || []).filter((id) => id !== fileId);
+      });
       state.storage = calculateStorageFromFiles(state.files, state.storage?.totalGB || 15.0);
     },
     emptyTrash: (state) => {
       state.trashFiles = [];
       state.cloudTrashIds = [];
+    },
+    // Multi-Selection Reducers
+    toggleSelectFile: (state, action) => {
+      const fileId = typeof action.payload === "object" ? action.payload?.fileId : action.payload;
+      if (!fileId) return;
+      const index = state.selectedFileIds.indexOf(fileId);
+      if (index >= 0) {
+        state.selectedFileIds.splice(index, 1);
+      } else {
+        state.selectedFileIds.push(fileId);
+      }
+    },
+    selectAllFiles: (state, action) => {
+      state.selectedFileIds = action.payload || state.files.map((f) => f.id || f.file_id);
+    },
+    clearSelection: (state) => {
+      state.selectedFileIds = [];
+    },
+    // Photo Gallery & View Mode Reducers
+    setPhotoViewMode: (state, action) => {
+      state.photoViewMode = action.payload || "cards"; // 'cards' | 'wall'
+    },
+    setPhotoCategory: (state, action) => {
+      state.activePhotoCategory = action.payload || "all";
+      state.activeTagFilter = null; // reset specific tag filter when category changes
+    },
+    setActiveTagFilter: (state, action) => {
+      state.activeTagFilter = action.payload;
+    },
+    // Custom Albums Reducers
+    setActiveAlbumId: (state, action) => {
+      state.activeAlbumId = action.payload;
+    },
+    createAlbum: (state, action) => {
+      const newAlbum = action.payload;
+      if (newAlbum && !state.albums.some((a) => a.id === newAlbum.id)) {
+        state.albums.push(newAlbum);
+      }
+    },
+    deleteAlbum: (state, action) => {
+      const albumId = action.payload;
+      state.albums = state.albums.filter((a) => a.id !== albumId);
+      if (state.activeAlbumId === albumId) {
+        state.activeAlbumId = null;
+      }
+    },
+    addFilesToAlbum: (state, action) => {
+      const { albumId, fileIds = [] } = action.payload || {};
+      const album = state.albums.find((a) => a.id === albumId);
+      if (album) {
+        album.fileIds = Array.from(new Set([...(album.fileIds || []), ...fileIds]));
+      }
+    },
+    removeFilesFromAlbum: (state, action) => {
+      const { albumId, fileIds = [] } = action.payload || {};
+      const album = state.albums.find((a) => a.id === albumId);
+      if (album) {
+        album.fileIds = (album.fileIds || []).filter((id) => !fileIds.includes(id));
+      }
     },
   },
 });
@@ -355,6 +428,17 @@ export const {
   restoreFromTrash,
   permanentDeleteFile,
   emptyTrash,
+  toggleSelectFile,
+  selectAllFiles,
+  clearSelection,
+  setPhotoViewMode,
+  setPhotoCategory,
+  setActiveTagFilter,
+  setActiveAlbumId,
+  createAlbum,
+  deleteAlbum,
+  addFilesToAlbum,
+  removeFilesFromAlbum,
 } = dashboardSlice.actions;
 
 export default dashboardSlice.reducer;

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import {
   Film,
   FileText,
@@ -15,9 +15,12 @@ import {
 } from "lucide-react";
 import FileCard from "./FileCard.jsx";
 import FileGridSkeleton from "./FileGridSkeleton.jsx";
+import { PhotoCategoryBar } from "./PhotoCategoryBar.jsx";
+import { PhotoWallView } from "./PhotoWallView.jsx";
 
 const FileGrid = ({
   files = [],
+  allFiles = [],
   quarantinedFiles = [],
   activeTab = "my-files",
   filterType = "all",
@@ -34,6 +37,17 @@ const FileGrid = ({
   onEmptyTrash,
   trashCount = 0,
   onResetSearch,
+  selectedFileIds = [],
+  onToggleSelect,
+  onSelectAll,
+  onClearSelection,
+  photoViewMode = "cards",
+  onTogglePhotoViewMode,
+  activePhotoCategory = "all",
+  onSelectPhotoCategory,
+  activeTagFilter = null,
+  onSelectTagFilter,
+  onOpenAddToAlbum,
 }) => {
   const filterOptions = [
     { id: "all", label: "All Files" },
@@ -41,6 +55,14 @@ const FileGrid = ({
     { id: "image", label: "Images (Vision AI)", icon: ImageIcon },
     { id: "pdf", label: "PDFs (GenAI Summary)", icon: FileText },
   ];
+
+  // Extract all images for category tag clustering
+  const allImages = useMemo(() => {
+    const list = allFiles.length > 0 ? allFiles : files;
+    return list.filter((f) => f.type === "image");
+  }, [allFiles, files]);
+
+  const isSelectionMode = selectedFileIds.length > 0;
 
   return (
     <div className="space-y-6">
@@ -143,6 +165,27 @@ const FileGrid = ({
         )}
       </div>
 
+      {/* Pillar 1: Smart AI Category & Rekognition Tag Bar (active when viewing images) */}
+      {filterType === "image" && (
+        <PhotoCategoryBar
+          images={allImages}
+          activeCategory={activePhotoCategory}
+          onSelectCategory={onSelectPhotoCategory}
+          activeTag={activeTagFilter}
+          onSelectTag={onSelectTagFilter}
+          photoViewMode={photoViewMode}
+          onToggleViewMode={() =>
+            onTogglePhotoViewMode(photoViewMode === "wall" ? "cards" : "wall")
+          }
+          isSelectionMode={isSelectionMode}
+          selectedCount={selectedFileIds.length}
+          onToggleSelectionMode={() => {
+            if (isSelectionMode) onClearSelection();
+            else if (files.length > 0) onToggleSelect(files[0]);
+          }}
+        />
+      )}
+
       {/* Files Display Container */}
       {isLoading ? (
         <FileGridSkeleton viewMode={viewMode} count={8} />
@@ -172,6 +215,8 @@ const FileGrid = ({
               ? "No files shared with you"
               : activeTab === "recent"
               ? "No recent files"
+              : filterType === "image" && activeTagFilter
+              ? `No photos tagged with "${activeTagFilter}"`
               : "No files found"}
           </h3>
           <p className="text-sm text-slate-500 max-w-sm mt-1">
@@ -185,9 +230,23 @@ const FileGrid = ({
               ? "Files and media shared with your account will appear here."
               : activeTab === "recent"
               ? "Upload or interact with files to see them in your recent activity."
+              : filterType === "image" && activeTagFilter
+              ? "Click 'Clear tag filter' above to show all photos."
               : "Your workspace is clean. Click '+ New Upload' in the sidebar to upload files directly to AWS S3 and trigger AI pipelines."}
           </p>
         </div>
+      ) : filterType === "image" && photoViewMode === "wall" ? (
+        /* Pillar 2: Google Photos-Style Chronological Wall & Edge-to-Edge Grid */
+        <PhotoWallView
+          photos={files}
+          selectedFileIds={selectedFileIds}
+          onToggleSelect={onToggleSelect}
+          onOpenPreview={onOpenPreview}
+          onToggleStar={onToggleStar}
+          onMoveToTrash={onMoveToTrash}
+          onOpenAddToAlbum={onOpenAddToAlbum}
+          isSelectionMode={isSelectionMode}
+        />
       ) : viewMode === "grid" ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           {files.map((file) => (
@@ -202,6 +261,9 @@ const FileGrid = ({
               onPermanentDelete={onPermanentDelete}
               activeTab={activeTab}
               viewMode="grid"
+              isSelected={selectedFileIds.includes(file.id || file.file_id)}
+              onToggleSelect={onToggleSelect}
+              isSelectionMode={isSelectionMode}
             />
           ))}
         </div>
@@ -229,6 +291,9 @@ const FileGrid = ({
                 onPermanentDelete={onPermanentDelete}
                 activeTab={activeTab}
                 viewMode="list"
+                isSelected={selectedFileIds.includes(file.id || file.file_id)}
+                onToggleSelect={onToggleSelect}
+                isSelectionMode={isSelectionMode}
               />
             ))}
           </div>

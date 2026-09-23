@@ -9,6 +9,8 @@ import ImageAiModal from "../components/ImageAiModal.jsx";
 import PdfSummaryModal from "../components/PdfSummaryModal.jsx";
 import UploadModal from "../../../../components/UploadModal.jsx";
 import DeleteConfirmModal from "../components/DeleteConfirmModal.jsx";
+import BulkActionBar from "../components/BulkActionBar.jsx";
+import AlbumModal from "../components/AlbumModal.jsx";
 
 /**
  * Layer 4: DashboardPage (Presentation Component)
@@ -17,6 +19,7 @@ import DeleteConfirmModal from "../components/DeleteConfirmModal.jsx";
 const DashboardPage = () => {
   const {
     files,
+    allFiles,
     totalFilesCount,
     tabCounts,
     trashCount,
@@ -30,6 +33,12 @@ const DashboardPage = () => {
     error,
     uploadPipeline,
     previewModal,
+    selectedFileIds,
+    albums,
+    activeAlbumId,
+    activePhotoCategory,
+    activeTagFilter,
+    photoViewMode,
     handleUploadFile,
     handleDeleteFile,
     handleMoveToTrash,
@@ -47,14 +56,43 @@ const DashboardPage = () => {
     handleOpenPreview,
     handleClosePreview,
     handleChangeQuality,
+    handleToggleSelect,
+    handleSelectAll,
+    handleClearSelection,
+    handleSetPhotoViewMode,
+    handleSetPhotoCategory,
+    handleSetActiveTagFilter,
+    handleSetActiveAlbumId,
+    handleCreateAlbum,
+    handleDeleteAlbum,
+    handleAddFilesToAlbum,
   } = useDashboard();
 
   const [isDirectUploadModalOpen, setIsDirectUploadModalOpen] = useState(false);
+  const [isAlbumModalOpen, setIsAlbumModalOpen] = useState(false);
+  const [albumTargetIds, setAlbumTargetIds] = useState([]);
   const [fileToDelete, setFileToDelete] = useState(null);
   const [isDeletingFile, setIsDeletingFile] = useState(false);
 
   // Dynamic header titles and subtitles per sidebar tab
   const getHeaderInfo = () => {
+    if (activeAlbumId) {
+      const activeAlbum = (albums || []).find((a) => a.id === activeAlbumId);
+      if (activeAlbum) {
+        return {
+          title: activeAlbum.name,
+          subtitle: `Custom Photo Album • ${files.length} ${files.length === 1 ? "item" : "items"}`,
+        };
+      }
+    }
+
+    if (filterType === "image" && activeTagFilter) {
+      return {
+        title: `Photos tagged "${activeTagFilter}"`,
+        subtitle: `Amazon Rekognition Vision AI tag filter • ${files.length} matching photos`,
+      };
+    }
+
     switch (activeTab) {
       case "recent":
         return {
@@ -112,10 +150,29 @@ const DashboardPage = () => {
           totalFilesCount={totalFilesCount}
           tabCounts={tabCounts}
           storage={storage}
+          albums={albums}
+          activeAlbumId={activeAlbumId}
+          onSelectAlbum={(id) => {
+            handleSetActiveAlbumId(id);
+            if (id) {
+              handleSelectFilter("image");
+            }
+          }}
+          onOpenCreateAlbum={() => {
+            setAlbumTargetIds([]);
+            setIsAlbumModalOpen(true);
+          }}
         />
 
         {/* Center/Right Content Area - Ultra Clean Layout */}
-        <main className="flex-1 overflow-y-auto p-6 lg:p-8 space-y-6">
+        <main
+          onClick={() => {
+            if (selectedFileIds.length > 0) {
+              handleClearSelection();
+            }
+          }}
+          className="flex-1 overflow-y-auto p-6 lg:p-8 space-y-6"
+        >
           {/* Welcome / Active Folder Header */}
           <div className="flex items-center justify-between">
             <div>
@@ -131,6 +188,7 @@ const DashboardPage = () => {
           {/* Files Grid / List View */}
           <FileGrid
             files={files}
+            allFiles={allFiles}
             quarantinedFiles={quarantinedFiles}
             activeTab={activeTab}
             filterType={filterType}
@@ -153,9 +211,43 @@ const DashboardPage = () => {
             onEmptyTrash={handleEmptyTrash}
             trashCount={trashCount}
             onResetSearch={() => handleSearch("")}
+            selectedFileIds={selectedFileIds}
+            onToggleSelect={handleToggleSelect}
+            onSelectAll={handleSelectAll}
+            onClearSelection={handleClearSelection}
+            photoViewMode={photoViewMode}
+            onTogglePhotoViewMode={handleSetPhotoViewMode}
+            activePhotoCategory={activePhotoCategory}
+            onSelectPhotoCategory={handleSetPhotoCategory}
+            activeTagFilter={activeTagFilter}
+            onSelectTagFilter={handleSetActiveTagFilter}
+            onOpenAddToAlbum={(file) => {
+              const ids = file ? [file.id || file.file_id] : selectedFileIds;
+              setAlbumTargetIds(ids);
+              setIsAlbumModalOpen(true);
+            }}
           />
         </main>
       </div>
+
+      {/* Floating Multi-Selection Bulk Action Bar */}
+      <BulkActionBar
+        allSelectableIds={files.map((f) => f.id || f.file_id)}
+        onOpenAddToAlbum={() => {
+          setAlbumTargetIds(selectedFileIds);
+          setIsAlbumModalOpen(true);
+        }}
+      />
+
+      {/* Custom Albums Modal */}
+      <AlbumModal
+        isOpen={isAlbumModalOpen}
+        onClose={() => {
+          setIsAlbumModalOpen(false);
+          setAlbumTargetIds([]);
+        }}
+        targetFileIds={albumTargetIds}
+      />
 
       {/* Asynchronous Pipeline Execution Docked Drawer */}
       <PipelineDrawer
