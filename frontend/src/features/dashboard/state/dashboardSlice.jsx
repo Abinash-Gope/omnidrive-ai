@@ -14,8 +14,9 @@ const initialState = {
   activePhotoCategory: "all", // 'all' | 'people' | 'nature' | 'urban' | 'documents' | 'vehicles'
   activeTagFilter: null,
   photoViewMode: "cards", // 'cards' | 'wall'
-  activeTab: "my-files", // 'my-files' | 'recent' | 'starred' | 'shared' | 'trash' | 'videos' | 'documents' | 'photos'
+  activeTab: "my-files", // 'my-files' | 'starred' | 'shared' | 'trash' | 'videos' | 'documents' | 'photos'
   filterType: "all", // 'all' | 'video' | 'image' | 'pdf'
+  sortBy: "recent", // 'recent' | 'oldest' | 'name-asc' | 'name-desc' | 'size-desc' | 'size-asc'
   searchQuery: "",
   viewMode: "grid", // 'grid' | 'list'
   isLoading: true,
@@ -120,7 +121,15 @@ export const dashboardSlice = createSlice({
       const newTrashItems = trashedFromRemote.filter((t) => !existingTrashIds.has(t.id || t.file_id));
       state.trashFiles = [...state.trashFiles, ...newTrashItems];
 
-      state.files = validFiles;
+      const seenIds = new Set();
+      const uniqueValidFiles = [];
+      for (const f of validFiles) {
+        const uid = f.id || f.file_id || f.s3Key || f.s3_key;
+        if (uid && seenIds.has(uid)) continue;
+        if (uid) seenIds.add(uid);
+        uniqueValidFiles.push(f);
+      }
+      state.files = uniqueValidFiles;
       state.quarantinedFiles = all.filter((f) => f.status === "REJECTED_SAFETY_VIOLATION");
       state.isLoading = false;
       state.error = null;
@@ -147,12 +156,23 @@ export const dashboardSlice = createSlice({
     },
     setActiveTab: (state, action) => {
       state.activeTab = action.payload;
+      state.activeTagFilter = null;
+      state.activePhotoCategory = "all";
+      state.filterType = "all";
+      state.activeAlbumId = null;
+      state.selectedFileIds = [];
     },
     setFilterType: (state, action) => {
       state.filterType = action.payload;
+      state.activeTagFilter = null;
+      state.activePhotoCategory = "all";
+      state.selectedFileIds = [];
     },
     setSearchQuery: (state, action) => {
       state.searchQuery = action.payload;
+    },
+    setSortBy: (state, action) => {
+      state.sortBy = action.payload;
     },
     toggleViewMode: (state) => {
       state.viewMode = state.viewMode === "grid" ? "list" : "grid";
@@ -204,7 +224,20 @@ export const dashboardSlice = createSlice({
       state.uploadPipeline.isOpen = false;
     },
     addFile: (state, action) => {
-      state.files.unshift(action.payload);
+      const newFile = action.payload;
+      if (!newFile) return;
+      const targetId = newFile.id || newFile.file_id;
+      const targetKey = newFile.s3Key || newFile.s3_key;
+      const existingIdx = state.files.findIndex(
+        (f) =>
+          (targetId && (f.id === targetId || f.file_id === targetId)) ||
+          (targetKey && (f.s3Key === targetKey || f.s3_key === targetKey))
+      );
+      if (existingIdx >= 0) {
+        state.files[existingIdx] = { ...state.files[existingIdx], ...newFile };
+      } else {
+        state.files.unshift(newFile);
+      }
       state.storage = calculateStorageFromFiles(state.files, state.storage?.totalGB || 15.0);
     },
     removeFile: (state, action) => {
@@ -408,6 +441,7 @@ export const {
   setError,
   setActiveTab,
   setFilterType,
+  setSortBy,
   setSearchQuery,
   toggleViewMode,
   openUploadPipeline,

@@ -70,6 +70,7 @@ export const getFilesApi = async () => {
                 ? `${(item.file_size / 1024).toFixed(1)} KB`
                 : `${(item.file_size / (1024 * 1024)).toFixed(1)} MB`)
             : "Unknown",
+          createdAt: item.created_at || null,
           date: item.created_at ? new Date(item.created_at).toLocaleDateString() : "Recently",
           status: item.status || "PROCESSING",
           moderationPassed: item.status !== "REJECTED_SAFETY_VIOLATION",

@@ -84,7 +84,7 @@ const FileCard = ({
             onOpenPreview(file);
           }
         }}
-        className={`group flex items-center justify-between px-4 py-3.5 border-b transition-all duration-200 cursor-pointer text-sm ${
+        className={`group flex items-center justify-between px-4 py-3.5 border-b transition-all duration-200 cursor-pointer text-sm select-none ${
           isSelected
             ? "bg-blue-500/10 dark:bg-blue-950/50 border-blue-500 shadow-[inset_3px_0_0_#3b82f6,0_0_15px_rgba(59,130,246,0.25)]"
             : "bg-white dark:bg-slate-900 hover:bg-blue-50/50 dark:hover:bg-slate-800/60 border-slate-100 dark:border-slate-800/80"
@@ -214,7 +214,7 @@ const FileCard = ({
       }}
       onMouseEnter={() => setIsCardHovered(true)}
       onMouseLeave={() => setIsCardHovered(false)}
-      className={`group relative bg-white dark:bg-slate-900 border rounded-2xl transition-all duration-300 flex flex-col cursor-pointer ${
+      className={`group relative bg-white dark:bg-slate-900 border rounded-2xl transition-all duration-300 flex flex-col cursor-pointer select-none ${
         isSelected
           ? "border-blue-500 ring-2 ring-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.6)] dark:shadow-[0_0_25px_rgba(59,130,246,0.75)] scale-[0.99] z-20"
           : "border-slate-200 dark:border-slate-800 hover:border-[#1a73e8]/50 dark:hover:border-blue-500/50 shadow-xs hover:shadow-xl"

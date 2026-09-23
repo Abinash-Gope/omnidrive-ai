@@ -6,36 +6,358 @@ import {
 } from "../features/dashboard/utils/thumbnailCache.jsx";
 
 /**
- * OmniDrive AI - Phase 3: Direct S3 Ingestion & Upload Hook
+ * OmniDrive AI — Multi-File Upload Hook (useFileUpload)
  * File: src/hooks/useFileUpload.jsx
  *
- * Responsibilities:
- * 1. Read active Cognito id_token from localStorage ("idToken" or "authToken").
- * 2. Request an S3 presigned PUT URL via POST /upload-url on API Gateway.
- * 3. Stream the file directly to AWS S3 using XMLHttpRequest with upload.onprogress tracking.
- * 4. Expose clean, reactive upload states:
- *    - uploadFile(file): async trigger
- *    - uploadProgress: 0 to 100
- *    - isUploading: boolean
- *    - isSuccess: boolean
- *    - error: string | null
- *    - uploadedData: object | null
- *    - resetUpload(): resets all states
+ * Supports multi-file queued uploads with bounded concurrency (2 at a time).
+ *
+ * Exposed API:
+ *   filesQueue      — array of { id, file, name, size, type, progress, status, error, result }
+ *   overallProgress — aggregate 0-100 value across all files (byte-weighted)
+ *   isUploading     — true while any file is actively uploading
+ *   isAllDone       — true when every queued file has completed or failed
+ *   hasError        — true if at least one file failed
+ *   stageFiles(files)      — add File[] to the staging queue (before upload starts)
+ *   removeFile(id)         — remove a file from the staging queue
+ *   clearQueue()           — reset everything
+ *   startUpload(onFileComplete) — begin processing the queue (concurrency 2)
+ *   retryFailed(onFileComplete) — retry files whose status is "error"
+ *
+ * Legacy single-file API (used by useDashboard executePipeline):
+ *   uploadFile(file) — async, returns result, sets uploadProgress / isSuccess / error
+ *   uploadProgress
+ *   isSuccess
+ *   error
+ *   uploadedData
+ *   resetUpload()
  */
+
+// Supported MIME type groups
+const ACCEPTED_TYPES = ["image/", "video/", "application/pdf"];
+const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024 * 1024; // 5 GB guard
+const CONCURRENCY = 2;
+
+let _nextId = 1;
+const nextId = () => `uf_${_nextId++}_${Date.now()}`;
+
+/** Build a queue item from a raw File */
+const makeQueueItem = (file) => ({
+  id: nextId(),
+  file,
+  name: file.name,
+  size: file.size,
+  type: file.type || "",
+  progress: 0,
+  status: "pending", // "pending" | "uploading" | "completed" | "error"
+  error: null,
+  result: null,
+});
+
+/** True if the file passes type/size guard */
+const isFileAccepted = (file) => {
+  const mime = file.type || "";
+  const accepted = ACCEPTED_TYPES.some((t) => mime.startsWith(t));
+  return accepted && file.size <= MAX_FILE_SIZE_BYTES;
+};
+
+// ---------------------------------------------------------------------------
+// Core single-file upload (shared between legacy and queue modes)
+// ---------------------------------------------------------------------------
+async function uploadSingleFile(file, onProgress) {
+  let thumbData = null;
+  try {
+    if (file.type?.startsWith("image/") || file.type?.startsWith("video/")) {
+      thumbData = await generateThumbnail(file);
+    }
+  } catch (_) {}
+
+  const idToken = await getOrRenewIdToken();
+  if (!idToken) throw new Error("Authentication required. Please sign in again.");
+
+  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
+  const uploadUrlEndpoint = apiBaseUrl ? `${apiBaseUrl}/upload-url` : "/upload-url";
+
+  const payload = {
+    file_name: file.name,
+    content_type: (file.type || "application/octet-stream").toLowerCase(),
+    file_size: file.size || 0,
+  };
+
+  const response = await fetch(uploadUrlEndpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${idToken}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    let errMessage = `Failed to get upload authorization (HTTP ${response.status})`;
+    try {
+      const errorData = await response.json();
+      if (errorData?.error) errMessage = errorData.error;
+    } catch (_) {}
+    throw new Error(errMessage);
+  }
+
+  const { upload_url, file_id, s3_key } = await response.json();
+  if (!upload_url) throw new Error("API Gateway did not return a valid S3 upload URL.");
+
+  // Persist thumbnail in client storage
+  if (thumbData?.dataUrl && file_id) {
+    saveThumbnail([file_id, s3_key, file.name], thumbData.dataUrl, {
+      width: thumbData.width,
+      height: thumbData.height,
+      format: thumbData.format,
+    });
+  }
+
+  // Inspect signed headers
+  let signedHeaders = [];
+  try {
+    const urlObj = new URL(upload_url);
+    const signedParam = urlObj.searchParams.get("X-Amz-SignedHeaders");
+    if (signedParam) signedHeaders = signedParam.toLowerCase().split(";");
+  } catch (_) {}
+
+  // Stream directly to S3 via XMLHttpRequest
+  await new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) {
+        const percent = Math.round((event.loaded / event.total) * 100);
+        onProgress?.(percent, xhr);
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        onProgress?.(100, xhr);
+        resolve();
+      } else {
+        reject(new Error(`S3 upload failed (HTTP ${xhr.status}). Check CORS policy.`));
+      }
+    };
+
+    xhr.onerror = () => reject(new Error("Network error during S3 upload. Check connection/CORS."));
+    xhr.onabort = () => reject(new Error("File upload was cancelled."));
+
+    xhr.open("PUT", upload_url, true);
+    onProgress?.(0, xhr);
+
+    if (signedHeaders.length === 0 || signedHeaders.includes("content-type")) {
+      xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+    }
+    if (signedHeaders.includes("x-amz-meta-file_id") && file_id) {
+      xhr.setRequestHeader("x-amz-meta-file_id", file_id);
+    }
+    if (signedHeaders.includes("x-amz-meta-original_name") && file.name) {
+      xhr.setRequestHeader("x-amz-meta-original_name", file.name.replace(/[^a-zA-Z0-9._-]/g, "_"));
+    }
+
+    xhr.send(file);
+  });
+
+  const result = {
+    file_id,
+    s3_key,
+    file_name: file.name,
+    file_size: file.size,
+    file_type: file.type,
+    thumbnail: thumbData?.dataUrl || null,
+    dimensions: thumbData
+      ? { width: thumbData.width, height: thumbData.height, format: thumbData.format }
+      : null,
+  };
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Hook
+// ---------------------------------------------------------------------------
 export const useFileUpload = () => {
+  // ── Multi-file queue state ──────────────────────────────────────────────
+  const [filesQueue, setFilesQueue] = useState([]); // QueueItem[]
+  const filesQueueRef = useRef(filesQueue);
+  filesQueueRef.current = filesQueue;
+  const isProcessingRef = useRef(false);
+  const activeXhrsRef = useRef(new Map());
+
+  // ── Legacy single-file state (for PipelineDrawer / UploadModal legacy) ──
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState(null);
   const [uploadedData, setUploadedData] = useState(null);
-
-  // Keep a ref to XMLHttpRequest in case abort/cancel is needed
   const xhrRef = useRef(null);
 
+  // ── Helpers ────────────────────────────────────────────────────────────
+
+  /** Update a single queue item by id */
+  const patchItem = useCallback((id, patch) => {
+    setFilesQueue((prev) => {
+      const updated = prev.map((item) => (item.id === id ? { ...item, ...patch } : item));
+      filesQueueRef.current = updated;
+      return updated;
+    });
+  }, []);
+
+  // ── Queue mutation ──────────────────────────────────────────────────────
+
+  /** Stage one or more File objects. Ignores unsupported types and deduplicates identical files. Returns list of rejected file names. */
+  const stageFiles = useCallback((files) => {
+    const rejected = [];
+    const existingSignatures = new Set(
+      filesQueueRef.current.map((item) => `${item.name}-${item.size}-${item.file?.lastModified || 0}`)
+    );
+    const newItems = [];
+    Array.from(files || []).forEach((f) => {
+      if (!isFileAccepted(f)) {
+        rejected.push(f.name);
+        return;
+      }
+      const sig = `${f.name}-${f.size}-${f.lastModified || 0}`;
+      if (existingSignatures.has(sig)) {
+        // File is already in the queue, skip duplicate
+        return;
+      }
+      existingSignatures.add(sig);
+      newItems.push(makeQueueItem(f));
+    });
+
+    if (newItems.length > 0) {
+      const updated = [...filesQueueRef.current, ...newItems];
+      filesQueueRef.current = updated;
+      setFilesQueue(updated);
+    }
+    return rejected;
+  }, []);
+
+  /** Remove a single pending item from the queue (cannot remove an active upload) */
+  const removeFile = useCallback((id) => {
+    const updated = filesQueueRef.current.filter((item) => item.id !== id || item.status !== "pending");
+    filesQueueRef.current = updated;
+    setFilesQueue(updated);
+  }, []);
+
+  /** Clear entire queue (only when not actively uploading) */
+  const clearQueue = useCallback(() => {
+    if (isProcessingRef.current) return;
+    filesQueueRef.current = [];
+    setFilesQueue([]);
+  }, []);
+
+  // ── Computed derived values ─────────────────────────────────────────────
+
+  const isUploading_multi = filesQueue.some((i) => i.status === "uploading");
+  const isAllDone =
+    filesQueue.length > 0 &&
+    filesQueue.every((i) => i.status === "completed" || i.status === "error");
+  const hasError = filesQueue.some((i) => i.status === "error");
+
+  // Byte-weighted overall progress across all files
+  const overallProgress = (() => {
+    if (filesQueue.length === 0) return 0;
+    const totalBytes = filesQueue.reduce((s, i) => s + (i.size || 1), 0);
+    const doneBytes = filesQueue.reduce((s, i) => {
+      if (i.status === "completed") return s + (i.size || 1);
+      if (i.status === "uploading") return s + ((i.size || 1) * i.progress) / 100;
+      return s;
+    }, 0);
+    return Math.round((doneBytes / totalBytes) * 100);
+  })();
+
+  // ── Queue processor ────────────────────────────────────────────────────
+
   /**
-   * Reset all state flags
+   * Processes the queue with bounded concurrency without re-entrant state updates.
+   * @param {function} onFileComplete - called with result for each successfully uploaded file
    */
+  const startUpload = useCallback(
+    (onFileComplete) => {
+      if (isProcessingRef.current) return;
+
+      const currentPending = filesQueueRef.current.filter((i) => i.status === "pending");
+      if (currentPending.length === 0) return;
+
+      isProcessingRef.current = true;
+
+      const runWorker = async () => {
+        while (isProcessingRef.current) {
+          // Synchronously grab next pending item from filesQueueRef
+          const targetItem = filesQueueRef.current.find((i) => i.status === "pending");
+          if (!targetItem) break;
+
+          // Immediately mutate and notify React so another worker cannot pick this item
+          targetItem.status = "uploading";
+          targetItem.progress = 0;
+          setFilesQueue([...filesQueueRef.current]);
+
+          try {
+            const result = await uploadSingleFile(targetItem.file, (percent, xhr) => {
+              if (xhr) activeXhrsRef.current.set(targetItem.id, xhr);
+              targetItem.progress = percent;
+              setFilesQueue([...filesQueueRef.current]);
+            });
+            activeXhrsRef.current.delete(targetItem.id);
+
+            targetItem.status = "completed";
+            targetItem.progress = 100;
+            targetItem.result = result;
+            setFilesQueue([...filesQueueRef.current]);
+
+            onFileComplete?.(result);
+          } catch (err) {
+            activeXhrsRef.current.delete(targetItem.id);
+            targetItem.status = "error";
+            targetItem.error = err.message || "Upload failed";
+            setFilesQueue([...filesQueueRef.current]);
+          }
+        }
+      };
+
+      // Launch CONCURRENCY parallel workers
+      const workerCount = Math.min(CONCURRENCY, currentPending.length);
+      const workers = Array.from({ length: workerCount }, () => runWorker());
+
+      Promise.all(workers).finally(() => {
+        const stillPending = filesQueueRef.current.some((i) => i.status === "pending");
+        if (!stillPending) {
+          isProcessingRef.current = false;
+        }
+      });
+    },
+    [] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  /** Retry only failed items */
+  const retryFailed = useCallback(
+    (onFileComplete) => {
+      filesQueueRef.current = filesQueueRef.current.map((i) =>
+        i.status === "error" ? { ...i, status: "pending", error: null, progress: 0 } : i
+      );
+      setFilesQueue([...filesQueueRef.current]);
+      setTimeout(() => {
+        isProcessingRef.current = false;
+        startUpload(onFileComplete);
+      }, 50);
+    },
+    [startUpload]
+  );
+
+  // ── Legacy single-file API ─────────────────────────────────────────────
+
   const resetUpload = useCallback(() => {
+    isProcessingRef.current = false;
+    activeXhrsRef.current.forEach((xhr) => {
+      try {
+        xhr.abort();
+      } catch (_) {}
+    });
+    activeXhrsRef.current.clear();
     if (xhrRef.current && xhrRef.current.readyState !== XMLHttpRequest.DONE) {
       xhrRef.current.abort();
     }
@@ -44,12 +366,13 @@ export const useFileUpload = () => {
     setIsSuccess(false);
     setError(null);
     setUploadedData(null);
+    filesQueueRef.current = [];
+    setFilesQueue([]);
   }, []);
 
   /**
-   * Main upload execution method
-   * @param {File} file - The native browser File object to upload
-   * @returns {Promise<object>} Result containing file_id, s3_key, file_name
+   * Legacy single-file upload used by useDashboard (PipelineDrawer flow).
+   * Returns the upload result object.
    */
   const uploadFile = useCallback(async (file) => {
     if (!file) {
@@ -58,155 +381,17 @@ export const useFileUpload = () => {
       throw new Error(err);
     }
 
-    // Reset previous run state
     setIsUploading(true);
     setIsSuccess(false);
     setError(null);
     setUploadProgress(0);
     setUploadedData(null);
 
-    // Generate client thumbnail preview
-    let thumbData = null;
     try {
-      if (file.type?.startsWith("image/") || file.type?.startsWith("video/")) {
-        thumbData = await generateThumbnail(file);
-      }
-    } catch (tErr) {
-      console.warn("Thumbnail generation notice:", tErr);
-    }
-
-    try {
-      // 1. Obtain fresh Cognito ID token via 7-day persistent auto-renewal
-      const idToken = await getOrRenewIdToken();
-      if (!idToken) {
-        throw new Error("Authentication required: Your session has expired. Please sign in again.");
-      }
-
-      // Determine API Gateway base URL from Vite environment variables
-      const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
-      const uploadUrlEndpoint = apiBaseUrl ? `${apiBaseUrl}/upload-url` : "/upload-url";
-
-      // 2. Request S3 Presigned PUT URL from AWS API Gateway
-      const payload = {
-        file_name: file.name,
-        content_type: (file.type || "application/octet-stream").toLowerCase(),
-        file_size: file.size || 0,
-      };
-
-      const response = await fetch(uploadUrlEndpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${idToken}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        let errMessage = `Failed to get upload authorization (HTTP ${response.status})`;
-        try {
-          const errorData = await response.json();
-          if (errorData?.error) {
-            errMessage = errorData.error;
-          }
-        } catch (_) {
-          // Ignore JSON parse error on non-json error responses
-        }
-        throw new Error(errMessage);
-      }
-
-      const { upload_url, file_id, s3_key } = await response.json();
-
-      if (!upload_url) {
-        throw new Error("API Gateway did not return a valid S3 upload URL.");
-      }
-
-      // Persist thumbnail in client storage
-      if (thumbData?.dataUrl && file_id) {
-        saveThumbnail([file_id, s3_key, file.name], thumbData.dataUrl, {
-          width: thumbData.width,
-          height: thumbData.height,
-          format: thumbData.format,
-        });
-      }
-
-      // Inspect signed headers
-      let signedHeaders = [];
-      try {
-        const urlObj = new URL(upload_url);
-        const signedParam = urlObj.searchParams.get("X-Amz-SignedHeaders");
-        if (signedParam) {
-          signedHeaders = signedParam.toLowerCase().split(";");
-        }
-      } catch (_) {}
-
-      // 3. Stream binary directly to S3 via XMLHttpRequest with real-time progress
-      await new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
+      const result = await uploadSingleFile(file, (percent, xhr) => {
         xhrRef.current = xhr;
-
-        // Track live upload progress
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable && event.total > 0) {
-            const percent = Math.round((event.loaded / event.total) * 100);
-            setUploadProgress(percent);
-          }
-        };
-
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            setUploadProgress(100);
-            resolve();
-          } else {
-            reject(
-              new Error(
-                `Direct S3 upload failed (HTTP ${xhr.status}). Please check S3 bucket CORS policy and signature.`
-              )
-            );
-          }
-        };
-
-        xhr.onerror = () => {
-          reject(
-            new Error(
-              "Network error during direct S3 upload. Check your internet connection or S3 CORS configuration."
-            )
-          );
-        };
-
-        xhr.onabort = () => {
-          reject(new Error("File upload was cancelled."));
-        };
-
-        // Initialize PUT request to S3 Presigned URL
-        xhr.open("PUT", upload_url, true);
-
-        // Content-Type: Set if signed or default
-        if (signedHeaders.length === 0 || signedHeaders.includes("content-type")) {
-          xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
-        }
-
-        // Check if x-amz-meta-* headers were signed
-        if (signedHeaders.includes("x-amz-meta-file_id") && file_id) {
-          xhr.setRequestHeader("x-amz-meta-file_id", file_id);
-        }
-        if (signedHeaders.includes("x-amz-meta-original_name") && file.name) {
-          xhr.setRequestHeader("x-amz-meta-original_name", file.name.replace(/[^a-zA-Z0-9._-]/g, "_"));
-        }
-
-        // CRITICAL: Do NOT send Authorization header to S3; S3 uses pre-authenticated SigV4 query parameters.
-        xhr.send(file);
+        setUploadProgress(percent);
       });
-
-      const result = {
-        file_id,
-        s3_key,
-        file_name: file.name,
-        file_size: file.size,
-        file_type: file.type,
-        thumbnail: thumbData?.dataUrl || null,
-        dimensions: thumbData ? { width: thumbData.width, height: thumbData.height, format: thumbData.format } : null,
-      };
 
       setUploadedData(result);
       setIsSuccess(true);
@@ -222,9 +407,21 @@ export const useFileUpload = () => {
   }, []);
 
   return {
+    // ── Multi-file API ─────────────────────────
+    filesQueue,
+    overallProgress,
+    isUploading: isUploading_multi || isUploading,
+    isAllDone,
+    hasError,
+    stageFiles,
+    removeFile,
+    clearQueue,
+    startUpload,
+    retryFailed,
+
+    // ── Legacy single-file API ──────────────────
     uploadFile,
     uploadProgress,
-    isUploading,
     isSuccess,
     error,
     uploadedData,

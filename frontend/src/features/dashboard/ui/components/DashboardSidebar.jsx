@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import {
   Plus,
   Folder,
-  Clock,
   Star,
   Users,
   Trash2,
@@ -91,9 +90,9 @@ const DashboardSidebar = ({
   };
 
   const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      onUploadFile(file);
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      onUploadFile(files);
       e.target.value = "";
     }
   };
@@ -105,7 +104,6 @@ const DashboardSidebar = ({
 
   const navItems = [
     { id: "my-files", label: "My Files", icon: Folder, count: myCount },
-    { id: "recent", label: "Recent", icon: Clock },
     { id: "starred", label: "Starred", icon: Star, count: starCount > 0 ? starCount : undefined },
     { id: "shared", label: "Shared with me", icon: Users, count: sharedCount > 0 ? sharedCount : undefined },
     {
@@ -128,7 +126,7 @@ const DashboardSidebar = ({
       : "bg-[#1a73e8]";
 
   return (
-    <aside className="w-64 shrink-0 bg-[#faf8ff] dark:bg-[#0b1329] border-r border-slate-200 dark:border-slate-800 p-4 flex flex-col justify-between h-[calc(100vh-4rem)] overflow-hidden select-none sticky top-16">
+    <aside className="w-64 shrink-0 bg-[#faf8ff] dark:bg-[#0b1329] border-r border-slate-200 dark:border-slate-800 p-4 flex flex-col justify-between h-full overflow-hidden select-none">
       <div className="space-y-5 overflow-y-auto flex-1 pr-1 custom-scrollbar">
         {/* + New Upload Elevated Button */}
         <div>
@@ -138,6 +136,7 @@ const DashboardSidebar = ({
             onChange={handleFileChange}
             className="hidden"
             accept="video/*,image/*,application/pdf"
+            multiple
           />
           <button
             onClick={() => {

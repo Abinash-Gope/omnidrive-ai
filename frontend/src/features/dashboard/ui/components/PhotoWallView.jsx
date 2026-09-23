@@ -136,7 +136,7 @@ export const PhotoWallView = ({
                         onOpenPreview(photo);
                       }
                     }}
-                    className={`group relative aspect-square rounded-2xl overflow-hidden bg-slate-900 border transition-all duration-300 cursor-pointer ${
+                    className={`group relative aspect-square rounded-2xl overflow-hidden bg-slate-900 border transition-all duration-300 cursor-pointer select-none ${
                       isSelected
                         ? "ring-2 ring-blue-500 border-blue-500 shadow-[0_0_22px_rgba(59,130,246,0.7)] dark:shadow-[0_0_28px_rgba(59,130,246,0.85)] scale-[0.98] z-10"
                         : "border-slate-200/60 dark:border-slate-800 hover:shadow-xl hover:scale-[1.02] hover:border-blue-500/50"

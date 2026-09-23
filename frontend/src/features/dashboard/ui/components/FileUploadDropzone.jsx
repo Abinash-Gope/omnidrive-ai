@@ -7,27 +7,31 @@ const FileUploadDropzone = ({ onUploadFile }) => {
 
   const handleDragOver = (e) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDragOver(true);
   };
 
   const handleDragLeave = (e) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDragOver(false);
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDragOver(false);
-    const droppedFile = e.dataTransfer?.files?.[0];
-    if (droppedFile) {
-      onUploadFile(droppedFile);
+    // Pass all dropped files as an array
+    const files = Array.from(e.dataTransfer?.files || []);
+    if (files.length > 0) {
+      onUploadFile(files);
     }
   };
 
   const handleFileChange = (e) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      onUploadFile(selectedFile);
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      onUploadFile(files);
       e.target.value = "";
     }
   };
@@ -47,6 +51,7 @@ const FileUploadDropzone = ({ onUploadFile }) => {
       <input
         ref={fileInputRef}
         type="file"
+        multiple
         onChange={handleFileChange}
         className="hidden"
         accept="video/*,image/*,application/pdf"
@@ -64,7 +69,7 @@ const FileUploadDropzone = ({ onUploadFile }) => {
               <Sparkles className="w-3.5 h-3.5 text-amber-500" />
             </h4>
             <p className="text-xs text-slate-500 mt-0.5">
-              Direct cloud upload with intelligent vision safety, video transcoding, and AI document summarization
+              Select multiple files — each goes through vision safety, video transcoding, and AI document summarization
             </p>
           </div>
         </div>

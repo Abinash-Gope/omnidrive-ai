@@ -16,7 +16,7 @@ const DashboardHeader = ({
   const { theme, isDark, toggleTheme } = useTheme();
 
   return (
-    <header className="h-16 px-4 sm:px-6 flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a] sticky top-0 z-30 transition-colors">
+    <header className="h-16 shrink-0 px-4 sm:px-6 flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a] z-30 transition-colors">
       {/* Left: Brand Identity */}
       <div className="flex items-center gap-3 shrink-0 cursor-pointer" onClick={onResetFilter}>
         <OmniDriveLogo size="sm" animate={true} />

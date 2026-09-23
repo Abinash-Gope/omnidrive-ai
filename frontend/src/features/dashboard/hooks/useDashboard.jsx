@@ -7,6 +7,7 @@ import {
   setError,
   setActiveTab,
   setFilterType,
+  setSortBy,
   setSearchQuery,
   toggleViewMode,
   openUploadPipeline,
@@ -85,6 +86,7 @@ export const useDashboard = () => {
     photoViewMode = "cards",
     activeTab,
     filterType,
+    sortBy = "recent",
     searchQuery,
     viewMode,
     storage,
@@ -356,13 +358,6 @@ export const useDashboard = () => {
       sourceList = files.filter(
         (f) => f.isStarred || (starredIds && starredIds.includes(f.id || f.file_id))
       );
-    } else if (activeTab === "recent") {
-      // Sort newest files first
-      sourceList = [...files].sort((a, b) => {
-        const timeA = new Date(a.createdAt || a.date || 0).getTime();
-        const timeB = new Date(b.createdAt || b.date || 0).getTime();
-        return timeB - timeA;
-      });
     } else if (activeTab === "shared") {
       sourceList = files.filter((f) => Boolean(f.isShared));
     }
@@ -374,7 +369,7 @@ export const useDashboard = () => {
       sourceList = sourceList.filter((f) => albumFileIds.has(f.id || f.file_id));
     }
 
-    return sourceList.filter((f) => {
+    const filtered = sourceList.filter((f) => {
       const matchesSearch =
         !searchQuery ||
         f.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -389,7 +384,7 @@ export const useDashboard = () => {
       }
 
       // If filtering images, apply smart category & tag filters
-      if (filterType === "image" || f.type === "image") {
+      if (filterType === "image") {
         if (activeTagFilter) {
           const hasTag =
             f.labels &&
@@ -440,11 +435,103 @@ export const useDashboard = () => {
 
       return true;
     });
+
+    // Helper to robustly extract timestamp
+    const getTimestamp = (item) => {
+      const val =
+        item.createdAt ||
+        item.created_at ||
+        item.uploadDate ||
+        item.lastModified ||
+        item.timestamp;
+      if (typeof val === "number" && !isNaN(val)) return val;
+      if (val) {
+        const parsed = new Date(val).getTime();
+        if (!isNaN(parsed) && parsed > 0) return parsed;
+      }
+      if (item.date && item.date !== "Recently") {
+        const parsed = new Date(item.date).getTime();
+        if (!isNaN(parsed) && parsed > 0) return parsed;
+      }
+      // Check for timestamp inside file ID
+      const idMatch = String(item.id || item.file_id || "").match(/(\d{10,13})/);
+      if (idMatch) {
+        const num = Number(idMatch[1]);
+        if (!isNaN(num) && num > 1600000000000) return num;
+        if (!isNaN(num) && num > 1600000000) return num * 1000;
+      }
+      return 0;
+    };
+
+    // Helper to robustly extract file size in bytes
+    const getFileSize = (item) => {
+      if (typeof item.sizeBytes === "number" && !isNaN(item.sizeBytes) && item.sizeBytes > 0) {
+        return item.sizeBytes;
+      }
+      if (typeof item.file_size === "number" && !isNaN(item.file_size) && item.file_size > 0) {
+        return item.file_size;
+      }
+      if (typeof item.size === "number" && !isNaN(item.size) && item.size > 0) {
+        return item.size;
+      }
+      if (typeof item.fileSize === "number" && !isNaN(item.fileSize) && item.fileSize > 0) {
+        return item.fileSize;
+      }
+      if (typeof item.bytes === "number" && !isNaN(item.bytes) && item.bytes > 0) {
+        return item.bytes;
+      }
+      if (typeof item.file_size === "string" && !isNaN(Number(item.file_size)) && Number(item.file_size) > 0) {
+        return Number(item.file_size);
+      }
+      // Parse formatted strings like "2.5 MB", "500 KB", "1.2 GB"
+      const sizeStr = typeof item.size === "string" ? item.size : typeof item.fileSize === "string" ? item.fileSize : "";
+      if (sizeStr) {
+        const match = sizeStr.trim().match(/^([\d.]+)\s*([a-zA-Z]+)?$/);
+        if (match) {
+          const num = parseFloat(match[1]);
+          const unit = (match[2] || "").toUpperCase();
+          if (unit.startsWith("K")) return Math.round(num * 1024);
+          if (unit.startsWith("M")) return Math.round(num * 1024 * 1024);
+          if (unit.startsWith("G")) return Math.round(num * 1024 * 1024 * 1024);
+          if (unit.startsWith("T")) return Math.round(num * 1024 * 1024 * 1024 * 1024);
+          return Math.round(num);
+        }
+      }
+      return 0;
+    };
+
+    // Apply Sort By (Recent / Newest first by default)
+    return [...filtered].sort((a, b) => {
+      if (sortBy === "oldest") {
+        const diff = getTimestamp(a) - getTimestamp(b);
+        if (diff !== 0) return diff;
+        return (a.id || a.file_id || "").localeCompare(b.id || b.file_id || "");
+      }
+      if (sortBy === "name-asc") {
+        return (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base", numeric: true });
+      }
+      if (sortBy === "name-desc") {
+        return (b.name || "").localeCompare(a.name || "", undefined, { sensitivity: "base", numeric: true });
+      }
+      if (sortBy === "size-desc") {
+        const diff = getFileSize(b) - getFileSize(a);
+        if (diff !== 0) return diff;
+        return (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base", numeric: true });
+      }
+      if (sortBy === "size-asc") {
+        const diff = getFileSize(a) - getFileSize(b);
+        if (diff !== 0) return diff;
+        return (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base", numeric: true });
+      }
+      // Default: "recent" (newest first)
+      const diff = getTimestamp(b) - getTimestamp(a);
+      if (diff !== 0) return diff;
+      return (b.id || b.file_id || "").localeCompare(a.id || a.file_id || "");
+    });
   })();
 
   // Dynamic tab counts for badges
   const myFilesCount = files.length;
-  const recentCount = files.length;
   const starredCount = files.filter(
     (f) => f.isStarred || (starredIds && starredIds.includes(f.id || f.file_id))
   ).length;
@@ -634,6 +721,7 @@ export const useDashboard = () => {
             ? `${(uploadedInfo.file_size / 1024).toFixed(1)} KB`
             : `${(uploadedInfo.file_size / (1024 * 1024)).toFixed(1)} MB`)
         : "1.0 MB",
+      createdAt: new Date().toISOString(),
       date: new Date().toLocaleDateString(),
       status: "PROCESSING",
       moderationPassed: true,
@@ -663,19 +751,18 @@ export const useDashboard = () => {
     allFilesCount: files.length,
     tabCounts: {
       myFilesCount,
-      recentCount,
       starredCount,
       sharedCount,
       trashCount,
     },
     myFilesCount,
-    recentCount,
     starredCount,
     sharedCount,
     trashCount,
     quarantinedFiles,
     activeTab,
     filterType,
+    sortBy,
     searchQuery,
     viewMode,
     storage,
@@ -700,6 +787,10 @@ export const useDashboard = () => {
     reloadFiles: loadFiles,
     handleSelectTab: (tab) => dispatch(setActiveTab(tab)),
     handleSelectFilter: (type) => dispatch(setFilterType(type)),
+    handleSetSortBy: (sortKey) => dispatch(setSortBy(sortKey)),
+    handleSearch: (query) => dispatch(setSearchQuery(query)),
+    handleToggleViewMode: () => dispatch(toggleViewMode()),
+    handleClosePipeline: () => dispatch(closeUploadPipeline()),
     handleOpenPreview: (file) => {
       dispatch(openPreviewModal(file));
       if (file) {
