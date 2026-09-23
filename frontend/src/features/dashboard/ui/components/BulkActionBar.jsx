@@ -7,6 +7,7 @@ import {
   Download,
   Trash2,
   FolderPlus,
+  FolderMinus,
   X,
   Sparkles,
 } from "lucide-react";
@@ -23,7 +24,10 @@ import { recordLocalActivity } from "../../services/activitySyncService.jsx";
  */
 export const BulkActionBar = ({
   allSelectableIds = [],
+  onOpenAddToFolder,
   onOpenAddToAlbum,
+  activeFolderId = null,
+  onRemoveFromFolder,
 }) => {
   const dispatch = useDispatch();
   const selectedFileIds = useSelector((state) => state.dashboard.selectedFileIds || []);
@@ -131,16 +135,30 @@ export const BulkActionBar = ({
           <span className="hidden md:inline">{areAllStarred ? "Unstar" : "Star"}</span>
         </button>
 
-        {/* Add to Album */}
-        {onOpenAddToAlbum && (
+        {/* Add / Move to Folder */}
+        {(onOpenAddToFolder || onOpenAddToAlbum) && (
           <button
             type="button"
-            onClick={onOpenAddToAlbum}
+            onClick={onOpenAddToFolder || onOpenAddToAlbum}
             className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-medium hover:bg-slate-800 text-slate-200 hover:text-blue-400 transition-all"
-            title="Add to Album"
+            title="Organize into Folder"
           >
             <FolderPlus className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">Album</span>
+            <span className="hidden md:inline">Folder</span>
+          </button>
+        )}
+
+        {/* Remove from Folder (when viewing within a folder) */}
+        {activeFolderId && onRemoveFromFolder && (
+          <button
+            type="button"
+            onClick={() => onRemoveFromFolder(selectedFileIds)}
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 transition-all border border-rose-500/30"
+            title="Remove Selected Items from This Folder"
+          >
+            <FolderMinus className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">Remove from Folder</span>
+            <span className="md:hidden">Remove</span>
           </button>
         )}
 

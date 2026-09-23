@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
-import { UploadCloud } from "lucide-react";
+import { UploadCloud, Folder, Trash2 } from "lucide-react";
 import useDashboard from "../../hooks/useDashboard.jsx";
+import { recordLocalActivity } from "../../services/activitySyncService.jsx";
 import DashboardHeader from "../components/DashboardHeader.jsx";
 import DashboardSidebar from "../components/DashboardSidebar.jsx";
 import FileGrid from "../components/FileGrid.jsx";
@@ -10,8 +11,9 @@ import ImageAiModal from "../components/ImageAiModal.jsx";
 import PdfSummaryModal from "../components/PdfSummaryModal.jsx";
 import UploadModal from "../../../../components/UploadModal.jsx";
 import DeleteConfirmModal from "../components/DeleteConfirmModal.jsx";
+import DeleteFolderModal from "../components/DeleteFolderModal.jsx";
 import BulkActionBar from "../components/BulkActionBar.jsx";
-import AlbumModal from "../components/AlbumModal.jsx";
+import FolderModal from "../components/FolderModal.jsx";
 
 /**
  * Layer 4: DashboardPage (Presentation Component)
@@ -36,8 +38,8 @@ const DashboardPage = () => {
     uploadPipeline,
     previewModal,
     selectedFileIds,
-    albums,
-    activeAlbumId,
+    folders,
+    activeFolderId,
     activePhotoCategory,
     activeTagFilter,
     photoViewMode,
@@ -65,17 +67,59 @@ const DashboardPage = () => {
     handleSetPhotoViewMode,
     handleSetPhotoCategory,
     handleSetActiveTagFilter,
-    handleSetActiveAlbumId,
-    handleCreateAlbum,
-    handleDeleteAlbum,
-    handleAddFilesToAlbum,
+    handleSetActiveFolderId,
+    handleCreateFolder,
+    handleDeleteFolder,
+    handleAddFilesToFolder,
+    handleRemoveFilesFromFolder,
   } = useDashboard();
 
   const [isDirectUploadModalOpen, setIsDirectUploadModalOpen] = useState(false);
-  const [isAlbumModalOpen, setIsAlbumModalOpen] = useState(false);
-  const [albumTargetIds, setAlbumTargetIds] = useState([]);
+  const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
+  const [folderTargetIds, setFolderTargetIds] = useState([]);
   const [fileToDelete, setFileToDelete] = useState(null);
   const [isDeletingFile, setIsDeletingFile] = useState(false);
+  const [folderToDelete, setFolderToDelete] = useState(null);
+
+  const handleRequestDeleteFolder = (folderId, folderName = "folder") => {
+    if (!folderId) return;
+    const target = (folders || []).find((f) => f.id === folderId) || { id: folderId, name: folderName };
+    setFolderToDelete(target);
+  };
+
+  const handleConfirmDeleteFolder = (folder) => {
+    if (!folder?.id) return;
+    if (activeFolderId === folder.id) {
+      handleSetActiveFolderId(null);
+    }
+    handleDeleteFolder(folder.id);
+    const remainingFolders = (folders || []).filter((f) => f.id !== folder.id);
+    recordLocalActivity(
+      "delete_folder",
+      { folderId: folder.id, name: folder.name },
+      { folders: remainingFolders }
+    );
+    setFolderToDelete(null);
+  };
+
+  const handleRemoveFromFolder = (fileIdsOrId) => {
+    if (!activeFolderId) return;
+    const targetIds = Array.isArray(fileIdsOrId) ? fileIdsOrId : [fileIdsOrId];
+    if (targetIds.length === 0) return;
+
+    handleRemoveFilesFromFolder({ folderId: activeFolderId, fileIds: targetIds });
+    const updatedFolders = (folders || []).map((f) =>
+      f.id === activeFolderId
+        ? { ...f, fileIds: (f.fileIds || []).filter((id) => !targetIds.includes(id)) }
+        : f
+    );
+    recordLocalActivity(
+      "remove_from_folder",
+      { folderId: activeFolderId, fileIds: targetIds },
+      { folders: updatedFolders }
+    );
+    handleClearSelection();
+  };
 
   // Dashboard-wide drag-and-drop overlay (heartbeat debounce timer pattern)
   const [isDashboardDragOver, setIsDashboardDragOver] = useState(false);
@@ -140,12 +184,14 @@ const DashboardPage = () => {
 
   // Dynamic header titles and subtitles per sidebar tab
   const getHeaderInfo = () => {
-    if (activeAlbumId) {
-      const activeAlbum = (albums || []).find((a) => a.id === activeAlbumId);
-      if (activeAlbum) {
+    if (activeFolderId) {
+      const activeFolder = (folders || []).find((f) => f.id === activeFolderId);
+      if (activeFolder) {
         return {
-          title: activeAlbum.name,
-          subtitle: `Custom Photo Album • ${files.length} ${files.length === 1 ? "item" : "items"}`,
+          title: activeFolder.name,
+          subtitle: `Folder • ${files.length} ${files.length === 1 ? "item" : "items"}`,
+          isFolder: true,
+          folder: activeFolder,
         };
       }
     }
@@ -213,17 +259,13 @@ const DashboardPage = () => {
           totalFilesCount={totalFilesCount}
           tabCounts={tabCounts}
           storage={storage}
-          albums={albums}
-          activeAlbumId={activeAlbumId}
-          onSelectAlbum={(id) => {
-            handleSetActiveAlbumId(id);
-            if (id) {
-              handleSelectFilter("image");
-            }
-          }}
-          onOpenCreateAlbum={() => {
-            setAlbumTargetIds([]);
-            setIsAlbumModalOpen(true);
+          folders={folders}
+          activeFolderId={activeFolderId}
+          onSelectFolder={handleSetActiveFolderId}
+          onDeleteFolder={handleRequestDeleteFolder}
+          onOpenCreateFolder={() => {
+            setFolderTargetIds([]);
+            setIsFolderModalOpen(true);
           }}
         />
 
@@ -239,14 +281,59 @@ const DashboardPage = () => {
         >
           {/* Welcome / Active Folder Header */}
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
-                {headerInfo.title}
-              </h1>
-              <p className="text-xs text-slate-500 mt-0.5">
-                {headerInfo.subtitle}
-              </p>
-            </div>
+            {headerInfo.isFolder ? (
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => handleSetActiveFolderId(null)}
+                    className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex items-center gap-1.5 shadow-xs"
+                  >
+                    <span>←</span>
+                    <span>Back to My Files</span>
+                  </button>
+                  <div>
+                    <div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium">
+                      <span
+                        className="hover:text-[#1a73e8] cursor-pointer"
+                        onClick={() => handleSetActiveFolderId(null)}
+                      >
+                        My Files
+                      </span>
+                      <span>/</span>
+                      <span className="text-slate-700 dark:text-slate-300 font-semibold">
+                        {headerInfo.title}
+                      </span>
+                    </div>
+                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2 mt-0.5">
+                      <Folder className="w-6 h-6 text-[#1a73e8] fill-[#1a73e8]/20" />
+                      <span>{headerInfo.title}</span>
+                    </h1>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleRequestDeleteFolder(activeFolderId, headerInfo.title)}
+                    className="px-3 py-1.5 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50/70 dark:bg-rose-950/40 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition-colors flex items-center gap-1.5 shadow-xs"
+                    title="Delete this folder"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete Folder</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+                  {headerInfo.title}
+                </h1>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {headerInfo.subtitle}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Files Grid / List View */}
@@ -287,10 +374,24 @@ const DashboardPage = () => {
             onSelectPhotoCategory={handleSetPhotoCategory}
             activeTagFilter={activeTagFilter}
             onSelectTagFilter={handleSetActiveTagFilter}
+            folders={folders}
+            activeFolderId={activeFolderId}
+            onSelectFolder={handleSetActiveFolderId}
+            onDeleteFolder={handleRequestDeleteFolder}
+            onRemoveFromFolder={handleRemoveFromFolder}
+            onOpenCreateFolder={() => {
+              setFolderTargetIds([]);
+              setIsFolderModalOpen(true);
+            }}
+            onOpenAddToFolder={(file) => {
+              const ids = file ? [file.id || file.file_id] : selectedFileIds;
+              setFolderTargetIds(ids);
+              setIsFolderModalOpen(true);
+            }}
             onOpenAddToAlbum={(file) => {
               const ids = file ? [file.id || file.file_id] : selectedFileIds;
-              setAlbumTargetIds(ids);
-              setIsAlbumModalOpen(true);
+              setFolderTargetIds(ids);
+              setIsFolderModalOpen(true);
             }}
           />
         </main>
@@ -300,19 +401,25 @@ const DashboardPage = () => {
       <BulkActionBar
         allSelectableIds={files.map((f) => f.id || f.file_id)}
         onOpenAddToAlbum={() => {
-          setAlbumTargetIds(selectedFileIds);
-          setIsAlbumModalOpen(true);
+          setFolderTargetIds(selectedFileIds);
+          setIsFolderModalOpen(true);
         }}
+        onOpenAddToFolder={() => {
+          setFolderTargetIds(selectedFileIds);
+          setIsFolderModalOpen(true);
+        }}
+        activeFolderId={activeFolderId}
+        onRemoveFromFolder={handleRemoveFromFolder}
       />
 
-      {/* Custom Albums Modal */}
-      <AlbumModal
-        isOpen={isAlbumModalOpen}
+      {/* Custom Folders Modal */}
+      <FolderModal
+        isOpen={isFolderModalOpen}
         onClose={() => {
-          setIsAlbumModalOpen(false);
-          setAlbumTargetIds([]);
+          setIsFolderModalOpen(false);
+          setFolderTargetIds([]);
         }}
-        targetFileIds={albumTargetIds}
+        targetFileIds={folderTargetIds}
       />
 
       {/* Asynchronous Pipeline Execution Docked Drawer */}
@@ -336,10 +443,12 @@ const DashboardPage = () => {
       />
 
       <PdfSummaryModal
+        key={previewModal?.file?.id || previewModal?.file?.file_id || previewModal?.file?.s3Key || previewModal?.file?.name || "pdf-modal"}
         file={previewModal?.file}
         isOpen={previewModal?.isOpen && previewModal?.file?.type === "pdf"}
         onClose={handleClosePreview}
       />
+
 
       {/* Dashboard-Wide Drag-and-Drop Overlay */}
       {isDashboardDragOver && !isDirectUploadModalOpen && (
@@ -391,6 +500,14 @@ const DashboardPage = () => {
             setIsDeletingFile(false);
           }
         }}
+      />
+
+      {/* Enterprise Folder Deletion Confirmation Modal */}
+      <DeleteFolderModal
+        isOpen={Boolean(folderToDelete)}
+        folder={folderToDelete}
+        onClose={() => setFolderToDelete(null)}
+        onConfirm={handleConfirmDeleteFolder}
       />
     </div>
   );

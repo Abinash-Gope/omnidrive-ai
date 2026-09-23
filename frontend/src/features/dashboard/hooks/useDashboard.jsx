@@ -32,6 +32,12 @@ import {
   setPhotoViewMode,
   setPhotoCategory,
   setActiveTagFilter,
+  setActiveFolderId,
+  createFolder,
+  deleteFolder,
+  renameFolder,
+  addFilesToFolder,
+  removeFilesFromFolder,
   setActiveAlbumId,
   createAlbum,
   deleteAlbum,
@@ -79,6 +85,8 @@ export const useDashboard = () => {
     cloudTrashIds,
     quarantinedFiles,
     selectedFileIds = [],
+    folders = [],
+    activeFolderId = null,
     albums = [],
     activeAlbumId = null,
     activePhotoCategory = "all",
@@ -104,13 +112,15 @@ export const useDashboard = () => {
       localPrefs &&
       (localPrefs.starred?.length > 0 ||
         localPrefs.trash?.length > 0 ||
+        localPrefs.folders?.length > 0 ||
         localPrefs.albums?.length > 0)
     ) {
       dispatch(
         setCloudState({
           starredIds: localPrefs.starred || [],
           trashIds: localPrefs.trash || [],
-          albums: localPrefs.albums || [],
+          folders: localPrefs.folders || localPrefs.albums || [],
+          albums: localPrefs.folders || localPrefs.albums || [],
         })
       );
     }
@@ -125,9 +135,21 @@ export const useDashboard = () => {
               setCloudState({
                 starredIds: prefs.starred || [],
                 trashIds: prefs.trash || [],
-                albums: prefs.albums || [],
+                folders: prefs.folders || prefs.albums || [],
+                albums: prefs.folders || prefs.albums || [],
               })
             );
+            if (prefs.summaries && typeof prefs.summaries === "object") {
+              Object.entries(prefs.summaries).forEach(([fid, sumData]) => {
+                dispatch(
+                  updateFileStatus({
+                    fileId: fid,
+                    summary: sumData,
+                    takeaways: sumData?.takeaways || [],
+                  })
+                );
+              });
+            }
           }
         }
       } catch (err) {
@@ -362,11 +384,13 @@ export const useDashboard = () => {
       sourceList = files.filter((f) => Boolean(f.isShared));
     }
 
-    // Filter by Active Album if set
-    if (activeAlbumId) {
-      const targetAlbum = (albums || []).find((a) => a.id === activeAlbumId);
-      const albumFileIds = new Set(targetAlbum?.fileIds || []);
-      sourceList = sourceList.filter((f) => albumFileIds.has(f.id || f.file_id));
+    // Filter by Active Folder if set
+    const currentFolderId = activeFolderId || activeAlbumId;
+    if (currentFolderId) {
+      const allFlds = (folders && folders.length > 0) ? folders : albums;
+      const targetFolder = (allFlds || []).find((f) => f.id === currentFolderId);
+      const folderFileIds = new Set(targetFolder?.fileIds || []);
+      sourceList = sourceList.filter((f) => folderFileIds.has(f.id || f.file_id));
     }
 
     const filtered = sourceList.filter((f) => {
@@ -571,7 +595,7 @@ export const useDashboard = () => {
     recordLocalActivity(
       wasStarred ? "unstar" : "star",
       { fileId, fileName },
-      { starred: updatedStarred, trash: cloudTrashIds || [] }
+      { starred: updatedStarred, trash: cloudTrashIds || [], folders: folders || [] }
     );
   };
 
@@ -591,7 +615,7 @@ export const useDashboard = () => {
     recordLocalActivity(
       "trash",
       { fileId, fileName: file.name },
-      { starred: starredIds || [], trash: updatedTrash }
+      { starred: starredIds || [], trash: updatedTrash, folders: folders || [] }
     );
   };
 
@@ -611,7 +635,7 @@ export const useDashboard = () => {
     recordLocalActivity(
       "restore",
       { fileId, fileName: file.name },
-      { starred: starredIds || [], trash: updatedTrash }
+      { starred: starredIds || [], trash: updatedTrash, folders: folders || [] }
     );
   };
 
@@ -626,17 +650,21 @@ export const useDashboard = () => {
       // Optimistically remove from state & trash
       dispatch(permanentDeleteFile(fileId));
 
-      // Call API to remove from DynamoDB and S3
-      await deleteFileApi(fileId, s3Key, fileName);
-
       // Clean up local preference buffer and record deletion activity
       const updatedTrash = (cloudTrashIds || []).filter((id) => id !== fileId);
       const updatedStarred = (starredIds || []).filter((id) => id !== fileId);
+      const updatedFolders = (folders || []).map((f) => ({
+        ...f,
+        fileIds: (f.fileIds || []).filter((id) => id !== fileId),
+      }));
       recordLocalActivity(
         "delete",
         { fileId, fileName },
-        { starred: updatedStarred, trash: updatedTrash }
+        { starred: updatedStarred, trash: updatedTrash, folders: updatedFolders }
       );
+
+      // Call API to remove from DynamoDB and S3
+      await deleteFileApi(fileId, s3Key, fileName);
 
       dispatch(
         setToast({
@@ -672,7 +700,7 @@ export const useDashboard = () => {
     recordLocalActivity(
       "empty_trash",
       { count: items.length },
-      { starred: starredIds || [], trash: [] }
+      { starred: starredIds || [], trash: [], folders: folders || [] }
     );
 
     // Concurrently purge from S3 & DynamoDB
@@ -771,8 +799,10 @@ export const useDashboard = () => {
     uploadPipeline,
     previewModal,
     selectedFileIds,
-    albums,
-    activeAlbumId,
+    folders: (folders && folders.length > 0 ? folders : albums) || [],
+    activeFolderId: activeFolderId || activeAlbumId,
+    albums: (folders && folders.length > 0 ? folders : albums) || [],
+    activeAlbumId: activeFolderId || activeAlbumId,
     activePhotoCategory,
     activeTagFilter,
     photoViewMode,
@@ -809,12 +839,123 @@ export const useDashboard = () => {
     handleSetPhotoViewMode: (mode) => dispatch(setPhotoViewMode(mode)),
     handleSetPhotoCategory: (cat) => dispatch(setPhotoCategory(cat)),
     handleSetActiveTagFilter: (tag) => dispatch(setActiveTagFilter(tag)),
-    handleSetActiveAlbumId: (id) => dispatch(setActiveAlbumId(id)),
-    handleCreateAlbum: (album) => dispatch(createAlbum(album)),
-    handleDeleteAlbum: (id) => dispatch(deleteAlbum(id)),
-    handleAddFilesToAlbum: ({ albumId, fileIds }) => dispatch(addFilesToAlbum({ albumId, fileIds })),
-    handleRemoveFilesFromAlbum: ({ albumId, fileIds }) =>
-      dispatch(removeFilesFromAlbum({ albumId, fileIds })),
+    handleSetActiveFolderId: (id) => dispatch(setActiveFolderId(id)),
+    handleCreateFolder: (folder) => {
+      dispatch(createFolder(folder));
+      const updatedFolders = [...(folders || []), folder];
+      recordLocalActivity(
+        "folder_create",
+        { folderId: folder.id, folderName: folder.name },
+        { folders: updatedFolders, starred: starredIds || [], trash: cloudTrashIds || [] }
+      );
+    },
+    handleDeleteFolder: (folderId) => {
+      dispatch(deleteFolder(folderId));
+      const updatedFolders = (folders || []).filter((f) => f.id !== folderId);
+      recordLocalActivity(
+        "folder_delete",
+        { folderId },
+        { folders: updatedFolders, starred: starredIds || [], trash: cloudTrashIds || [] }
+      );
+    },
+    handleRenameFolder: ({ folderId, newName }) => {
+      dispatch(renameFolder({ folderId, newName }));
+      const updatedFolders = (folders || []).map((f) =>
+        f.id === folderId ? { ...f, name: newName?.trim() } : f
+      );
+      recordLocalActivity(
+        "folder_rename",
+        { folderId, newName },
+        { folders: updatedFolders, starred: starredIds || [], trash: cloudTrashIds || [] }
+      );
+    },
+    handleAddFilesToFolder: ({ folderId, fileIds }) => {
+      dispatch(addFilesToFolder({ folderId, fileIds }));
+      const updatedFolders = (folders || []).map((f) => {
+        if (f.id === folderId) {
+          return {
+            ...f,
+            fileIds: Array.from(new Set([...(f.fileIds || []), ...fileIds])),
+          };
+        }
+        return f;
+      });
+      recordLocalActivity(
+        "folder_add_files",
+        { folderId, count: fileIds?.length || 0 },
+        { folders: updatedFolders, starred: starredIds || [], trash: cloudTrashIds || [] }
+      );
+    },
+    handleRemoveFilesFromFolder: ({ folderId, fileIds }) => {
+      dispatch(removeFilesFromFolder({ folderId, fileIds }));
+      const updatedFolders = (folders || []).map((f) => {
+        if (f.id === folderId) {
+          return {
+            ...f,
+            fileIds: (f.fileIds || []).filter((id) => !fileIds.includes(id)),
+          };
+        }
+        return f;
+      });
+      recordLocalActivity(
+        "folder_remove_files",
+        { folderId, count: fileIds?.length || 0 },
+        { folders: updatedFolders, starred: starredIds || [], trash: cloudTrashIds || [] }
+      );
+    },
+    handleSetActiveAlbumId: (id) => dispatch(setActiveFolderId(id)),
+    handleCreateAlbum: (album) => {
+      dispatch(createFolder(album));
+      const updatedFolders = [...(folders || []), album];
+      recordLocalActivity(
+        "folder_create",
+        { folderId: album.id, folderName: album.name },
+        { folders: updatedFolders, starred: starredIds || [], trash: cloudTrashIds || [] }
+      );
+    },
+    handleDeleteAlbum: (id) => {
+      dispatch(deleteFolder(id));
+      const updatedFolders = (folders || []).filter((f) => f.id !== id);
+      recordLocalActivity(
+        "folder_delete",
+        { folderId: id },
+        { folders: updatedFolders, starred: starredIds || [], trash: cloudTrashIds || [] }
+      );
+    },
+    handleAddFilesToAlbum: ({ albumId, fileIds }) => {
+      dispatch(addFilesToFolder({ folderId: albumId, fileIds }));
+      const updatedFolders = (folders || []).map((f) => {
+        if (f.id === albumId) {
+          return {
+            ...f,
+            fileIds: Array.from(new Set([...(f.fileIds || []), ...fileIds])),
+          };
+        }
+        return f;
+      });
+      recordLocalActivity(
+        "folder_add_files",
+        { folderId: albumId, count: fileIds?.length || 0 },
+        { folders: updatedFolders, starred: starredIds || [], trash: cloudTrashIds || [] }
+      );
+    },
+    handleRemoveFilesFromAlbum: ({ albumId, fileIds }) => {
+      dispatch(removeFilesFromFolder({ folderId: albumId, fileIds }));
+      const updatedFolders = (folders || []).map((f) => {
+        if (f.id === albumId) {
+          return {
+            ...f,
+            fileIds: (f.fileIds || []).filter((id) => !fileIds.includes(id)),
+          };
+        }
+        return f;
+      });
+      recordLocalActivity(
+        "folder_remove_files",
+        { folderId: albumId, count: fileIds?.length || 0 },
+        { folders: updatedFolders, starred: starredIds || [], trash: cloudTrashIds || [] }
+      );
+    },
     flushActivityToCloud: flushPendingActivityToCloud,
     getLocalActivity,
   };

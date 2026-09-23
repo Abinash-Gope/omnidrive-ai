@@ -95,7 +95,10 @@ export const AuthProvider = ({ children }) => {
     try {
       // 1. Immediately flush all buffered local activity & preferences to AWS Cognito Cloud before signing out
       try {
-        await flushPendingActivityToCloud();
+        await Promise.race([
+          flushPendingActivityToCloud(),
+          new Promise((resolve) => setTimeout(resolve, 3500)), // Safe 3.5s timeout so logout never hangs on offline/slow network
+        ]);
       } catch (syncErr) {
         console.warn("Could not flush activity before logout:", syncErr);
       }

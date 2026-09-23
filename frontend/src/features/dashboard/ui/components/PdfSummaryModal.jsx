@@ -20,12 +20,50 @@ import {
   Loader2,
   AlertCircle,
   RefreshCw,
+  RotateCcw,
   BookOpen,
 } from "lucide-react";
 import PdfPreview from "./PdfPreview.jsx";
-import { extractPdfText, askPdfQuestion } from "../../utils/pdfChatService.jsx";
+import { extractPdfText, askPdfQuestion, generateRealPdfSummary } from "../../utils/pdfChatService.jsx";
 import { useDispatch } from "react-redux";
 import { updateFileStatus } from "../../state/dashboardSlice.jsx";
+import { recordLocalActivity } from "../../services/activitySyncService.jsx";
+
+// Detect if a summary is the hardcoded mock/fallback string from Lambda
+export const isPlaceholderSummary = (text) => {
+  if (!text || typeof text !== "string") return true;
+  const lower = text.toLowerCase();
+  return (
+    lower.includes("comprehensive enterprise cloud documentation") ||
+    lower.includes("automated content safety governance with aws rekognition") ||
+    lower.includes("direct client s3 ingestion eliminates compute bottleneck") ||
+    lower.includes("omnidrive ai cloud architecture document") ||
+    (lower.includes("rekognition") && !lower.includes("lexiassist"))
+  );
+};
+
+// Session-based summary cache: persists for the active browser session so AI never re-runs until browser is closed
+export const getSessionSummary = (id) => {
+  if (!id) return null;
+  try {
+    const raw = sessionStorage.getItem(`omnidrive_session_summary_${id}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.executive && !isPlaceholderSummary(parsed.executive)) {
+        return parsed;
+      }
+    }
+  } catch (e) {}
+  return null;
+};
+
+export const setSessionSummary = (id, summaryObj) => {
+  if (!id || !summaryObj) return;
+  try {
+    sessionStorage.setItem(`omnidrive_session_summary_${id}`, JSON.stringify(summaryObj));
+  } catch (e) {}
+};
+
 
 // ─── Chat message bubble ───────────────────────────────────────────────────────
 const ChatBubble = ({ msg }) => {
@@ -88,9 +126,17 @@ const SUGGESTIONS = [
   "Who is the intended audience?",
 ];
 
+const DEFAULT_GREETING = [
+  {
+    role: "model",
+    text: "Hi! I've analyzed this document. Ask me anything about it — I'll answer directly from the content.",
+  },
+];
+
 // ─── Main Modal ────────────────────────────────────────────────────────────────
 const PdfSummaryModal = ({ file, isOpen, onClose }) => {
   const dispatch = useDispatch();
+  const fileId = file?.id || file?.file_id || file?.s3Key || file?.name;
 
   // PDF viewer state
   const [copied, setCopied] = useState(false);
@@ -101,7 +147,6 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
   const handlePageCount = (count) => {
     if (!count) return;
     setTotalPages(count);
-    const fileId = file?.id || file?.file_id;
     if (fileId) {
       dispatch(
         updateFileStatus({
@@ -119,8 +164,21 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
   // Right panel tabs: "summary" | "chat"
   const [activeTab, setActiveTab] = useState("summary");
 
-  // Chat state
-  const [messages, setMessages] = useState([]);
+  // Chat state - scoped per document from localStorage
+  const [messages, setMessages] = useState(() => {
+    if (!fileId) return DEFAULT_GREETING;
+    try {
+      const saved = localStorage.getItem(`omnidrive_pdf_chat_${fileId}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch {}
+    return DEFAULT_GREETING;
+  });
+
   const [inputValue, setInputValue] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [pdfText, setPdfText] = useState(null);
@@ -128,6 +186,59 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
   const [extractError, setExtractError] = useState(null);
   const chatEndRef = useRef(null);
   const inputRef = useRef(null);
+
+  // Real-time AI synthesis state (synchronously loaded from sessionStorage so AI never re-runs)
+  const [isSynthesizing, setIsSynthesizing] = useState(false);
+  const [synthError, setSynthError] = useState(null);
+  const [realSummary, setRealSummary] = useState(() => getSessionSummary(fileId));
+
+  // When changing document, load session cache and reset viewer state
+  useEffect(() => {
+    if (!fileId) return;
+    setPdfText(null);
+    setSynthError(null);
+    setExtractError(null);
+    setIsExtractingText(false);
+    setPageNumber(1);
+    setScale(1.0);
+    setInputValue("");
+
+    // Instantly load from sessionStorage if already analyzed in this browser session
+    const sessionCached = getSessionSummary(fileId);
+    setRealSummary(sessionCached);
+
+    // Load this specific document's saved chat
+    try {
+      const saved = localStorage.getItem(`omnidrive_pdf_chat_${fileId}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMessages(parsed);
+          return;
+        }
+      }
+    } catch {}
+    setMessages(DEFAULT_GREETING);
+  }, [fileId]);
+
+  // Persist chat history per document whenever messages change
+  useEffect(() => {
+    if (!fileId || messages.length === 0) return;
+    const clean = messages.filter((m) => !m.loading);
+    try {
+      localStorage.setItem(`omnidrive_pdf_chat_${fileId}`, JSON.stringify(clean));
+    } catch {}
+  }, [messages, fileId]);
+
+  // Clear chat history for this specific document
+  const handleClearChat = () => {
+    if (fileId) {
+      try {
+        localStorage.removeItem(`omnidrive_pdf_chat_${fileId}`);
+      } catch {}
+    }
+    setMessages(DEFAULT_GREETING);
+  };
 
   // PDF viewer container & free-movement drag state
   const viewerContainerRef = useRef(null);
@@ -192,7 +303,7 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
     if (activeTab !== "chat" || pdfText !== null || isExtractingText) return;
     const pdfUrl = file?.downloadUrl || file?.download_url;
     if (!pdfUrl) {
-      setExtractError("No PDF URL available — cannot extract text for chat.");
+      setExtractError("No document URL available — cannot extract text for chat.");
       return;
     }
     setIsExtractingText(true);
@@ -201,24 +312,100 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
       .then((text) => {
         setPdfText(text);
         setIsExtractingText(false);
-        // Greet the user
-        setMessages([
-          {
-            role: "model",
-            text: `Hi! I've read "${file.name}". Ask me anything about it — I'll answer from the document content.`,
-          },
-        ]);
+        // Only set default greeting if messages are empty
+        setMessages((prev) => (prev && prev.length > 0 ? prev : DEFAULT_GREETING));
       })
       .catch((err) => {
-        setExtractError(err.message || "Failed to read PDF text.");
+        setExtractError(err.message || "Failed to read document text.");
         setIsExtractingText(false);
       });
   }, [activeTab, pdfText, isExtractingText, file]);
 
+  const handleSynthesizeSummary = async (force = false) => {
+    const pdfTargetUrl = file?.downloadUrl || file?.download_url || file?.thumbnail_url;
+    if (!pdfTargetUrl) {
+      setSynthError("No document URL available for AI synthesis.");
+      return;
+    }
+    setIsSynthesizing(true);
+    setSynthError(null);
+    setRealSummary(null);
+
+    try {
+      // Always extract fresh text for this document to prevent cross-document contamination
+      const text = await extractPdfText(pdfTargetUrl);
+      setPdfText(text);
+
+      const generated = await generateRealPdfSummary(text);
+      setRealSummary(generated);
+
+      if (fileId) {
+        // Store in sessionStorage: AI never needs to run again for this file until the browser is closed
+        setSessionSummary(fileId, generated);
+
+        const summaryPayload = {
+          executive: generated.executive,
+          takeaways: generated.takeaways,
+          pages: totalPages || file.pages || null,
+          model: generated.model || "Meta LLaMA 3.2 · Live GenAI",
+        };
+
+        dispatch(
+          updateFileStatus({
+            fileId,
+            summary: summaryPayload,
+            takeaways: generated.takeaways,
+          })
+        );
+
+        // Register dynamic summary into Sync Manager for cloud persistence on logout/close
+        recordLocalActivity(
+          "summary_generated",
+          { fileId, fileName: file?.name },
+          {
+            summaries: {
+              [fileId]: summaryPayload,
+            },
+          }
+        );
+      }
+    } catch (err) {
+      console.error("Failed to synthesize real AI summary:", err);
+      setSynthError(err.message || "AI synthesis failed.");
+    } finally {
+      setIsSynthesizing(false);
+    }
+  };
+
+  // Auto-detect and synthesize real AI summary if placeholder/missing for this specific file
+  useEffect(() => {
+    if (!isOpen || !file || file.type !== "pdf" || !fileId) return;
+
+    // 1. If already present in memory state or sessionStorage, do NOT call AI!
+    if (realSummary && !isPlaceholderSummary(realSummary.executive)) return;
+    const sessionCached = getSessionSummary(fileId);
+    if (sessionCached) {
+      setRealSummary(sessionCached);
+      return;
+    }
+
+    // 2. If file.summary from Redux is already a real verified summary, do NOT call AI!
+    const curExec = typeof file.summary === "string"
+      ? file.summary
+      : file.summary?.executive || file.summary?.summary || "";
+
+    if (!isPlaceholderSummary(curExec)) {
+      return;
+    }
+
+    // 3. Only synthesize if completely missing / placeholder
+    handleSynthesizeSummary();
+  }, [isOpen, fileId, realSummary]);
+
   if (!isOpen || !file || file.type !== "pdf") return null;
 
-  // Normalise summary
-  const summary = file.summary
+  // Normalise summary (prefer verified realSummary for current document)
+  const rawSummary = realSummary || (file.summary
     ? typeof file.summary === "string"
       ? {
           executive: file.summary,
@@ -230,9 +417,16 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
           executive: file.summary.executive || file.summary.summary || "",
           takeaways: file.summary.takeaways || file.summary.key_takeaways || [],
           pages: file.summary.pages || file.summary.page_count || file.pages || null,
-          model: "OmniDrive Neural Engine",
+          model: file.summary.model || "OmniDrive Neural Engine",
         }
-    : null;
+    : null);
+
+  // If currently synthesizing OR if summary is detected as placeholder, hide it so fake text is never shown
+  const summary = (isSynthesizing || (rawSummary && isPlaceholderSummary(rawSummary.executive)))
+    ? null
+    : rawSummary;
+
+
 
   const pdfUrl = file.downloadUrl || file.download_url || file.thumbnail_url || null;
 
@@ -276,13 +470,14 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
 
     try {
       const history = messages.filter((m) => !m.loading && !m.error);
-      const summaryText = summary?.executive
+      const isPlaceholder = isPlaceholderSummary(summary?.executive);
+      const summaryText = (!isPlaceholder && summary?.executive)
         ? `Executive Summary: ${summary.executive}`
         : undefined;
       const answer = await askPdfQuestion(
         question,
         pdfText || "",
-        { name: file.name, summary: summaryText },
+        { summary: summaryText },
         history
       );
 
@@ -295,7 +490,7 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
       setMessages((prev) =>
         prev.map((m, i) =>
           i === prev.length - 1
-            ? { role: "model", text: err.message || "Failed to get a response. Check your Gemini API key.", error: true }
+            ? { role: "model", text: err.message || "Failed to get a response from AI assistant.", error: true }
             : m
         )
       );
@@ -507,18 +702,22 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
             {/* ── SUMMARY TAB ── */}
             {activeTab === "summary" && (
               <div className="flex-1 overflow-y-auto p-5 space-y-5">
-                {!summary ? (
-                  <div className="py-14 px-4 text-center flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl bg-slate-50/50 dark:bg-slate-900/40 mt-2">
-                    <div className="w-14 h-14 rounded-2xl bg-purple-50 dark:bg-purple-950/80 text-purple-600 dark:text-purple-400 flex items-center justify-center mb-4 animate-pulse">
-                      <BrainCircuit className="w-7 h-7" />
+                {!summary || isSynthesizing ? (
+                  <div className="py-14 px-4 text-center flex flex-col items-center justify-center border-2 border-dashed border-purple-200 dark:border-purple-800/60 rounded-3xl bg-purple-50/40 dark:bg-purple-950/20 mt-2">
+                    <div className="w-14 h-14 rounded-2xl bg-purple-100 dark:bg-purple-900/60 text-purple-600 dark:text-purple-300 flex items-center justify-center mb-4 animate-pulse">
+                      <Sparkles className="w-7 h-7" />
                     </div>
-                    <h4 className="text-sm font-bold text-slate-900 dark:text-white">AI Summary In Progress</h4>
-                    <p className="text-xs text-slate-500 max-w-xs mt-2 leading-relaxed">
-                      Analyzing document structure and synthesizing your executive brief and key takeaways.
+                    <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                      {isSynthesizing ? "Synthesizing with Generative AI…" : "AI Summary In Progress"}
+                    </h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs mt-2 leading-relaxed">
+                      {isSynthesizing
+                        ? "Reading document content and generating a live executive brief and key takeaways with Meta LLaMA 3.2…"
+                        : "Analyzing document structure and synthesizing your executive brief and key takeaways."}
                     </p>
                     <div className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 text-xs font-medium">
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>OmniDrive AI Pipeline</span>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Meta LLaMA 3.2 GenAI</span>
                     </div>
                   </div>
                 ) : (
@@ -532,11 +731,27 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
                           <span className="text-xs font-bold text-purple-900 dark:text-purple-200 flex items-center gap-1">
                             Generative AI Extraction <Sparkles className="w-3 h-3 text-amber-500" />
                           </span>
-                          <span className="text-[11px] text-purple-700 dark:text-purple-300 font-mono">{summary.model}</span>
+                          <span className="text-[11px] text-purple-700 dark:text-purple-300 font-mono">
+                            {summary.model || "Meta LLaMA 3.2 · Live GenAI"}
+                          </span>
                         </div>
                       </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white dark:bg-slate-800 text-purple-700 dark:text-purple-300 shadow-xs border border-purple-100 dark:border-purple-800">Verified AI</span>
+                      <div className="flex flex-col items-end gap-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => handleSynthesizeSummary(true)}
+                            disabled={isSynthesizing}
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/60 dark:hover:bg-purple-800 text-purple-700 dark:text-purple-300 text-[10px] font-semibold transition-colors disabled:opacity-50"
+                            title="Regenerate summary with AI"
+                          >
+                            <RefreshCw className={`w-3 h-3 ${isSynthesizing ? "animate-spin" : ""}`} />
+                            <span>{isSynthesizing ? "Analyzing…" : "Regenerate"}</span>
+                          </button>
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white dark:bg-slate-800 text-purple-700 dark:text-purple-300 shadow-xs border border-purple-100 dark:border-purple-800 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            Verified AI
+                          </span>
+                        </div>
                         {(totalPages || file.pages || summary?.pages) && (
                           <span className="text-[10px] font-mono text-purple-500 dark:text-purple-400">
                             <Layers className="inline w-3 h-3 mr-0.5" />
@@ -590,13 +805,31 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
             {/* ── CHAT TAB ── */}
             {activeTab === "chat" && (
               <div className="flex flex-col flex-1 min-h-0">
+                {/* Chat toolbar */}
+                <div className="flex items-center justify-between px-4 py-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 shrink-0">
+                  <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    <MessageSquare className="w-3.5 h-3.5 text-blue-500" />
+                    Document Conversation
+                  </span>
+                  {messages.length > 1 && (
+                    <button
+                      onClick={handleClearChat}
+                      className="text-[10px] text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 flex items-center gap-1 transition-colors px-2 py-0.5 rounded hover:bg-slate-200/60 dark:hover:bg-slate-800"
+                      title="Clear chat history for this document"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      Reset Chat
+                    </button>
+                  )}
+                </div>
+
                 {/* Chat messages area */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
                   {isExtractingText && (
                     <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-400">
                       <Loader2 className="w-7 h-7 animate-spin text-blue-500" />
                       <p className="text-xs text-center text-slate-500">
-                        Reading PDF content…<br />
+                        Reading document content…<br />
                         <span className="text-[11px] text-slate-400">This takes a moment for large documents</span>
                       </p>
                     </div>
@@ -656,7 +889,7 @@ const PdfSummaryModal = ({ file, isOpen, onClose }) => {
                       value={inputValue}
                       onChange={(e) => setInputValue(e.target.value)}
                       onKeyDown={handleKeyDown}
-                      placeholder={pdfText ? "Ask anything about this PDF…" : "Loading PDF…"}
+                      placeholder={pdfText ? "Ask anything about this document…" : "Reading document…"}
                       disabled={!pdfText || isSending}
                       className="flex-1 bg-transparent text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 resize-none outline-none leading-relaxed max-h-28 disabled:opacity-50"
                       style={{ minHeight: "1.5rem" }}

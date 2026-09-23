@@ -1,14 +1,18 @@
-import { saveCloudPreferences, fetchCloudPreferences } from "../../auth/api/cloudPreferencesService.jsx";
+import {
+  saveCloudPreferences,
+  saveCloudPreferencesKeepAlive,
+  fetchCloudPreferences,
+} from "../../auth/api/cloudPreferencesService.jsx";
 
 /**
- * OmniDrive AI - Activity & Deferred Cloud Sync Service
+ * OmniDrive AI - Dynamic Cloud Sync Service & Change Ledger
  * 
- * Provides ultra-fast, 0ms local activity buffering for all user interactions
- * (starring, trashing, restoring, previewing) and automatically flushes
- * pending state to AWS Cognito Cloud when:
- * 1. The user explicitly logs out.
- * 2. The user is inactive or leaves for 5 minutes (300,000 ms).
- * 3. The page is hidden / navigated away from.
+ * Provides:
+ * 1. 0ms local state buffering for all user actions (Folders, Starring, Trashing, AI Summaries).
+ * 2. 1.5s debounced background auto-sync to AWS Cognito Cloud while user works.
+ * 3. Urgent keepalive cloud dispatch on browser closure (visibilitychange, pagehide, beforeunload).
+ * 4. Pre-logout blocking cloud flush before session credentials are deleted.
+ * 5. 5-minute inactivity sync watcher.
  */
 
 export const LOCAL_ACTIVITY_KEY = "omnidrive_local_activity";
@@ -16,8 +20,11 @@ export const PENDING_PREFS_KEY = "omnidrive_pending_preferences";
 export const SYNC_DIRTY_KEY = "omnidrive_sync_dirty";
 export const LAST_ACTIVE_KEY = "omnidrive_last_active";
 
-// 5 minutes in milliseconds
+// Inactivity threshold: 5 minutes in ms
 export const INACTIVITY_THRESHOLD_MS = 5 * 60 * 1000;
+
+// Debounce timer for continuous background cloud auto-save
+let debouncedSyncTimer = null;
 
 /**
  * Get all buffered local activity items
@@ -33,8 +40,8 @@ export const getLocalActivity = () => {
 };
 
 /**
- * Get pending local preferences (starred, trash) if any
- * @returns {{ starred: string[], trash: string[] } | null}
+ * Get pending local preferences (folders, starred, trash, summaries)
+ * @returns {{ starred: string[], trash: string[], folders: Array<object>, summaries: object } | null}
  */
 export const getLocalPreferences = () => {
   try {
@@ -58,11 +65,26 @@ export const hasPendingSync = () => {
 };
 
 /**
- * Record a user interaction into local storage with zero network latency.
+ * Schedule a debounced cloud sync (1.5 seconds)
+ */
+export const scheduleDebouncedSync = () => {
+  if (debouncedSyncTimer) {
+    clearTimeout(debouncedSyncTimer);
+  }
+  debouncedSyncTimer = setTimeout(async () => {
+    if (hasPendingSync()) {
+      await flushPendingActivityToCloud();
+    }
+  }, 1500);
+};
+
+/**
+ * Record a user interaction into local storage with zero network latency,
+ * merge pending state, mark dirty, and schedule debounced cloud sync.
  *
- * @param {string} actionType - 'star' | 'unstar' | 'trash' | 'restore' | 'delete' | 'preview' | 'upload'
- * @param {object} details - { fileId, fileName, ... }
- * @param {{ starred?: string[], trash?: string[] }} [preferences] - Updated preferences if modified
+ * @param {string} actionType - 'folder_create' | 'folder_delete' | 'folder_rename' | 'folder_add_files' | 'folder_remove_files' | 'star' | 'unstar' | 'trash' | 'restore' | 'delete' | 'preview' | 'summary_generated'
+ * @param {object} details - { fileId, fileName, folderId, folderName, ... }
+ * @param {{ starred?: string[], trash?: string[], folders?: Array<object>, summaries?: object }} [preferences] - Updated state snapshot
  */
 export const recordLocalActivity = (actionType, details = {}, preferences = null) => {
   const now = Date.now();
@@ -79,26 +101,32 @@ export const recordLocalActivity = (actionType, details = {}, preferences = null
   try {
     // 1. Buffer activity in circular queue (up to 50 items)
     const existing = getLocalActivity();
-    const updated = [event, ...existing.filter((e) => e.id !== event.id)].slice(0, 50);
-    localStorage.setItem(LOCAL_ACTIVITY_KEY, JSON.stringify(updated));
+    const updatedActivity = [event, ...existing.filter((e) => e.id !== event.id)].slice(0, 50);
+    localStorage.setItem(LOCAL_ACTIVITY_KEY, JSON.stringify(updatedActivity));
 
-    // 2. If preferences updated, save pending preferences and mark dirty
+    // 2. If preferences provided, merge with existing pending preferences to avoid wiping sibling fields
     if (preferences) {
-      localStorage.setItem(
-        PENDING_PREFS_KEY,
-        JSON.stringify({
-          starred: Array.isArray(preferences.starred) ? preferences.starred : [],
-          trash: Array.isArray(preferences.trash) ? preferences.trash : [],
-          albums: Array.isArray(preferences.albums) ? preferences.albums : [],
-        })
-      );
+      const prevPrefs = getLocalPreferences() || { starred: [], trash: [], folders: [], summaries: {} };
+      const mergedPrefs = {
+        starred: preferences.starred !== undefined ? preferences.starred : prevPrefs.starred || [],
+        trash: preferences.trash !== undefined ? preferences.trash : prevPrefs.trash || [],
+        folders: preferences.folders !== undefined ? preferences.folders : prevPrefs.folders || [],
+        summaries: preferences.summaries !== undefined
+          ? { ...(prevPrefs.summaries || {}), ...preferences.summaries }
+          : prevPrefs.summaries || {},
+      };
+
+      localStorage.setItem(PENDING_PREFS_KEY, JSON.stringify(mergedPrefs));
       localStorage.setItem(SYNC_DIRTY_KEY, "true");
+
+      // Auto-sync to cloud after 1.5s debounce
+      scheduleDebouncedSync();
     }
 
     // 3. Update last active timestamp
     localStorage.setItem(LAST_ACTIVE_KEY, now.toString());
 
-    // 4. Notify UI via custom event for instant reactivity
+    // 4. Notify UI via custom event
     if (typeof window !== "undefined") {
       window.dispatchEvent(
         new CustomEvent("omnidrive:activity", {
@@ -117,25 +145,28 @@ export const recordLocalActivity = (actionType, details = {}, preferences = null
  * Flush all pending local preferences and activity to AWS Cloud (Cognito).
  * Invoked on:
  * - User logout
+ * - Continuous 1.5s background debounce
  * - 5 minutes of user inactivity / leave
- * - Page unload or visibility change
+ * - Tab hidden or navigated away from
  *
+ * @param {{ starred?: string[], trash?: string[], folders?: Array<object>, summaries?: object }} [directSnapshot] - Optional direct state snapshot
  * @returns {Promise<boolean>} True if sync succeeded or was not needed
  */
-export const flushPendingActivityToCloud = async () => {
-  const isDirty = hasPendingSync();
-  const pendingPrefs = getLocalPreferences();
+export const flushPendingActivityToCloud = async (directSnapshot = null) => {
+  const isDirty = hasPendingSync() || Boolean(directSnapshot);
+  const pendingPrefs = directSnapshot || getLocalPreferences();
 
   if (!isDirty || !pendingPrefs) {
     return true;
   }
 
   try {
-    console.log("[ActivitySync] Flushing pending activity & preferences to AWS Cognito Cloud...");
+    console.log("[ActivitySync] Flushing pending state to AWS Cognito Cloud...");
     const success = await saveCloudPreferences({
       starred: pendingPrefs.starred || [],
       trash: pendingPrefs.trash || [],
-      albums: pendingPrefs.albums || [],
+      folders: pendingPrefs.folders || [],
+      summaries: pendingPrefs.summaries || {},
     });
 
     if (success) {
@@ -154,12 +185,26 @@ export const flushPendingActivityToCloud = async () => {
 };
 
 /**
- * Initializes the 5-minute inactivity & leave watcher.
- * Tracks user interaction (mouse, keyboard, scroll, touch) and automatically flushes
- * pending state to AWS Cloud if the user leaves or remains inactive for 5 minutes.
+ * Urgent flush specifically optimized for pagehide and beforeunload when browser is closing.
+ * Uses keepalive HTTP request so it is not killed when the window context is destroyed.
+ */
+export const flushUrgentOnWindowClose = () => {
+  if (!hasPendingSync()) return false;
+  const pendingPrefs = getLocalPreferences();
+  if (!pendingPrefs) return false;
+
+  console.log("[ActivitySync] Browser closing: dispatching urgent keepalive cloud sync...");
+  return saveCloudPreferencesKeepAlive(pendingPrefs);
+};
+
+/**
+ * Initializes the background sync watchers:
+ * 1. 15-second check for 5-minute idle sync
+ * 2. visibilitychange (when tab is hidden/switched)
+ * 3. pagehide and beforeunload with keepalive (when tab/browser closes)
  *
  * @param {function} [onSyncCallback] - Optional callback after background sync
- * @returns {function} Cleanup function to remove listeners
+ * @returns {function} Cleanup function
  */
 export const initInactivitySyncWatcher = (onSyncCallback) => {
   if (typeof window === "undefined") return () => {};
@@ -167,7 +212,7 @@ export const initInactivitySyncWatcher = (onSyncCallback) => {
   let lastInteraction = Date.now();
   localStorage.setItem(LAST_ACTIVE_KEY, lastInteraction.toString());
 
-  // Debounced interaction updater
+  // Debounced user activity interaction recorder
   let interactionTimeout = null;
   const handleUserInteraction = () => {
     const now = Date.now();
@@ -185,7 +230,7 @@ export const initInactivitySyncWatcher = (onSyncCallback) => {
   const events = ["mousemove", "keydown", "click", "scroll", "touchstart"];
   events.forEach((evt) => window.addEventListener(evt, handleUserInteraction, { passive: true }));
 
-  // Periodic checker every 15 seconds: if idle for >= 5 minutes, flush pending data
+  // Periodic checker: if idle for >= 5 minutes, flush pending data
   const intervalId = setInterval(async () => {
     const now = Date.now();
     const storedLastActive = Number(localStorage.getItem(LAST_ACTIVE_KEY) || lastInteraction);
@@ -200,15 +245,11 @@ export const initInactivitySyncWatcher = (onSyncCallback) => {
     }
   }, 15000);
 
-  // Tab hidden / leave handler: if user leaves tab and has been away >= 5 minutes or hides tab
+  // When tab is hidden or minimized: flush immediately
   const handleVisibilityChange = async () => {
     if (document.visibilityState === "hidden") {
-      const now = Date.now();
-      const storedLastActive = Number(localStorage.getItem(LAST_ACTIVE_KEY) || lastInteraction);
-      const idleDuration = now - Math.max(lastInteraction, storedLastActive);
-
-      if (idleDuration >= INACTIVITY_THRESHOLD_MS && hasPendingSync()) {
-        console.log("[ActivitySync] Tab hidden after 5min inactivity. Flushing to cloud...");
+      if (hasPendingSync()) {
+        console.log("[ActivitySync] Tab hidden with unsaved changes. Flushing to cloud...");
         await flushPendingActivityToCloud();
       }
     }
@@ -216,22 +257,27 @@ export const initInactivitySyncWatcher = (onSyncCallback) => {
 
   document.addEventListener("visibilitychange", handleVisibilityChange);
 
-  // Page unload handler: flush before window closes
-  const handleBeforeUnload = () => {
-    if (hasPendingSync()) {
-      flushPendingActivityToCloud();
-    }
+  // When page begins to unload / browser window is closing: dispatch urgent keepalive
+  const handlePageHide = () => {
+    flushUrgentOnWindowClose();
   };
 
+  const handleBeforeUnload = () => {
+    flushUrgentOnWindowClose();
+  };
+
+  window.addEventListener("pagehide", handlePageHide);
   window.addEventListener("beforeunload", handleBeforeUnload);
 
   // Return cleanup function
   return () => {
     events.forEach((evt) => window.removeEventListener(evt, handleUserInteraction));
     document.removeEventListener("visibilitychange", handleVisibilityChange);
+    window.removeEventListener("pagehide", handlePageHide);
     window.removeEventListener("beforeunload", handleBeforeUnload);
     clearInterval(intervalId);
     if (interactionTimeout) clearTimeout(interactionTimeout);
+    if (debouncedSyncTimer) clearTimeout(debouncedSyncTimer);
   };
 };
 
@@ -241,5 +287,6 @@ export default {
   hasPendingSync,
   recordLocalActivity,
   flushPendingActivityToCloud,
+  flushUrgentOnWindowClose,
   initInactivitySyncWatcher,
 };

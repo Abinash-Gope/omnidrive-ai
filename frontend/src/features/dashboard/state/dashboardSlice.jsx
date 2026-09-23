@@ -9,6 +9,8 @@ const initialState = {
   quarantinedFiles: [],
   selectedFile: null,
   selectedFileIds: [],
+  folders: [],
+  activeFolderId: null,
   albums: [],
   activeAlbumId: null,
   activePhotoCategory: "all", // 'all' | 'people' | 'nature' | 'urban' | 'documents' | 'vehicles'
@@ -68,12 +70,16 @@ export const dashboardSlice = createSlice({
   initialState,
   reducers: {
     setCloudState: (state, action) => {
-      const { starredIds = [], trashIds = [], albums = [] } = action.payload || {};
+      const { starredIds = [], trashIds = [], folders = [], albums = [] } = action.payload || {};
       state.starredIds = starredIds;
       state.cloudTrashIds = trashIds;
-      if (Array.isArray(albums)) {
-        state.albums = albums;
-      }
+      const activeFolders = Array.isArray(folders) && folders.length > 0
+        ? folders
+        : Array.isArray(albums)
+        ? albums
+        : [];
+      state.folders = activeFolders;
+      state.albums = activeFolders;
 
       const trashSet = new Set(trashIds);
       const starredSet = new Set(starredIds);
@@ -159,6 +165,7 @@ export const dashboardSlice = createSlice({
       state.activeTagFilter = null;
       state.activePhotoCategory = "all";
       state.filterType = "all";
+      state.activeFolderId = null;
       state.activeAlbumId = null;
       state.selectedFileIds = [];
     },
@@ -295,11 +302,23 @@ export const dashboardSlice = createSlice({
     },
     updateFileStatus: (state, action) => {
       const { fileId, ...updates } = action.payload;
-      const file = state.files.find((f) => f.id === fileId);
+      const file = state.files.find(
+        (f) =>
+          f.id === fileId ||
+          f.file_id === fileId ||
+          f.s3Key === fileId ||
+          f.name === fileId
+      );
       if (file) {
         Object.assign(file, updates);
       }
-      if (state.previewModal.file && state.previewModal.file.id === fileId) {
+      if (
+        state.previewModal.file &&
+        (state.previewModal.file.id === fileId ||
+          state.previewModal.file.file_id === fileId ||
+          state.previewModal.file.s3Key === fileId ||
+          state.previewModal.file.name === fileId)
+      ) {
         state.previewModal.file = { ...state.previewModal.file, ...updates };
       }
     },
@@ -400,25 +419,87 @@ export const dashboardSlice = createSlice({
     setActiveTagFilter: (state, action) => {
       state.activeTagFilter = action.payload;
     },
-    // Custom Albums Reducers
+    // Custom Folders Reducers
+    setActiveFolderId: (state, action) => {
+      state.activeFolderId = action.payload;
+      state.activeAlbumId = action.payload;
+    },
+    createFolder: (state, action) => {
+      const newFolder = action.payload;
+      if (newFolder && !state.folders.some((f) => f.id === newFolder.id)) {
+        state.folders.push(newFolder);
+        state.albums.push(newFolder);
+      }
+    },
+    deleteFolder: (state, action) => {
+      const folderId = action.payload;
+      state.folders = state.folders.filter((f) => f.id !== folderId);
+      state.albums = state.albums.filter((a) => a.id !== folderId);
+      if (state.activeFolderId === folderId) {
+        state.activeFolderId = null;
+        state.activeAlbumId = null;
+      }
+    },
+    renameFolder: (state, action) => {
+      const { folderId, newName } = action.payload || {};
+      const folder = state.folders.find((f) => f.id === folderId);
+      if (folder && newName?.trim()) {
+        folder.name = newName.trim();
+      }
+      const album = state.albums.find((a) => a.id === folderId);
+      if (album && newName?.trim()) {
+        album.name = newName.trim();
+      }
+    },
+    addFilesToFolder: (state, action) => {
+      const { folderId, fileIds = [] } = action.payload || {};
+      const folder = state.folders.find((f) => f.id === folderId);
+      if (folder) {
+        folder.fileIds = Array.from(new Set([...(folder.fileIds || []), ...fileIds]));
+      }
+      const album = state.albums.find((a) => a.id === folderId);
+      if (album) {
+        album.fileIds = Array.from(new Set([...(album.fileIds || []), ...fileIds]));
+      }
+    },
+    removeFilesFromFolder: (state, action) => {
+      const { folderId, fileIds = [] } = action.payload || {};
+      const folder = state.folders.find((f) => f.id === folderId);
+      if (folder) {
+        folder.fileIds = (folder.fileIds || []).filter((id) => !fileIds.includes(id));
+      }
+      const album = state.albums.find((a) => a.id === folderId);
+      if (album) {
+        album.fileIds = (album.fileIds || []).filter((id) => !fileIds.includes(id));
+      }
+    },
+    // Backwards-compatible aliases
     setActiveAlbumId: (state, action) => {
+      state.activeFolderId = action.payload;
       state.activeAlbumId = action.payload;
     },
     createAlbum: (state, action) => {
       const newAlbum = action.payload;
-      if (newAlbum && !state.albums.some((a) => a.id === newAlbum.id)) {
+      if (newAlbum && !state.folders.some((f) => f.id === newAlbum.id)) {
+        state.folders.push(newAlbum);
         state.albums.push(newAlbum);
       }
     },
     deleteAlbum: (state, action) => {
       const albumId = action.payload;
+      state.folders = state.folders.filter((f) => f.id !== albumId);
       state.albums = state.albums.filter((a) => a.id !== albumId);
-      if (state.activeAlbumId === albumId) {
+      if (state.activeFolderId === albumId) {
+        state.activeFolderId = null;
         state.activeAlbumId = null;
       }
     },
     addFilesToAlbum: (state, action) => {
       const { albumId, fileIds = [] } = action.payload || {};
+      const folder = state.folders.find((f) => f.id === albumId);
+      if (folder) {
+        folder.fileIds = Array.from(new Set([...(folder.fileIds || []), ...fileIds]));
+      }
       const album = state.albums.find((a) => a.id === albumId);
       if (album) {
         album.fileIds = Array.from(new Set([...(album.fileIds || []), ...fileIds]));
@@ -426,6 +507,10 @@ export const dashboardSlice = createSlice({
     },
     removeFilesFromAlbum: (state, action) => {
       const { albumId, fileIds = [] } = action.payload || {};
+      const folder = state.folders.find((f) => f.id === albumId);
+      if (folder) {
+        folder.fileIds = (folder.fileIds || []).filter((id) => !fileIds.includes(id));
+      }
       const album = state.albums.find((a) => a.id === albumId);
       if (album) {
         album.fileIds = (album.fileIds || []).filter((id) => !fileIds.includes(id));
@@ -468,6 +553,12 @@ export const {
   setPhotoViewMode,
   setPhotoCategory,
   setActiveTagFilter,
+  setActiveFolderId,
+  createFolder,
+  deleteFolder,
+  renameFolder,
+  addFilesToFolder,
+  removeFilesFromFolder,
   setActiveAlbumId,
   createAlbum,
   deleteAlbum,

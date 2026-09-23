@@ -14,6 +14,8 @@ import {
   Trash2,
   Star,
   RotateCcw,
+  FolderPlus,
+  FolderMinus,
 } from "lucide-react";
 import FileStatusBadge from "./FileStatusBadge.jsx";
 import PdfPreview from "./PdfPreview.jsx";
@@ -32,6 +34,9 @@ const FileCard = ({
   isSelected = false,
   onToggleSelect,
   isSelectionMode = false,
+  onOpenAddToFolder,
+  activeFolderId = null,
+  onRemoveFromFolder,
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isCardHovered, setIsCardHovered] = useState(false);
@@ -151,6 +156,34 @@ const FileCard = ({
                 title="Inspect with AI Preview"
               >
                 <ExternalLink className="w-4 h-4" />
+              </button>
+            )}
+
+            {!isInTrash && onOpenAddToFolder && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenAddToFolder(file);
+                }}
+                className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-blue-500 transition-colors"
+                title="Organize into Folder"
+              >
+                <FolderPlus className="w-4 h-4" />
+              </button>
+            )}
+
+            {!isInTrash && activeFolderId && onRemoveFromFolder && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemoveFromFolder(file.id || file.file_id);
+                }}
+                className="p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-400 hover:text-rose-500 transition-colors"
+                title="Remove from Folder"
+              >
+                <FolderMinus className="w-4 h-4" />
               </button>
             )}
 
@@ -363,6 +396,32 @@ const FileCard = ({
                       <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
                       <span>View & AI Preview</span>
                     </button>
+                    {!isInTrash && onOpenAddToFolder && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsMenuOpen(false);
+                          onOpenAddToFolder(file);
+                        }}
+                        className="w-full px-3 py-2 text-left text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60 flex items-center gap-2"
+                      >
+                        <FolderPlus className="w-3.5 h-3.5 text-blue-500" />
+                        <span>Organize into Folder</span>
+                      </button>
+                    )}
+                    {!isInTrash && activeFolderId && onRemoveFromFolder && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsMenuOpen(false);
+                          onRemoveFromFolder(file.id || file.file_id);
+                        }}
+                        className="w-full px-3 py-2 text-left text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center gap-2 font-medium"
+                      >
+                        <FolderMinus className="w-3.5 h-3.5 text-rose-500" />
+                        <span>Remove from Folder</span>
+                      </button>
+                    )}
                     <div className="h-px bg-slate-100 dark:bg-slate-700/60 my-1" />
                     {isInTrash ? (
                       <>

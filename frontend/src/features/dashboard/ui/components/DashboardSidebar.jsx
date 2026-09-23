@@ -30,6 +30,11 @@ const DashboardSidebar = ({
   totalFilesCount = 0,
   tabCounts = {},
   storage: propStorage,
+  folders = [],
+  activeFolderId = null,
+  onSelectFolder,
+  onOpenCreateFolder,
+  onDeleteFolder,
   albums = [],
   activeAlbumId = null,
   onSelectAlbum,
@@ -191,18 +196,18 @@ const DashboardSidebar = ({
           })}
         </nav>
 
-        {/* Custom Albums Section */}
+        {/* Custom Folders Section */}
         <div className="space-y-2 pt-3 border-t border-slate-200 dark:border-slate-800">
           <div className="flex items-center justify-between px-2">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              Albums
+              Folders
             </span>
-            {onOpenCreateAlbum && (
+            {(onOpenCreateFolder || onOpenCreateAlbum) && (
               <button
                 type="button"
-                onClick={onOpenCreateAlbum}
+                onClick={onOpenCreateFolder || onOpenCreateAlbum}
                 className="p-1 rounded-md text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
-                title="Create New Album"
+                title="Create New Folder"
               >
                 <Plus className="w-3.5 h-3.5" />
               </button>
@@ -210,38 +215,70 @@ const DashboardSidebar = ({
           </div>
 
           <div className="space-y-1">
-            {albums.length === 0 ? (
+            {((folders && folders.length > 0) ? folders : albums).length === 0 ? (
               <button
                 type="button"
-                onClick={onOpenCreateAlbum}
+                onClick={onOpenCreateFolder || onOpenCreateAlbum}
                 className="w-full text-left px-3 py-2 rounded-xl text-xs text-slate-400 hover:text-blue-500 hover:bg-slate-200/40 dark:hover:bg-slate-800/40 transition-colors flex items-center gap-2 border border-dashed border-slate-200 dark:border-slate-800"
               >
                 <Plus className="w-3.5 h-3.5 text-blue-500" />
-                <span>Create an album</span>
+                <span>Create a folder</span>
               </button>
             ) : (
-              albums.map((album) => {
-                const isActive = activeAlbumId === album.id;
-                const count = album.fileIds ? album.fileIds.length : 0;
+              ((folders && folders.length > 0) ? folders : albums).map((folder) => {
+                const isFolderActive = (activeFolderId || activeAlbumId) === folder.id;
+                const count = folder.fileIds ? folder.fileIds.length : 0;
+                const colorClass =
+                  folder.color === "indigo"
+                    ? "text-indigo-500 fill-indigo-500/20"
+                    : folder.color === "emerald"
+                    ? "text-emerald-500 fill-emerald-500/20"
+                    : folder.color === "amber"
+                    ? "text-amber-500 fill-amber-500/20"
+                    : folder.color === "rose"
+                    ? "text-rose-500 fill-rose-500/20"
+                    : folder.color === "purple"
+                    ? "text-purple-500 fill-purple-500/20"
+                    : "text-[#1a73e8] fill-[#1a73e8]/20";
+
+                const handleFolderClick = () => {
+                  const selectFn = onSelectFolder || onSelectAlbum;
+                  if (selectFn) selectFn(isFolderActive ? null : folder.id);
+                };
+
                 return (
-                  <button
-                    key={album.id}
-                    type="button"
-                    onClick={() => onSelectAlbum && onSelectAlbum(isActive ? null : album.id)}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
-                      isActive
+                  <div
+                    key={folder.id}
+                    onClick={handleFolderClick}
+                    className={`group w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer select-none ${
+                      isFolderActive
                         ? "bg-[#eaedff] text-[#005bbf] dark:bg-blue-950 dark:text-blue-300 font-semibold shadow-xs"
                         : "text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100"
                     }`}
                   >
-                    <div className="flex items-center gap-2.5 truncate">
-                      <Folder className={`w-3.5 h-3.5 shrink-0 ${isActive ? "fill-blue-500 text-blue-500" : "text-slate-400"}`} />
-                      <span className="truncate">{album.name}</span>
+                    <div className="flex items-center gap-2.5 truncate flex-1 min-w-0">
+                      <Folder className={`w-3.5 h-3.5 shrink-0 ${colorClass}`} />
+                      <span className="truncate">{folder.name}</span>
                     </div>
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-slate-200/60 dark:bg-slate-800 text-slate-500 shrink-0">
-                      {count}
-                    </span>
-                  </button>
+                    <div className="flex items-center gap-1.5 shrink-0 ml-1">
+                      {onDeleteFolder && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteFolder(folder.id, folder.name);
+                          }}
+                          className="p-1 rounded-md text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/60 opacity-0 group-hover:opacity-100 transition-opacity"
+                          title={`Delete folder "${folder.name}"`}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      )}
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-slate-200/60 dark:bg-slate-800 text-slate-500 shrink-0">
+                        {count}
+                      </span>
+                    </div>
+                  </div>
                 );
               })
             )}
