@@ -65,3 +65,8 @@ variable "video_queue_arn" {
 variable "video_queue_url" {
   type = string
 }
+
+variable "cloudfront_domain" {
+  type    = string
+  default = ""
+}

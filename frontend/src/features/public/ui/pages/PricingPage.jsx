@@ -8,7 +8,7 @@ import { getPricingPlans } from "../../api/publicApi.jsx";
 const faqs = [
   {
     q: "How does the Free 15GB tier work?",
-    a: "You get 15GB of free Amazon S3 storage with full access to Direct-to-S3 uploads, automated Rekognition moderation, and 720p HLS video transcoding. No credit card is required to sign up.",
+    a: "You get 15GB of free Amazon S3 storage with full access to Direct-to-S3 uploads, automated Rekognition moderation, and 480p SD HLS video streaming. Upgrading to Pro Cloud unlocks 1080p Full HD and Original source streaming. No credit card is required to sign up.",
   },
   {
     q: "Can I bring my own AWS Account and VPC?",

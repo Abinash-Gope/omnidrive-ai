@@ -183,43 +183,7 @@ export const useDashboard = () => {
     }
   }, [authUser?.cloudPreferences, dispatch]);
 
-  // Intelligent background poller: polls DynamoDB whenever any file is pending Rekognition analysis
-  // so Rekognition Vision AI labels and dimensions appear automatically in real-time without user refresh
-  useEffect(() => {
-    const isAnalyzing = (f) => {
-      if (f.status === "PROCESSING" || f.status === "PENDING_UPLOAD") return true;
-      if (
-        f.type === "image" &&
-        (!f.labels || f.labels.length === 0) &&
-        f.status !== "REJECTED_SAFETY_VIOLATION"
-      ) {
-        return true;
-      }
-      return false;
-    };
 
-    const hasPendingAnalysis = files.some(isAnalyzing);
-    if (!hasPendingAnalysis) return;
-
-    let attempts = 0;
-    const maxAttempts = 15; // poll every 2s up to 30s
-
-    const timer = setInterval(async () => {
-      attempts += 1;
-      try {
-        const latestFiles = await getFilesApi();
-        dispatch(setFiles(latestFiles));
-        const stillPending = latestFiles.some(isAnalyzing);
-        if (!stillPending || attempts >= maxAttempts) {
-          clearInterval(timer);
-        }
-      } catch {
-        clearInterval(timer);
-      }
-    }, 2000);
-
-    return () => clearInterval(timer);
-  }, [files, dispatch]);
 
   const loadFiles = async () => {
     try {

@@ -152,6 +152,8 @@ resource "aws_lambda_function" "files_api" {
   environment {
     variables = {
       DYNAMODB_TABLE_NAME = var.dynamodb_table_name
+      RAW_BUCKET_NAME     = var.raw_bucket_name
+      CLOUDFRONT_DOMAIN   = var.cloudfront_domain
     }
   }
 }
@@ -268,6 +270,11 @@ resource "aws_iam_role_policy" "vision_ai" {
       },
       {
         Effect   = "Allow"
+        Action   = ["s3:PutObject"]
+        Resource = "${var.processed_bucket_arn}/*"
+      },
+      {
+        Effect   = "Allow"
         Action   = ["rekognition:DetectLabels"]
         Resource = "*"
       },
@@ -292,9 +299,10 @@ resource "aws_lambda_function" "vision_ai" {
 
   environment {
     variables = {
-      DYNAMODB_TABLE_NAME = var.dynamodb_table_name
-      MAX_LABELS          = "10"
-      MIN_CONFIDENCE      = "75.0"
+      DYNAMODB_TABLE_NAME   = var.dynamodb_table_name
+      PROCESSED_BUCKET_NAME = var.processed_bucket_name
+      MAX_LABELS            = "10"
+      MIN_CONFIDENCE        = "75.0"
     }
   }
 }

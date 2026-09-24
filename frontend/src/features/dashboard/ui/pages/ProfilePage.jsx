@@ -588,7 +588,7 @@ const ProfilePage = () => {
                         </li>
                         <li className="flex items-center gap-2">
                           <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                          <span>720p HLS Transcoding</span>
+                          <span>480p SD Max HLS Streaming</span>
                         </li>
                         <li className="flex items-center gap-2">
                           <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
@@ -1693,7 +1693,7 @@ const ProfilePage = () => {
                         Task Definition: omnidrive-ffmpeg-transcoder
                       </span>
                       <span className="text-[10px] text-slate-400 block">
-                        AWS Graviton3 • Shared Spot Worker (720p Max)
+                        AWS Graviton3 • Shared Spot Worker (480p SD Max on Free)
                       </span>
                     </div>
 

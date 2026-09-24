@@ -26,14 +26,18 @@ dynamodb = boto3.resource("dynamodb")
 s3_client = boto3.client("s3")
 DYNAMODB_TABLE_NAME = os.environ.get("DYNAMODB_TABLE_NAME", "omnidrive-ai-registry-dev")
 RAW_BUCKET_NAME = os.environ.get("RAW_BUCKET_NAME", "omnidrive-ai-raw-dev-01ed8837")
+CLOUDFRONT_DOMAIN = os.environ.get("CLOUDFRONT_DOMAIN", "").strip()
 
 
 def enrich_file_urls(item):
-    """Generates an authenticated S3 presigned GET URL for secure client viewing."""
+    """Generates authenticated S3 presigned GET URLs and CloudFront edge delivery links."""
     if not item:
         return item
     s3_key = item.get("s3_key") or item.get("s3_raw_key")
     bucket = item.get("s3_bucket") or RAW_BUCKET_NAME
+    file_id = item.get("file_id")
+    file_type = (item.get("file_type") or item.get("content_type") or "").lower()
+
     if s3_key and bucket:
         try:
             view_url = s3_client.generate_presigned_url(
@@ -42,10 +46,28 @@ def enrich_file_urls(item):
                 ExpiresIn=3600,
             )
             item["download_url"] = view_url
+            item["full_url"] = view_url
             if not item.get("thumbnail_url"):
                 item["thumbnail_url"] = view_url
         except Exception as e:
             logger.warning("Failed to generate presigned GET URL for key %s: %s", s3_key, str(e))
+
+    # CloudFront CDN edge delivery links for resilient 3G / HTTP/3 QUIC streaming
+    if CLOUDFRONT_DOMAIN and file_id:
+        has_hls_stream = bool(item.get("hls_master_url") or item.get("hlsUrl") or (item.get("status") == "COMPLETED" and "video" in file_type))
+        if has_hls_stream:
+            cdn_hls = f"https://{CLOUDFRONT_DOMAIN}/hls/{file_id}/master.m3u8"
+            item["stream_url"] = cdn_hls
+            item["hls_master_url"] = cdn_hls
+            item["hls_url"] = cdn_hls
+            item["hlsUrl"] = cdn_hls
+        elif "video" in file_type:
+            item["stream_url"] = item.get("download_url") or item.get("downloadUrl")
+        if "image" in file_type or item.get("thumbnail_s3_key"):
+            thumb_webp = f"https://{CLOUDFRONT_DOMAIN}/thumbnails/{file_id}.webp"
+            item["thumbnail_url"] = thumb_webp
+            item["thumbnailUrl"] = thumb_webp
+
     return item
 
 

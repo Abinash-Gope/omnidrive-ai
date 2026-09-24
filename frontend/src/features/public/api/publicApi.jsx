@@ -17,7 +17,7 @@ export const getPricingPlans = async () => {
         "15 GB Amazon S3 Storage",
         "Direct-to-S3 Multi-Part Uploads",
         "Rekognition Content Moderation",
-        "720p HLS Video Transcoding",
+        "480p SD HLS Video Streaming (Upgrade for 1080p HD)",
         "Bedrock Claude 3 Document Summaries (50 docs/mo)",
         "Community Support",
       ],

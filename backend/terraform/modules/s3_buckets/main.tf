@@ -83,3 +83,28 @@ resource "aws_s3_bucket_cors_configuration" "processed" {
     max_age_seconds = 3000
   }
 }
+
+# Allow CloudFront OAC read access to Processed Assets Bucket
+resource "aws_s3_bucket_policy" "processed_cdn_policy" {
+  bucket = aws_s3_bucket.processed.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowCloudFrontServicePrincipalReadOnly"
+        Effect = "Allow"
+        Principal = {
+          Service = "cloudfront.amazonaws.com"
+        }
+        Action   = "s3:GetObject"
+        Resource = "${aws_s3_bucket.processed.arn}/*"
+        Condition = {
+          StringEquals = {
+            "AWS:SourceArn" = aws_cloudfront_distribution.processed_cdn.arn
+          }
+        }
+      }
+    ]
+  })
+}

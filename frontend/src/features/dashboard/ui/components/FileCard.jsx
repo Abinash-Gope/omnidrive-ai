@@ -102,8 +102,14 @@ const FileCard = ({
               <VideoPreview file={file} isCompact={true} />
             ) : isPdf && file.downloadUrl ? (
               <PdfPreview url={file.downloadUrl} pageNumber={1} scale={0.5} className="w-full h-full" fitParent={true} objectFit="cover" onPageCount={setRealPageCount} />
-            ) : (file.thumbnail || file.downloadUrl) && !isPdf ? (
-              <img src={file.thumbnail || file.downloadUrl} alt={file.name} className="w-full h-full object-cover" />
+            ) : (file.thumbnail_url || file.thumbnail || file.downloadUrl) && !isPdf ? (
+              <img
+                src={file.thumbnail_url || file.thumbnail || file.downloadUrl}
+                alt={file.name}
+                loading="lazy"
+                decoding="async"
+                className="w-full h-full object-cover"
+              />
             ) : (
               getFileIcon()
             )}
@@ -275,12 +281,13 @@ const FileCard = ({
             {/* Subtle bottom shadow vignette for smooth transition and badge contrast */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
           </div>
-        ) : (file.thumbnail || file.downloadUrl) ? (
+        ) : (file.thumbnail_url || file.thumbnail || file.downloadUrl) ? (
           <img
-            src={file.thumbnail || file.downloadUrl}
+            src={file.thumbnail_url || file.thumbnail || file.downloadUrl}
             alt={file.name}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             loading="lazy"
+            decoding="async"
           />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 text-slate-400">

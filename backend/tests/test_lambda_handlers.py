@@ -115,6 +115,70 @@ class TestPresignedUrlLambda(unittest.TestCase):
         self.assertIn("omnidrive-test-bucket.s3-accelerate.amazonaws.com", url)
         self.assertIn("raw/user-1/file-1/document.pdf", url)
 
+    def test_multipart_upload_lifecycle(self):
+        """Verify initiate_multipart, part_url, and complete_multipart actions."""
+        mock_s3 = MagicMock()
+        mock_s3.create_multipart_upload.return_value = {"UploadId": "mp-test-upload-id"}
+        mock_s3.generate_presigned_url.return_value = "https://s3-accelerate.amazonaws.com/part-1-url"
+        mock_s3.complete_multipart_upload.return_value = {"Location": "s3://test-raw-bucket/raw/user-123/file-1/video.mp4"}
+        presigned_app.s3_client = mock_s3
+
+        mock_dynamo = MagicMock()
+        mock_table = MagicMock()
+        mock_dynamo.Table.return_value = mock_table
+        presigned_app.dynamodb = mock_dynamo
+
+        auth_event = {
+            "requestContext": {
+                "authorizer": {
+                    "jwt": {"claims": {"sub": "user-mp-123"}}
+                }
+            }
+        }
+
+        # 1. Initiate Multipart
+        init_event = dict(auth_event, body=json.dumps({
+            "action": "initiate_multipart",
+            "file_name": "heavy_asset.mp4",
+            "file_type": "video/mp4",
+            "file_size": 52428800
+        }))
+        init_res = presigned_app.lambda_handler(init_event, None)
+        self.assertEqual(init_res["statusCode"], 200)
+        init_body = json.loads(init_res["body"])
+        self.assertEqual(init_body["upload_id"], "mp-test-upload-id")
+        self.assertIn("raw/user-mp-123/", init_body["s3_key"])
+        s3_key = init_body["s3_key"]
+        file_id = init_body["file_id"]
+
+        # 2. Get Part URL
+        part_event = dict(auth_event, body=json.dumps({
+            "action": "part_url",
+            "file_key": s3_key,
+            "upload_id": "mp-test-upload-id",
+            "part_number": 1
+        }))
+        part_res = presigned_app.lambda_handler(part_event, None)
+        self.assertEqual(part_res["statusCode"], 200)
+        part_body = json.loads(part_res["body"])
+        self.assertEqual(part_body["presigned_url"], "https://s3-accelerate.amazonaws.com/part-1-url")
+        self.assertEqual(part_body["part_number"], 1)
+
+        # 3. Complete Multipart
+        comp_event = dict(auth_event, body=json.dumps({
+            "action": "complete_multipart",
+            "file_key": s3_key,
+            "upload_id": "mp-test-upload-id",
+            "file_id": file_id,
+            "parts": [{"PartNumber": 1, "ETag": "test-etag-1"}]
+        }))
+        comp_res = presigned_app.lambda_handler(comp_event, None)
+        self.assertEqual(comp_res["statusCode"], 200)
+        comp_body = json.loads(comp_res["body"])
+        self.assertEqual(comp_body["status"], "COMPLETED")
+        self.assertEqual(comp_body["file_id"], file_id)
+        mock_s3.complete_multipart_upload.assert_called_once()
+
 
 class TestFilesApiLambda(unittest.TestCase):
     def test_missing_sub_returns_401(self):
@@ -162,6 +226,44 @@ class TestFilesApiLambda(unittest.TestCase):
         body = json.loads(response["body"])
         self.assertEqual(body["count"], 1)
         self.assertEqual(body["files"][0]["file_id"], "file-abc")
+
+    def test_cloudfront_url_enrichment(self):
+        """Verify that files_api generates CloudFront URLs when CLOUDFRONT_DOMAIN is set."""
+        mock_table = MagicMock()
+        mock_table.query.return_value = {
+            "Items": [
+                {
+                    "PK": "USER#user-cdn",
+                    "SK": "FILE#file-video-99",
+                    "file_id": "file-video-99",
+                    "file_name": "presentation.mp4",
+                    "content_type": "video/mp4",
+                    "status": "COMPLETED",
+                    "hls_master_url": "s3://test-processed-bucket/hls/file-video-99/master.m3u8",
+                    "thumbnail_s3_key": "processed/thumbnails/file-video-99.webp"
+                }
+            ]
+        }
+        mock_dynamo = MagicMock()
+        mock_dynamo.Table.return_value = mock_table
+        files_app.dynamodb = mock_dynamo
+
+        with patch.dict(os.environ, {"CLOUDFRONT_DOMAIN": "cdn.omnidrive.ai"}):
+            files_app.CLOUDFRONT_DOMAIN = "cdn.omnidrive.ai"
+            event = {
+                "requestContext": {
+                    "authorizer": {
+                        "jwt": {"claims": {"sub": "user-cdn"}}
+                    }
+                },
+                "httpMethod": "GET"
+            }
+            response = files_app.lambda_handler(event, None)
+            self.assertEqual(response["statusCode"], 200)
+            body = json.loads(response["body"])
+            item = body["files"][0]
+            self.assertEqual(item["hlsUrl"], "https://cdn.omnidrive.ai/hls/file-video-99/master.m3u8")
+            self.assertEqual(item["thumbnailUrl"], "https://cdn.omnidrive.ai/thumbnails/file-video-99.webp")
 
 
 class TestModerationGateLambda(unittest.TestCase):
@@ -394,6 +496,17 @@ class TestVideoTranscoderWorker(unittest.TestCase):
         self.assertIn(":hls_master_url", last_call["ExpressionAttributeValues"])
         # Check SQS message deleted
         mock_sqs.delete_message.assert_called_once()
+
+    def test_transcoder_6_tier_qualities_ladder(self):
+        """Verify that transcoder defines 6-tier ladder down to 240p with Original source quality."""
+        qualities = [q["name"] for q in self.transcoder_mod.HLS_QUALITIES]
+        self.assertEqual(qualities, ["Original", "1080p", "720p", "480p", "360p", "240p"])
+        # Verify 240p has 200k video bitrate for 3G cellular stability
+        q_240p = next(q for q in self.transcoder_mod.HLS_QUALITIES if q["name"] == "240p")
+        self.assertEqual(q_240p["video_bitrate"], "200k")
+        # Verify Original has no scaling limit
+        q_orig = next(q for q in self.transcoder_mod.HLS_QUALITIES if q["name"] == "Original")
+        self.assertIsNone(q_orig["resolution"])
 
 
 if __name__ == "__main__":

@@ -79,6 +79,18 @@ def lambda_handler(event, context):
 
         # 2. Parse HTTP body: { "file_name": str, "file_type": str, "file_size": num }
         body = parse_request_body(event)
+
+        # Check for Resumable Multipart Upload routes & actions
+        path = event.get("rawPath") or event.get("path") or ""
+        action = body.get("action", "")
+
+        if action == "initiate_multipart" or path.endswith("/upload/initiate") or path.endswith("/initiate"):
+            return handle_initiate_multipart(user_id, body)
+        if action == "part_url" or path.endswith("/upload/part-url") or path.endswith("/part-url"):
+            return handle_part_presigned_url(user_id, body)
+        if action == "complete_multipart" or path.endswith("/upload/complete") or path.endswith("/complete"):
+            return handle_complete_multipart(user_id, body)
+
         file_name = body.get("file_name", "").strip()
         # Accept file_type (per prompt) or content_type
         file_type = (body.get("file_type") or body.get("content_type", "")).strip().lower()
@@ -236,3 +248,135 @@ def build_response(status_code, body_dict):
         "headers": CORS_HEADERS,
         "body": json.dumps(body_dict),
     }
+
+
+def handle_initiate_multipart(user_id, body):
+    """Initiates an S3 multipart upload for connection-drop resilience."""
+    file_name = (body.get("file_name") or body.get("fileName") or "upload").strip()
+    file_type = (body.get("file_type") or body.get("contentType") or "application/octet-stream").strip().lower()
+    file_id = str(uuid.uuid4())
+    sanitized_file_name = sanitize_filename(file_name)
+    s3_raw_key = f"raw/{user_id}/{file_id}/{sanitized_file_name}"
+
+    mp_res = s3_client.create_multipart_upload(
+        Bucket=RAW_BUCKET_NAME,
+        Key=s3_raw_key,
+        ContentType=file_type,
+    )
+    upload_id = mp_res["UploadId"]
+
+    # Register record in DynamoDB
+    timestamp = datetime.now(timezone.utc).isoformat()
+    table = dynamodb.Table(DYNAMODB_TABLE_NAME)
+    registry_item = {
+        "PK": f"USER#{user_id}",
+        "SK": f"FILE#{file_id}",
+        "file_id": file_id,
+        "user_id": user_id,
+        "file_name": sanitized_file_name,
+        "file_type": file_type,
+        "content_type": file_type,
+        "s3_raw_key": s3_raw_key,
+        "s3_key": s3_raw_key,
+        "s3_bucket": RAW_BUCKET_NAME,
+        "upload_id": upload_id,
+        "status": "PENDING_UPLOAD",
+        "pipeline_step": "MULTIPART_INITIATED",
+        "created_at": timestamp,
+        "updated_at": timestamp,
+    }
+    table.put_item(Item=registry_item)
+
+    return build_response(200, {
+        "upload_id": upload_id,
+        "uploadId": upload_id,
+        "file_id": file_id,
+        "fileId": file_id,
+        "s3_key": s3_raw_key,
+        "fileKey": s3_raw_key,
+        "file_key": s3_raw_key,
+    })
+
+
+def handle_part_presigned_url(user_id, body):
+    """Generates an accelerated presigned PUT URL for a specific multipart part."""
+    file_key = body.get("file_key") or body.get("fileKey") or body.get("s3_key")
+    upload_id = body.get("upload_id") or body.get("uploadId")
+    part_number = int(body.get("part_number") or body.get("partNumber") or 1)
+
+    if not file_key or not upload_id:
+        return build_response(400, {"error": "Missing 'file_key' or 'upload_id' for multipart part URL."})
+
+    part_url = s3_client.generate_presigned_url(
+        ClientMethod="upload_part",
+        Params={
+            "Bucket": RAW_BUCKET_NAME,
+            "Key": file_key,
+            "UploadId": upload_id,
+            "PartNumber": part_number,
+        },
+        ExpiresIn=URL_EXPIRATION_SECONDS,
+    )
+
+    return build_response(200, {
+        "presigned_url": part_url,
+        "presignedUrl": part_url,
+        "part_number": part_number,
+        "partNumber": part_number,
+    })
+
+
+def handle_complete_multipart(user_id, body):
+    """Completes the S3 multipart upload and sets status to PENDING_PROCESSING."""
+    file_key = body.get("file_key") or body.get("fileKey") or body.get("s3_key")
+    upload_id = body.get("upload_id") or body.get("uploadId")
+    raw_parts = body.get("parts") or []
+
+    if not file_key or not upload_id:
+        return build_response(400, {"error": "Missing 'file_key' or 'upload_id' to complete multipart upload."})
+
+    parts = []
+    for p in raw_parts:
+        pn = p.get("PartNumber") or p.get("partNumber") or p.get("part_number")
+        etag = p.get("ETag") or p.get("etag") or ""
+        if pn and etag:
+            parts.append({"PartNumber": int(pn), "ETag": str(etag).strip('"')})
+
+    parts.sort(key=lambda x: x["PartNumber"])
+
+    comp_res = s3_client.complete_multipart_upload(
+        Bucket=RAW_BUCKET_NAME,
+        Key=file_key,
+        UploadId=upload_id,
+        MultipartUpload={"Parts": parts},
+    )
+
+    file_id = body.get("file_id") or body.get("fileId")
+    if not file_id and len(file_key.split("/")) >= 3:
+        file_id = file_key.split("/")[2]
+
+    if file_id:
+        try:
+            table = dynamodb.Table(DYNAMODB_TABLE_NAME)
+            table.update_item(
+                Key={"PK": f"USER#{user_id}", "SK": f"FILE#{file_id}"},
+                UpdateExpression="SET #status = :s, pipeline_step = :p, updated_at = :u",
+                ExpressionAttributeNames={"#status": "status"},
+                ExpressionAttributeValues={
+                    ":s": "PENDING_PROCESSING",
+                    ":p": "UPLOAD_COMPLETED",
+                    ":u": datetime.now(timezone.utc).isoformat(),
+                },
+            )
+        except Exception as db_err:
+            logger.warning("Could not update DynamoDB status on complete multipart: %s", db_err)
+
+    return build_response(200, {
+        "status": "COMPLETED",
+        "file_id": file_id,
+        "fileId": file_id,
+        "file_key": file_key,
+        "s3_key": file_key,
+        "location": comp_res.get("Location", ""),
+        "bucket": RAW_BUCKET_NAME,
+    })

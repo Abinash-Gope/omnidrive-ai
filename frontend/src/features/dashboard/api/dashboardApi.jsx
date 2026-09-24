@@ -91,6 +91,9 @@ export const getFilesApi = async () => {
           // Expose raw download_url so players and preview components can stream directly
           downloadUrl: item.download_url || null,
           hlsUrl: item.hls_master_url || item.hls_url || null,
+          cdnHlsUrl: (item.hls_master_url || item.hls_url)
+            ? (item.hls_master_url || item.hls_url).replace(/https:\/\/[^/]+\.s3\.[^/]+\.amazonaws\.com/, "https://d2i01c2y2nswfl.cloudfront.net")
+            : null,
           dimensions,
           exif: exifData,
           previewSnippet: item.preview_snippet || item.status,

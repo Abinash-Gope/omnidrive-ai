@@ -4,6 +4,10 @@ import {
   generateThumbnail,
   saveThumbnail,
 } from "../features/dashboard/utils/thumbnailCache.jsx";
+import {
+  uploadFileMultipart,
+  MULTIPART_CHUNK_SIZE,
+} from "./useResumableUpload.js";
 
 /**
  * OmniDrive AI — Multi-File Upload Hook (useFileUpload)
@@ -70,6 +74,38 @@ async function uploadSingleFile(file, onProgress) {
       thumbData = await generateThumbnail(file);
     }
   } catch (_) {}
+
+  // Delegate files > 5MB to S3 Transfer-Accelerated 5MB chunked multipart uploads
+  if (file.size > MULTIPART_CHUNK_SIZE) {
+    const mpResult = await uploadFileMultipart(file, {
+      onProgress: (percent, xhr) => {
+        onProgress?.(percent, xhr);
+      },
+      onXhrCreated: (xhr) => {
+        onProgress?.(null, xhr);
+      },
+    });
+
+    if (thumbData?.dataUrl && mpResult.file_id) {
+      saveThumbnail([mpResult.file_id, mpResult.s3_key, file.name], thumbData.dataUrl, {
+        width: thumbData.width,
+        height: thumbData.height,
+        format: thumbData.format,
+      });
+    }
+
+    return {
+      file_id: mpResult.file_id,
+      s3_key: mpResult.s3_key,
+      file_name: file.name,
+      file_size: file.size,
+      file_type: file.type,
+      thumbnail: thumbData?.dataUrl || null,
+      dimensions: thumbData
+        ? { width: thumbData.width, height: thumbData.height, format: thumbData.format }
+        : null,
+    };
+  }
 
   const idToken = await getOrRenewIdToken();
   if (!idToken) throw new Error("Authentication required. Please sign in again.");
@@ -299,8 +335,10 @@ export const useFileUpload = () => {
           try {
             const result = await uploadSingleFile(targetItem.file, (percent, xhr) => {
               if (xhr) activeXhrsRef.current.set(targetItem.id, xhr);
-              targetItem.progress = percent;
-              setFilesQueue([...filesQueueRef.current]);
+              if (typeof percent === "number") {
+                targetItem.progress = percent;
+                setFilesQueue([...filesQueueRef.current]);
+              }
             });
             activeXhrsRef.current.delete(targetItem.id);
 
@@ -389,8 +427,10 @@ export const useFileUpload = () => {
 
     try {
       const result = await uploadSingleFile(file, (percent, xhr) => {
-        xhrRef.current = xhr;
-        setUploadProgress(percent);
+        if (xhr) xhrRef.current = xhr;
+        if (typeof percent === "number") {
+          setUploadProgress(percent);
+        }
       });
 
       setUploadedData(result);

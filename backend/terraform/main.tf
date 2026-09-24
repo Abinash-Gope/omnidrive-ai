@@ -91,6 +91,7 @@ module "lambda" {
   pdf_queue_url         = module.sqs_eventbridge.pdf_queue_url
   video_queue_arn       = module.sqs_eventbridge.video_queue_arn
   video_queue_url       = module.sqs_eventbridge.video_queue_url
+  cloudfront_domain     = module.s3_buckets.cloudfront_domain_name
 }
 
 # Module 7: API Gateway HTTP API v2 (Cognito JWT Authorizer & Lambda Integrations)
@@ -107,3 +108,21 @@ module "api_gateway" {
   files_api_function_arn      = module.lambda.files_api_function_arn
   files_api_function_name     = module.lambda.files_api_function_name
 }
+
+# Module 8: AWS Elemental MediaConvert (Broadcast-Grade 5-Tier ABR HLS Transcoding)
+module "mediaconvert" {
+  source                = "./modules/mediaconvert"
+  project_name          = var.project_name
+  environment           = var.environment
+  aws_region            = var.aws_region
+  raw_bucket_arn        = module.s3_buckets.raw_bucket_arn
+  raw_bucket_name       = module.s3_buckets.raw_bucket_name
+  processed_bucket_arn  = module.s3_buckets.processed_bucket_arn
+  processed_bucket_name = module.s3_buckets.processed_bucket_name
+  dynamodb_table_arn    = module.dynamodb.table_arn
+  dynamodb_table_name   = module.dynamodb.table_name
+  video_queue_arn       = module.sqs_eventbridge.video_queue_arn
+  video_queue_url       = module.sqs_eventbridge.video_queue_url
+  cloudfront_domain     = module.s3_buckets.cloudfront_domain_name
+}
+

@@ -29,6 +29,16 @@ DYNAMODB_TABLE_NAME = os.environ.get("DYNAMODB_TABLE_NAME", "omnidrive-ai-files-
 MAX_WAIT_TIME = 20 # Long poll timeout
 
 
+HLS_QUALITIES = [
+    {"name": "Original", "resolution": None, "video_bitrate": "8000k", "audio_bitrate": "256k"},
+    {"name": "1080p", "resolution": "1920:1080", "video_bitrate": "3500k", "audio_bitrate": "192k"},
+    {"name": "720p", "resolution": "1280:720", "video_bitrate": "1800k", "audio_bitrate": "128k"},
+    {"name": "480p", "resolution": "854:480", "video_bitrate": "800k", "audio_bitrate": "96k"},
+    {"name": "360p", "resolution": "640:360", "video_bitrate": "400k", "audio_bitrate": "64k"},
+    {"name": "240p", "resolution": "426:240", "video_bitrate": "200k", "audio_bitrate": "48k"},
+]
+
+
 def main():
     logger.info("ECS Fargate Transcoder task started. Checking SQS queue: %s", VIDEO_QUEUE_URL)
 
@@ -96,7 +106,7 @@ def main():
             "HLS Adaptive Video Transcoding finished",
             extra={
                 "hls_master_url": master_playlist_url,
-                "hls_qualities": ["1080p", "720p", "480p"],
+                "hls_qualities": ["Original", "1080p", "720p", "480p", "360p", "240p"],
                 "transcoder_worker": "AWS ECS Fargate ARM64 • FFmpeg 6.1",
             },
         )
@@ -140,27 +150,50 @@ def resolve_keys(table, file_id, user_id=None, raw_key=None):
 
 def run_ffmpeg_hls(input_path, output_dir):
     """
-    Executes FFmpeg generating 1080p, 720p, and 480p HLS playlists + master playlist.
+    Executes FFmpeg generating a 6-tier ladder:
+    Variant 0: Original (Source Quality - No Limit)
+    Variant 1: 1080p Full HD
+    Variant 2: 720p HD
+    Variant 3: 480p SD
+    Variant 4: 360p Low
+    Variant 5: 240p Ultra-Low (3G)
+    plus master playlist with 2s independent segments.
     """
     cmd = [
         "ffmpeg", "-y", "-i", input_path,
-        # Variant 0: 1080p
-        "-map", "0:v:0", "-map", "0:a:0?", "-b:v:0", "4500k", "-s:v:0", "1920x1080", "-b:a:0", "192k",
-        # Variant 1: 720p
-        "-map", "0:v:0", "-map", "0:a:0?", "-b:v:1", "2200k", "-s:v:1", "1280x720", "-b:a:1", "128k",
-        # Variant 2: 480p
-        "-map", "0:v:0", "-map", "0:a:0?", "-b:v:2", "800k", "-s:v:2", "854x480", "-b:a:2", "96k",
-        # HLS options & keyframe GOP alignment for smooth seeking & adaptive streaming
-        "-c:v", "libx264", "-c:a", "aac",
+        "-filter_complex",
+        "[0:v]split=6[v0],[v1],[v2],[v3],[v4],[v5]; "
+        "[v0]null[v0out]; "
+        "[v1]scale=w=1920:h=1080:force_original_aspect_ratio=decrease[v1out]; "
+        "[v2]scale=w=1280:h=720:force_original_aspect_ratio=decrease[v2out]; "
+        "[v3]scale=w=854:h=480:force_original_aspect_ratio=decrease[v3out]; "
+        "[v4]scale=w=640:h=360:force_original_aspect_ratio=decrease[v4out]; "
+        "[v5]scale=w=426:h=240:force_original_aspect_ratio=decrease[v5out]",
+        # Video streams
+        "-map", "[v0out]", "-c:v:0", "libx264", "-b:v:0", "8000k", "-maxrate:v:0", "12000k", "-bufsize:v:0", "16000k",
+        "-map", "[v1out]", "-c:v:1", "libx264", "-b:v:1", "3500k", "-maxrate:v:1", "4000k", "-bufsize:v:1", "6000k",
+        "-map", "[v2out]", "-c:v:2", "libx264", "-b:v:2", "1800k", "-maxrate:v:2", "2200k", "-bufsize:v:2", "3000k",
+        "-map", "[v3out]", "-c:v:3", "libx264", "-b:v:3", "800k",  "-maxrate:v:3", "1000k", "-bufsize:v:3", "1500k",
+        "-map", "[v4out]", "-c:v:4", "libx264", "-b:v:4", "400k",  "-maxrate:v:4", "500k",  "-bufsize:v:4", "800k",
+        "-map", "[v5out]", "-c:v:5", "libx264", "-b:v:5", "200k",  "-maxrate:v:5", "250k",  "-bufsize:v:5", "400k",
+        # Audio streams
+        "-map", "0:a:0?", "-c:a:0", "aac", "-b:a:0", "256k",
+        "-map", "0:a:0?", "-c:a:1", "aac", "-b:a:1", "192k",
+        "-map", "0:a:0?", "-c:a:2", "aac", "-b:a:2", "128k",
+        "-map", "0:a:0?", "-c:a:3", "aac", "-b:a:3", "96k",
+        "-map", "0:a:0?", "-c:a:4", "aac", "-b:a:4", "64k",
+        "-map", "0:a:0?", "-c:a:5", "aac", "-b:a:5", "48k",
+        # HLS options & keyframe GOP alignment
         "-preset", "fast",
         "-g", "60", "-keyint_min", "60", "-sc_threshold", "0",
         "-f", "hls",
-        "-hls_time", "4",
+        "-hls_time", "2",
         "-hls_playlist_type", "vod",
-        "-hls_segment_filename", os.path.join(output_dir, "v%v_segment_%03d.ts"),
+        "-hls_flags", "independent_segments",
+        "-hls_segment_filename", os.path.join(output_dir, "segment_%v_%03d.ts"),
         "-master_pl_name", "master.m3u8",
-        "-var_stream_map", "v:0,a:0? v:1,a:1? v:2,a:2?",
-        os.path.join(output_dir, "v%v.m3u8"),
+        "-var_stream_map", "v:0,a:0? v:1,a:1? v:2,a:2? v:3,a:3? v:4,a:4? v:5,a:5?",
+        os.path.join(output_dir, "output_%v.m3u8"),
     ]
 
     logger.info("FFmpeg command: %s", " ".join(cmd))

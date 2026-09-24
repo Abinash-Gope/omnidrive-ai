@@ -36,14 +36,15 @@ const VideoPreview = ({ file, isCompact = false, isHovered = false }) => {
   const videoRef = useRef(null);
 
   // Check if thumbnail is a valid image URL or base64 dataUrl (not a raw mp4 video)
+  const thumbUrl = file.thumbnail_url || file.thumbnail;
   const isImageThumbnail =
-    file.thumbnail &&
-    typeof file.thumbnail === "string" &&
-    (file.thumbnail.startsWith("data:image/") ||
-      file.thumbnail.startsWith("blob:") ||
-      /\.(jpe?g|png|webp|gif)(\?.*)?$/i.test(file.thumbnail));
+    thumbUrl &&
+    typeof thumbUrl === "string" &&
+    (thumbUrl.startsWith("data:image/") ||
+      thumbUrl.startsWith("blob:") ||
+      /\.(jpe?g|png|webp|gif)(\?.*)?$/i.test(thumbUrl));
 
-  const videoSourceUrl = file.downloadUrl || (file.thumbnail && file.thumbnail.endsWith(".mp4") ? file.thumbnail : null);
+  const videoSourceUrl = file.downloadUrl || (thumbUrl && typeof thumbUrl === "string" && thumbUrl.endsWith(".mp4") ? thumbUrl : null);
 
   const handleMetadata = (e) => {
     const sec = e.target?.duration;
@@ -78,8 +79,10 @@ const VideoPreview = ({ file, isCompact = false, isHovered = false }) => {
     if (isImageThumbnail) {
       return (
         <img
-          src={file.thumbnail}
+          src={thumbUrl}
           alt={file.name}
+          loading="lazy"
+          decoding="async"
           className="w-full h-full object-cover rounded-lg"
           onError={() => setHasError(true)}
         />
@@ -117,11 +120,12 @@ const VideoPreview = ({ file, isCompact = false, isHovered = false }) => {
       {/* 1. Image Thumbnail from Cache or S3 */}
       {isImageThumbnail && !hasError ? (
         <img
-          src={file.thumbnail}
+          src={thumbUrl}
           alt={file.name}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           onError={() => setHasError(true)}
           loading="lazy"
+          decoding="async"
         />
       ) : videoSourceUrl && !hasError ? (
         /* 2. Live Video Poster & Hover Preview Frame */
