@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import { getOrRenewIdToken } from "../features/auth/api/authApi.jsx";
+import axiosInstance from "../shared/api/axiosClient.jsx";
 import {
   generateThumbnail,
   saveThumbnail,
@@ -107,37 +108,23 @@ async function uploadSingleFile(file, onProgress) {
     };
   }
 
-  const idToken = await getOrRenewIdToken();
-  if (!idToken) throw new Error("Authentication required. Please sign in again.");
-
-  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
-  const uploadUrlEndpoint = apiBaseUrl ? `${apiBaseUrl}/upload-url` : "/upload-url";
-
-  const payload = {
-    file_name: file.name,
-    content_type: (file.type || "application/octet-stream").toLowerCase(),
-    file_size: file.size || 0,
-  };
-
-  const response = await fetch(uploadUrlEndpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${idToken}`,
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    let errMessage = `Failed to get upload authorization (HTTP ${response.status})`;
-    try {
-      const errorData = await response.json();
-      if (errorData?.error) errMessage = errorData.error;
-    } catch (_) {}
-    throw new Error(errMessage);
+  let data;
+  try {
+    const res = await axiosInstance.post("/upload-url", {
+      file_name: file.name,
+      content_type: (file.type || "application/octet-stream").toLowerCase(),
+      file_size: file.size || 0,
+    });
+    data = res.data;
+  } catch (err) {
+    if (err.response?.status === 401) {
+      throw new Error("Your authentication session has expired (HTTP 401). Please sign in again.");
+    }
+    const msg = err.response?.data?.error || err.message || `Failed to get upload authorization (${err.response?.status || "network error"}).`;
+    throw new Error(msg);
   }
 
-  const { upload_url, file_id, s3_key } = await response.json();
+  const { upload_url, file_id, s3_key } = data;
   if (!upload_url) throw new Error("API Gateway did not return a valid S3 upload URL.");
 
   // Persist thumbnail in client storage

@@ -45,6 +45,7 @@ export const loginApi = ({ email, password }) => {
         const idToken = result.getIdToken().getJwtToken();
         const claims = result.getIdToken().decodePayload();
         const user = formatUserFromClaims(claims, idToken);
+        localStorage.setItem("cognito_username", email.trim());
         localStorage.setItem("last_login_timestamp", Date.now().toString());
         resolve({ token: idToken, user });
       },
@@ -59,6 +60,7 @@ export const loginApi = ({ email, password }) => {
             const idToken = result.getIdToken().getJwtToken();
             const claims = result.getIdToken().decodePayload();
             const user = formatUserFromClaims(claims, idToken);
+            localStorage.setItem("cognito_username", email.trim());
             localStorage.setItem("last_login_timestamp", Date.now().toString());
             resolve({ token: idToken, user });
           },
@@ -176,6 +178,7 @@ export const resendConfirmationCodeApi = (email) => {
  * 2. If <= 7 days and current token is valid (not expiring within 2 min): returns current token.
  * 3. If <= 7 days and token is expired/expiring soon: seamlessly exchanges Cognito refresh
  *    token for a fresh 1-hour ID token without prompting the user.
+ * 4. Never returns an expired token to callers.
  * @returns {Promise<string|null>}
  */
 export const getOrRenewIdToken = async () => {
@@ -196,28 +199,135 @@ export const getOrRenewIdToken = async () => {
     return storedToken;
   }
 
-  // 3. Token is expired or expiring soon: attempt transparent refresh via Cognito SDK
-  return new Promise((resolve) => {
-    const currentUser = userPool.getCurrentUser();
+  // 3. Helper to locate stored Cognito Refresh Token from localStorage
+  const findStoredRefreshToken = () => {
+    const clientId = cognitoConfig.clientId;
+    const lastUser =
+      localStorage.getItem("cognito_username") ||
+      localStorage.getItem(`CognitoIdentityServiceProvider.${clientId}.LastAuthUser`);
+
+    if (lastUser) {
+      const directKey = `CognitoIdentityServiceProvider.${clientId}.${lastUser}.refreshToken`;
+      const token = localStorage.getItem(directKey);
+      if (token) return token;
+    }
+
+    // Fallback: search any key ending in .refreshToken
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.includes(clientId) && key.endsWith(".refreshToken")) {
+        const val = localStorage.getItem(key);
+        if (val) return val;
+      }
+    }
+    return null;
+  };
+
+  // 4. Direct HTTPS fallback to AWS Cognito InitiateAuth REFRESH_TOKEN_AUTH
+  const refreshViaHttp = async (refreshToken) => {
+    if (!refreshToken) return null;
+    try {
+      const res = await fetch(`https://cognito-idp.${cognitoConfig.region}.amazonaws.com/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-amz-json-1.1",
+          "X-Amz-Target": "AWSCognitoIdentityProviderService.InitiateAuth",
+        },
+        body: JSON.stringify({
+          AuthFlow: "REFRESH_TOKEN_AUTH",
+          ClientId: cognitoConfig.clientId,
+          AuthParameters: {
+            REFRESH_TOKEN: refreshToken,
+          },
+        }),
+      });
+
+      if (!res.ok) {
+        console.warn("Direct Cognito refresh returned HTTP", res.status);
+        return null;
+      }
+
+      const data = await res.json();
+      const freshIdToken = data?.AuthenticationResult?.IdToken;
+      if (freshIdToken) {
+        localStorage.setItem("idToken", freshIdToken);
+        localStorage.setItem("authToken", freshIdToken);
+        localStorage.setItem("last_login_timestamp", Date.now().toString());
+        return freshIdToken;
+      }
+    } catch (err) {
+      console.warn("Direct Cognito refresh network error:", err);
+    }
+    return null;
+  };
+
+  // 5. Token is expired or expiring soon: attempt transparent refresh via Cognito SDK with direct HTTP fallback
+  return new Promise(async (resolve) => {
+    let currentUser = userPool.getCurrentUser();
+    if (!currentUser) {
+      const storedUser =
+        localStorage.getItem("cognito_username") ||
+        localStorage.getItem(`CognitoIdentityServiceProvider.${cognitoConfig.clientId}.LastAuthUser`);
+      if (storedUser) {
+        currentUser = new CognitoUser({ Username: storedUser, Pool: userPool });
+      }
+    }
+
     if (currentUser) {
-      currentUser.getSession((err, session) => {
-        if (!err && session && session.isValid()) {
-          const freshIdToken = session.getIdToken().getJwtToken();
-          localStorage.setItem("idToken", freshIdToken);
-          localStorage.setItem("authToken", freshIdToken);
-          localStorage.setItem("last_login_timestamp", Date.now().toString());
-          return resolve(freshIdToken);
+      currentUser.getSession(async (err, session) => {
+        if (!err && session) {
+          if (session.isValid()) {
+            const freshIdToken = session.getIdToken().getJwtToken();
+            localStorage.setItem("idToken", freshIdToken);
+            localStorage.setItem("authToken", freshIdToken);
+            localStorage.setItem("last_login_timestamp", Date.now().toString());
+            return resolve(freshIdToken);
+          }
+
+          // If session exists but token is expired, exchange refresh token for fresh ID token
+          const refreshToken = session.getRefreshToken();
+          if (refreshToken && refreshToken.getToken()) {
+            currentUser.refreshSession(refreshToken, async (refreshErr, newSession) => {
+              if (!refreshErr && newSession && newSession.isValid()) {
+                const freshIdToken = newSession.getIdToken().getJwtToken();
+                localStorage.setItem("idToken", freshIdToken);
+                localStorage.setItem("authToken", freshIdToken);
+                localStorage.setItem("last_login_timestamp", Date.now().toString());
+                return resolve(freshIdToken);
+              }
+              // SDK refresh failed; try direct HTTP endpoint
+              const fallbackToken = await refreshViaHttp(refreshToken.getToken());
+              if (fallbackToken) return resolve(fallbackToken);
+
+              if (storedToken && !isTokenExpired(storedToken)) return resolve(storedToken);
+              resolve(null);
+            });
+            return;
+          }
         }
 
-        // If SDK refresh fails, fallback to stored token if within 7-day window
-        if (storedToken && (!lastLogin || Date.now() - lastLogin < SEVEN_DAYS_MS)) {
+        // Session was null or had no refreshToken: try direct HTTP with stored refresh token
+        const storedRt = findStoredRefreshToken();
+        if (storedRt) {
+          const directToken = await refreshViaHttp(storedRt);
+          if (directToken) return resolve(directToken);
+        }
+
+        // If all refresh methods fail, only return storedToken if it is NOT expired
+        if (storedToken && !isTokenExpired(storedToken)) {
           return resolve(storedToken);
         }
         resolve(null);
       });
     } else {
-      // Non-SDK session (e.g. Google OAuth or local token) within 7 days
-      if (storedToken && (!lastLogin || Date.now() - lastLogin < SEVEN_DAYS_MS)) {
+      // Non-SDK session: check for stored refresh token
+      const storedRt = findStoredRefreshToken();
+      if (storedRt) {
+        const directToken = await refreshViaHttp(storedRt);
+        if (directToken) return resolve(directToken);
+      }
+
+      if (storedToken && !isTokenExpired(storedToken)) {
         return resolve(storedToken);
       }
       resolve(null);

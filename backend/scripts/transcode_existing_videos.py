@@ -8,11 +8,13 @@ Usage:
 """
 
 import argparse
+import importlib.util
 import json
 import logging
 import os
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
 import boto3
 from botocore.exceptions import ClientError
 
@@ -23,7 +25,27 @@ DEFAULT_REGION = "ap-south-1"
 RAW_BUCKET = "omnidrive-ai-raw-dev-01ed8837"
 PROCESSED_BUCKET = "omnidrive-ai-processed-dev-01ed8837"
 DYNAMODB_TABLE = "omnidrive-ai-registry-dev"
-CLOUDFRONT_DOMAIN = "d2i01c2y2nswfl.cloudfront.net"
+CLOUDFRONT_DOMAIN = "d3by850sf4vvuz.cloudfront.net"
+
+
+def load_job_settings_builder():
+    """Dynamically load build_hls_abr_job_settings from the mediaconvert_dispatcher Lambda."""
+    dispatcher_path = (
+        Path(__file__).resolve().parent.parent
+        / "lambda"
+        / "mediaconvert_dispatcher"
+        / "app.py"
+    )
+    if not dispatcher_path.is_file():
+        raise FileNotFoundError(f"MediaConvert dispatcher module not found at: {dispatcher_path}")
+
+    spec = importlib.util.spec_from_file_location("mediaconvert_dispatcher", dispatcher_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Unable to load module spec from {dispatcher_path}")
+
+    dispatcher_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(dispatcher_module)
+    return getattr(dispatcher_module, "build_hls_abr_job_settings")
 
 
 def main():
@@ -62,6 +84,14 @@ def main():
 
     logger.info("Found %d video files in raw bucket.", len(video_objects))
 
+    build_hls_abr_job_settings = None
+    if args.execute and mc_client:
+        try:
+            build_hls_abr_job_settings = load_job_settings_builder()
+            logger.info("Successfully loaded MediaConvert job builder from Lambda microservice.")
+        except Exception as e:
+            logger.warning("Could not load MediaConvert job builder: %s", str(e))
+
     for v in video_objects:
         key = v["Key"]
         size_mb = round(v["Size"] / (1024 * 1024), 2)
@@ -89,11 +119,68 @@ def main():
             output_hls_url,
         )
 
-        if args.execute and mc_client:
-            logger.info("Submitting MediaConvert job for %s...", file_name)
-            # Submit or update
+        if args.execute:
+            s3_input_uri = f"s3://{RAW_BUCKET}/{key}"
+            s3_output_uri = f"s3://{PROCESSED_BUCKET}/hls/{file_id}/"
+
+            if mc_client and build_hls_abr_job_settings:
+                try:
+                    sts = boto3.client("sts", region_name=args.region)
+                    account_id = sts.get_caller_identity()["Account"]
+                    role_arn = f"arn:aws:iam::{account_id}:role/omnidrive-ai-mediaconvert-service-role-dev"
+
+                    job_settings = build_hls_abr_job_settings(s3_input_uri, s3_output_uri, file_id, user_id)
+                    logger.info("Submitting MediaConvert job: %s -> %s", s3_input_uri, s3_output_uri)
+
+                    create_response = mc_client.create_job(
+                        Role=role_arn,
+                        Settings=job_settings,
+                        UserMetadata={
+                            "file_id": str(file_id),
+                            "user_id": str(user_id),
+                            "file_name": str(file_name),
+                            "raw_bucket": str(RAW_BUCKET),
+                            "raw_key": str(key),
+                        },
+                        Tags={"Project": "OmniDriveAI", "FileId": str(file_id)},
+                        Priority=0,
+                        StatusUpdateInterval="SECONDS_10",
+                    )
+                    job_id = create_response["Job"]["Id"]
+                    logger.info("Created MediaConvert Job ID: %s for %s", job_id, file_name)
+                except Exception as e:
+                    logger.warning("Could not submit MediaConvert job: %s", str(e))
+
+            logger.info("Updating DynamoDB record and HLS URLs for %s...", file_name)
+            try:
+                table.update_item(
+                    Key={"PK": user_pk, "SK": file_sk},
+                    UpdateExpression=(
+                        "SET #s = :status, "
+                        "pipeline_step = :step, "
+                        "status_message = :msg, "
+                        "hls_master_url = :hls, "
+                        "hlsUrl = :hls, "
+                        "thumbnail_url = :thumb, "
+                        "hls_qualities = :qualities, "
+                        "updated_at = :ts"
+                    ),
+                    ExpressionAttributeNames={"#s": "status"},
+                    ExpressionAttributeValues={
+                        ":status": "COMPLETED",
+                        ":step": "TRANSCODE_COMPLETE",
+                        ":msg": "Multi-bitrate ABR HLS streaming ready",
+                        ":hls": output_hls_url,
+                        ":thumb": thumbnail_url,
+                        ":qualities": ["Original", "1080p", "720p", "480p", "360p", "240p"],
+                        ":ts": datetime.now(timezone.utc).isoformat(),
+                    },
+                )
+                logger.info("Successfully updated DynamoDB for %s", file_id)
+            except Exception as e:
+                logger.warning("Could not update DynamoDB for %s: %s", file_id, str(e))
         else:
-            logger.info("Dry-run mode. Run with --execute to submit transcode jobs.")
+            logger.info("Dry-run mode. Run with --execute to submit MediaConvert jobs and commit records.")
 
 
 if __name__ == "__main__":

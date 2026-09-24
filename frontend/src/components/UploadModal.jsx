@@ -137,14 +137,17 @@ const FileRow = ({ item, phase, onRemove }) => {
 
       {/* Per-file progress bar (active uploads) */}
       {item.status === "uploading" && (
-        <div className="mt-2.5">
-          <div className="flex justify-between text-[10px] font-mono text-slate-500 mb-1">
-            <span>Streaming to S3…</span>
-            <span className="text-[#1a73e8] font-bold">{item.progress}%</span>
+        <div className="mt-2.5 pt-2 border-t border-blue-100/60 dark:border-blue-900/40">
+          <div className="flex justify-between items-center text-[11px] mb-1 font-medium">
+            <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5 font-mono text-[10px]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#1a73e8] animate-pulse" />
+              Streaming to AWS S3…
+            </span>
+            <span className="text-[#1a73e8] font-bold font-mono text-xs">{item.progress}%</span>
           </div>
-          <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+          <div className="h-2 w-full bg-slate-200/80 dark:bg-slate-800 rounded-full overflow-hidden p-0.5">
             <div
-              className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-all duration-150 rounded-full"
+              className="h-full bg-gradient-to-r from-[#1a73e8] via-blue-500 to-indigo-500 transition-all duration-150 rounded-full shadow-[0_0_8px_rgba(26,115,232,0.4)]"
               style={{ width: `${item.progress}%` }}
             />
           </div>
@@ -162,9 +165,22 @@ const FileRow = ({ item, phase, onRemove }) => {
             {expanded ? "Hide error" : "Show error"}
           </button>
           {expanded && (
-            <p className="mt-1 text-[10px] text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30 rounded-lg p-2 leading-relaxed">
-              {item.error}
-            </p>
+            <div className="mt-1 text-[10px] text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30 rounded-lg p-2 leading-relaxed flex flex-col gap-1.5">
+              <p>{item.error}</p>
+              {(item.error.includes("401") || item.error.toLowerCase().includes("session") || item.error.toLowerCase().includes("sign in")) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    localStorage.removeItem("idToken");
+                    localStorage.removeItem("authToken");
+                    window.location.assign("/");
+                  }}
+                  className="self-start px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded text-[10px] font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                >
+                  Sign In Again
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -495,27 +511,26 @@ const UploadModal = ({ isOpen, onClose, onUploadComplete, stagedFiles, onClearSt
           {/* ─── STAGING / UPLOADING / DONE: File List ─── */}
           {phase !== "empty" && (
             <>
-              {/* Aggregate progress bar (during upload) */}
-              {(phase === "uploading") && (
-                <div className="space-y-1.5 p-3.5 rounded-2xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/40">
+              {/* Aggregate progress bar (only displayed when uploading multiple files) */}
+              {phase === "uploading" && filesQueue.length > 1 && (
+                <div className="space-y-1.5 p-3.5 rounded-2xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/40 animate-in fade-in duration-150">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-semibold text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
                       <Loader2 className="w-3.5 h-3.5 animate-spin text-[#1a73e8]" />
-                      Uploading{" "}
-                      {filesQueue.filter((i) => i.status === "uploading").length > 0
-                        ? `${filesQueue.filter((i) => i.status === "completed").length + filesQueue.filter((i) => i.status === "uploading").length} of ${totalCount} files`
-                        : "…"}
+                      Total Batch Progress (
+                      {filesQueue.filter((i) => i.status === "completed").length} of {totalCount} completed
+                      )
                     </span>
                     <span className="font-mono font-bold text-[#1a73e8]">{overallProgress}%</span>
                   </div>
                   <div className="h-2 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-all duration-200 rounded-full"
+                      className="h-full bg-gradient-to-r from-[#1a73e8] to-indigo-600 transition-all duration-200 rounded-full"
                       style={{ width: `${overallProgress}%` }}
                     />
                   </div>
                   <p className="text-[10px] text-slate-500 dark:text-slate-400 text-center">
-                    2 concurrent S3 streams • zero web-server overhead
+                    Parallel S3 multi-stream • zero web-server overhead
                   </p>
                 </div>
               )}
@@ -626,16 +641,20 @@ const UploadModal = ({ isOpen, onClose, onUploadComplete, stagedFiles, onClearSt
               </>
             )}
 
-            {/* UPLOADING: live message with option to cancel */}
+            {/* UPLOADING: clean footer with cancel action */}
             {phase === "uploading" && (
-              <div className="w-full flex items-center justify-between py-2 px-1">
-                <span className="text-xs text-slate-500">
-                  Streaming directly to secure S3 storage…
+              <div className="w-full flex items-center justify-between py-1 px-1">
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  Direct secure S3 upload in progress
                 </span>
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="text-xs font-semibold text-rose-500 hover:text-rose-600 transition-colors hover:underline"
+                  className="text-xs font-semibold text-rose-500 hover:text-rose-600 dark:hover:text-rose-400 transition-colors hover:underline cursor-pointer"
                 >
                   Cancel Upload
                 </button>
@@ -646,14 +665,29 @@ const UploadModal = ({ isOpen, onClose, onUploadComplete, stagedFiles, onClearSt
             {phase === "done" && (
               <>
                 {hasError && (
-                  <button
-                    type="button"
-                    onClick={handleRetry}
-                    className="flex items-center gap-1.5 py-2.5 px-4 rounded-xl border border-amber-300 dark:border-amber-800 text-xs font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    Retry Failed ({errorCount})
-                  </button>
+                  filesQueue.some((i) => i.error && (i.error.includes("401") || i.error.toLowerCase().includes("session") || i.error.toLowerCase().includes("sign in"))) ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        localStorage.removeItem("idToken");
+                        localStorage.removeItem("authToken");
+                        window.location.assign("/");
+                      }}
+                      className="flex items-center gap-1.5 py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-xs font-semibold text-white transition-colors cursor-pointer shadow-md shadow-rose-600/20"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      Sign In to Retry
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleRetry}
+                      className="flex items-center gap-1.5 py-2.5 px-4 rounded-xl border border-amber-300 dark:border-amber-800 text-xs font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      Retry Failed ({errorCount})
+                    </button>
+                  )
                 )}
                 <button
                   type="button"

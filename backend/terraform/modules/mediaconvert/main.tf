@@ -132,7 +132,6 @@ resource "aws_lambda_function" "mediaconvert_dispatcher" {
       PROCESSED_BUCKET_NAME = var.processed_bucket_name
       MEDIACONVERT_ROLE_ARN = aws_iam_role.mediaconvert_service_role.arn
       CLOUDFRONT_DOMAIN     = var.cloudfront_domain
-      AWS_REGION            = var.aws_region
     }
   }
 }
@@ -188,7 +187,6 @@ resource "aws_lambda_function" "mediaconvert_complete" {
       DYNAMODB_TABLE_NAME   = var.dynamodb_table_name
       PROCESSED_BUCKET_NAME = var.processed_bucket_name
       CLOUDFRONT_DOMAIN     = var.cloudfront_domain
-      AWS_REGION            = var.aws_region
     }
   }
 }

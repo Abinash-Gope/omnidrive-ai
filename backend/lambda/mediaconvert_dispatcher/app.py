@@ -230,7 +230,7 @@ def build_hls_abr_job_settings(input_uri, output_uri, file_id, user_id):
                         height=240,
                         video_bitrate=200000,
                         max_bitrate=250000,
-                        audio_bitrate=48000,
+                        audio_bitrate=64000,
                     ),
                 ],
             },
@@ -309,7 +309,6 @@ def create_hls_rendition(name_modifier, width, height, video_bitrate, max_bitrat
                     "TemporalAdaptiveQuantization": "ENABLED",
                     "FlickerAdaptiveQuantization": "DISABLED",
                     "EntropyEncoding": "CABAC",
-                    "Bitrate": video_bitrate,
                     "MaxBitrate": max_bitrate,
                     "RateControlMode": "QVBR",
                     "QvbrSettings": {

@@ -82,10 +82,27 @@ def lambda_handler(event, context):
                 message="Automated AWS Rekognition moderation check in progress",
             )
 
-            # 4. Perform Content Moderation Scan
-            is_image = any(content_type.startswith(t) for t in ["image/jpeg", "image/png", "image/webp"])
-            is_video = any(content_type.startswith(t) for t in ["video/mp4", "video/quicktime", "video/x-matroska", "video/webm"])
-            is_pdf = content_type == "application/pdf"
+            # 4. Perform Content Moderation Scan (Check MIME type and filename extension)
+            lower_name = (file_name or "").lower()
+            lower_key = (s3_key or "").lower()
+            video_exts = (".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v", ".3gp", ".ts", ".flv", ".wmv", ".ogv")
+            image_exts = (".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff", ".svg")
+
+            is_video = (
+                any(content_type.startswith(t) for t in ["video/", "video/mp4", "video/quicktime", "video/x-matroska", "video/webm"])
+                or any(lower_name.endswith(ext) for ext in video_exts)
+                or any(lower_key.endswith(ext) for ext in video_exts)
+            )
+            is_image = (
+                any(content_type.startswith(t) for t in ["image/jpeg", "image/png", "image/webp", "image/gif", "image/"])
+                or any(lower_name.endswith(ext) for ext in image_exts)
+                or any(lower_key.endswith(ext) for ext in image_exts)
+            )
+            is_pdf = (
+                content_type == "application/pdf"
+                or lower_name.endswith(".pdf")
+                or lower_key.endswith(".pdf")
+            )
 
             is_violation, moderation_labels = check_safety_violation(bucket_name, s3_key, is_image)
 

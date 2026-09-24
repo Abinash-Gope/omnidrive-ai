@@ -431,7 +431,12 @@ const DashboardPage = () => {
       {/* Multimodal Preview Modals */}
       <VideoPlayerModal
         file={previewModal?.file}
-        isOpen={previewModal?.isOpen && previewModal?.file?.type === "video"}
+        isOpen={Boolean(
+          previewModal?.isOpen &&
+            previewModal?.file &&
+            (previewModal.file.type === "video" ||
+              /\.(mp4|mov|mkv|webm|avi|m4v|3gp|flv|wmv)$/i.test(previewModal.file.name || ""))
+        )}
         onClose={handleClosePreview}
         onChangeQuality={handleChangeQuality}
       />

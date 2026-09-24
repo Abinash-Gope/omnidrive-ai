@@ -164,10 +164,10 @@ const VideoPlayerModal = ({ file, isOpen, onClose, onChangeQuality }) => {
     return () => cancelAnimationFrame(animId);
   }, [isOpen]);
 
-  // Debounce buffering spinner by 250ms to prevent micro-stutter flash
+  // Debounce buffering spinner by 750ms to prevent micro-stutter flash during brief Range requests
   useEffect(() => {
     if (isBuffering) {
-      const timer = setTimeout(() => setIsDebouncedBuffering(true), 250);
+      const timer = setTimeout(() => setIsDebouncedBuffering(true), 750);
       return () => clearTimeout(timer);
     } else {
       setIsDebouncedBuffering(false);
@@ -191,11 +191,12 @@ const VideoPlayerModal = ({ file, isOpen, onClose, onChangeQuality }) => {
 
     try {
       const latestFiles = await getFilesApi();
+      const currentTarget = activeFileRef.current;
       const updated = latestFiles.find(
         (f) =>
-          (f.id && (f.id === activeFile?.id || f.id === activeFile?.file_id)) ||
-          (f.file_id && (f.file_id === activeFile?.file_id || f.file_id === activeFile?.id)) ||
-          (f.s3Key && f.s3Key === activeFile?.s3Key)
+          (f.id && (f.id === currentTarget?.id || f.id === currentTarget?.file_id)) ||
+          (f.file_id && (f.file_id === currentTarget?.file_id || f.file_id === currentTarget?.id)) ||
+          (f.s3Key && f.s3Key === currentTarget?.s3Key)
       );
 
       if (updated) {
@@ -213,7 +214,8 @@ const VideoPlayerModal = ({ file, isOpen, onClose, onChangeQuality }) => {
       setIsBuffering(true);
       setReloadTrigger((t) => t + 1);
     }
-  }, [activeFile]);
+  }, []);
+
 
   // Trigger automated backoff reconnection for 3G cellular stability
   const triggerAutoRetry = useCallback((reason = "network_stall") => {
@@ -288,7 +290,8 @@ const VideoPlayerModal = ({ file, isOpen, onClose, onChangeQuality }) => {
     const errorCode = video?.error?.code;
     console.warn("[VideoPlayerModal] Native video error event:", errorCode);
 
-    const rawUrl = activeFile?.downloadUrl || activeFile?.download_url;
+    const currentTarget = activeFileRef.current;
+    const rawUrl = currentTarget?.downloadUrl || currentTarget?.download_url;
     if (streamMode !== "direct-mp4" && rawUrl) {
       console.info("[VideoPlayerModal] HLS stream error, falling back to direct MP4 stream:", rawUrl);
       setStreamMode("direct-mp4");
@@ -310,7 +313,7 @@ const VideoPlayerModal = ({ file, isOpen, onClose, onChangeQuality }) => {
     } else {
       setIsBuffering(true);
     }
-  }, [activeFile, streamMode, refreshFileAndStream]);
+  }, [streamMode, refreshFileAndStream]);
 
   // Background Cloud Poller: If the video is still processing in AWS, automatically
   // poll every 4s and auto-play as soon as status becomes COMPLETED or HLS is ready
@@ -366,7 +369,11 @@ const VideoPlayerModal = ({ file, isOpen, onClose, onChangeQuality }) => {
   const activeFileId = activeFile?.id || activeFile?.file_id || activeFile?.s3Key;
 
   useEffect(() => {
-    if (!isOpen || !activeFile || activeFile.type !== "video") return;
+    const isVideo =
+      activeFile?.type === "video" ||
+      /\.(mp4|mov|mkv|webm|avi|m4v|3gp|flv|wmv)$/i.test(activeFile?.name || "");
+
+    if (!isOpen || !activeFile || !isVideo) return;
 
     const currentKey = activeFile.id || activeFile.file_id || activeFile.s3Key;
     const isNewMedia = currentSetupRef.current.id !== currentKey;
@@ -410,6 +417,12 @@ const VideoPlayerModal = ({ file, isOpen, onClose, onChangeQuality }) => {
         activeFile.status === "PROCESSING" ||
         activeFile.status === "APPROVED_PROCESSING" ||
         activeFile.status === "PENDING_PROCESSING";
+
+      if (!isProcessing && !isRefreshingRef.current) {
+        refreshFileAndStream();
+        return;
+      }
+
       setStreamErrorReason(isProcessing ? "processing" : "network_stall");
       setHasStreamError(true);
       setIsBuffering(false);
@@ -469,74 +482,93 @@ const VideoPlayerModal = ({ file, isOpen, onClose, onChangeQuality }) => {
       hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
         setIsBuffering(false);
 
-        // Extract available multi-bitrate rendition levels (6-tier ladder)
+        // Map all available rendition levels directly from Hls.js
         const parsedLevels = (data.levels || []).map((lvl, index) => {
-          const height = lvl.height || 720;
+          const rawH = lvl.height || 720;
+          const normH =
+            rawH <= 200 ? 240 :
+            rawH <= 300 ? 360 :
+            rawH <= 500 ? 480 :
+            rawH <= 750 ? 720 :
+            rawH <= 1200 ? 1080 :
+            rawH <= 1600 ? 1440 : 2160;
+
           const fps = lvl.attrs?.["FRAME-RATE"] ? Math.round(lvl.attrs["FRAME-RATE"]) : 60;
-          const bitrateNum = lvl.bitrate ? (lvl.bitrate / 1000000).toFixed(1) : null;
-          const isSourceTier = index === 0 && (lvl.height >= 1080 || (data.levels && data.levels.length >= 4));
+          const bitrateMbps = lvl.bitrate ? (lvl.bitrate / 1000000).toFixed(1) : null;
+          const bitrateKbps = lvl.bitrate ? Math.round(lvl.bitrate / 1000) : null;
+          const bitrateDisplay = bitrateMbps && parseFloat(bitrateMbps) >= 1.0
+            ? `${bitrateMbps} Mbps`
+            : bitrateKbps
+            ? `${bitrateKbps} kbps`
+            : "Auto Rate";
+
+          const tierSuffix =
+            normH >= 2160 ? "4K Ultra HD" :
+            normH >= 1440 ? "2K QHD" :
+            normH >= 1080 ? "Full HD" :
+            normH >= 720 ? "HD" :
+            normH >= 480 ? "SD" :
+            normH >= 360 ? "Low" : "Ultra-Low";
+
           return {
-            index,
-            height,
+            levelIndex: index,
+            height: normH,
+            rawHeight: rawH,
             width: lvl.width || 1280,
             fps,
-            bitrate: bitrateNum ? `${bitrateNum} Mbps` : "Auto Rate",
-            label: isSourceTier
-              ? "Original (Source Quality - No Limit)"
-              : `${height}p ${height >= 1080 ? "Full HD" : height >= 720 ? "HD" : height >= 480 ? "SD" : height >= 360 ? "Low" : "Ultra-Low 3G"}`,
-            value: isSourceTier ? "original" : `${height}p`,
-            isLocked: plan === "free" && height > 480,
+            bitrate: bitrateDisplay,
+            label: `${normH}p ${tierSuffix}`,
+            value: `${normH}p`,
+            isLocked: plan === "free" && normH > 480,
           };
         });
 
-        // Filter unique resolutions in descending quality order
-        const uniqueLevels = [];
-        const seenHeights = new Set();
+        // Deduplicate resolutions keeping the highest bitrate entry for each resolution tier,
+        // and sort in descending resolution order (1080p -> 720p -> 480p -> 360p -> 240p)
+        const uniqueMap = new Map();
         for (const l of parsedLevels) {
-          if (!seenHeights.has(l.height) || l.value === "original") {
-            seenHeights.add(l.height);
-            uniqueLevels.push(l);
+          if (!uniqueMap.has(l.height)) {
+            uniqueMap.set(l.height, l);
           }
         }
-        uniqueLevels.sort((a, b) => b.height - a.height);
+        const uniqueLevels = Array.from(uniqueMap.values()).sort((a, b) => b.height - a.height);
         setAvailableLevels(uniqueLevels);
 
-        // STRICT FREE TIER RESOLUTION CLAMPING:
-        // Free tier must NEVER stream above 480p in Auto or Manual mode!
+        // FREE TIER RESOLUTION CLAMPING:
+        // Capped to 480p SD max on Free plan
         if (plan === "free" && hls.levels && hls.levels.length > 0) {
-          let highestFreeIdx = -1;
+          let maxFreeLevelIndex = -1;
           hls.levels.forEach((lvl, idx) => {
             const h = lvl.height || 0;
-            const br = lvl.bitrate || 0;
-            // Qualify if height <= 480 OR bitrate <= 1.2 Mbps (standard 480p is ~800k)
-            if ((h > 0 && h <= 480) || (h === 0 && br <= 1200000)) {
-              highestFreeIdx = Math.max(highestFreeIdx, idx);
+            const normH = h <= 200 ? 240 : h <= 300 ? 360 : h <= 500 ? 480 : h <= 750 ? 720 : 1080;
+            if (normH <= 480) {
+              maxFreeLevelIndex = Math.max(maxFreeLevelIndex, idx);
             }
           });
 
-          if (highestFreeIdx === -1) {
-            highestFreeIdx = Math.min(2, Math.max(0, Math.floor(hls.levels.length / 2) - 1));
+          if (maxFreeLevelIndex === -1) {
+            maxFreeLevelIndex = Math.min(2, Math.max(0, Math.floor(hls.levels.length / 2) - 1));
           }
 
           // Lock autoLevelCapping to 480p maximum
-          hls.autoLevelCapping = highestFreeIdx;
-
-          // Start immediately at low bitrate (240p/360p) for instant, zero-buffering playback
-          hls.startLevel = 0;
-          hls.nextLevel = 0;
-          hls.loadLevel = 0;
+          hls.autoLevelCapping = maxFreeLevelIndex;
+          hls.startLevel = 0; // Quick initial startup at lowest bandwidth
         } else if (hls.levels && hls.levels.length > 0) {
           hls.autoLevelCapping = -1;
         }
+
+        // Trigger seamless auto-playback
+        video.play().catch(() => {});
       });
 
       // Track active rendition changes in real time
       hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
         const lvl = hls.levels[data.level];
         if (lvl) {
-          const height = lvl.height || 720;
+          const rawH = lvl.height || 720;
+          const normH = rawH <= 200 ? 240 : rawH <= 300 ? 360 : rawH <= 500 ? 480 : rawH <= 750 ? 720 : 1080;
           const fps = lvl.attrs?.["FRAME-RATE"] ? Math.round(lvl.attrs["FRAME-RATE"]) : 60;
-          setActiveRendition(`${height}p @ ${fps}fps`);
+          setActiveRendition(`${normH}p @ ${fps}fps`);
         }
       });
 
@@ -620,6 +652,40 @@ const VideoPlayerModal = ({ file, isOpen, onClose, onChangeQuality }) => {
       }
     };
   }, [isOpen, activeFileId, plan, streamMode, reloadTrigger, triggerAutoRetry]);
+
+  // Seamless background probe: When playing in direct-mp4 mode, check if Cloud HLS transcode has completed
+  useEffect(() => {
+    if (!isOpen || streamMode !== "direct-mp4") return;
+
+    const hlsCandidate = activeFile?.cdnHlsUrl || activeFile?.hlsUrl || activeFile?.hls_master_url;
+    if (!hlsCandidate || !hlsCandidate.includes(".m3u8")) return;
+
+    let isCancelled = false;
+    const probeInterval = setInterval(async () => {
+      try {
+        const res = await fetch(hlsCandidate, { method: "HEAD", cache: "no-cache" });
+        if (res.ok && !isCancelled) {
+          console.info("[VideoPlayerModal] Cloud HLS transcode completed! Seamlessly switching to Netflix-grade ABR stream.");
+          if (videoRef.current && videoRef.current.currentTime > 0) {
+            savedPlaybackTimeRef.current = videoRef.current.currentTime;
+          }
+          setStreamMode("hls");
+          setReloadTrigger((t) => t + 1);
+          dispatch(
+            setToast({
+              type: "success",
+              message: "🚀 Cloud Transcoding Complete! Switched to Netflix-grade Adaptive Bitrate Streaming.",
+            })
+          );
+        }
+      } catch (_) {}
+    }, 12000);
+
+    return () => {
+      isCancelled = true;
+      clearInterval(probeInterval);
+    };
+  }, [isOpen, streamMode, activeFile, dispatch]);
 
   // Real-Time Adaptive FPS & Hardware Performance Engine Loop
   useEffect(() => {
@@ -860,128 +926,156 @@ const VideoPlayerModal = ({ file, isOpen, onClose, onChangeQuality }) => {
     resetControlsTimeout();
   };
 
-  // Adaptive Quality Selection & Manual Level Switcher
-  const handleQualitySelect = (targetQuality) => {
+  // Adaptive Quality Selection & Manual Level Switcher with Timestamp Preservation
+  const handleQualitySelect = (targetQuality, targetLevelIndex) => {
+    const video = videoRef.current;
     const hls = hlsRef.current;
-
-    if (targetQuality === "auto") {
-      setSelectedQuality("auto");
-      setActiveRendition("Auto");
-      if (hls && hls.levels && hls.levels.length > 0) {
-        if (plan === "free") {
-          let highestFreeIdx = -1;
-          hls.levels.forEach((lvl, idx) => {
-            const h = lvl.height || 0;
-            const br = lvl.bitrate || 0;
-            if ((h > 0 && h <= 480) || (h === 0 && br <= 1200000)) {
-              highestFreeIdx = Math.max(highestFreeIdx, idx);
-            }
-          });
-          if (highestFreeIdx === -1) highestFreeIdx = Math.min(2, hls.levels.length - 1);
-          hls.autoLevelCapping = highestFreeIdx;
-        } else {
-          hls.autoLevelCapping = -1;
-        }
-        hls.currentLevel = -1; // Resume Auto Adaptive Bitrate
-        hls.nextLevel = -1;
-        hls.loadLevel = -1;
-      }
-      dispatch(
-        setToast({
-          type: "info",
-          message: plan === "free" ? "Adaptive Engine active (Free Tier capped at 480p SD)." : "Adaptive FPS & Bitrate Engine engaged (Optimal playback).",
-        })
-      );
-      setShowQualityMenu(false);
-      resetControlsTimeout();
-      return;
-    }
-
-    if (targetQuality === "original") {
-      if (plan === "free") {
-        setUpgradeTargetQuality("Original Source Quality");
-        setShowUpgradePrompt(true);
-        setShowQualityMenu(false);
-        resetControlsTimeout();
-        return;
-      }
-      setSelectedQuality("original");
-      if (hls && hls.levels && hls.levels.length > 0) {
-        const topIdx = hls.levels.length - 1;
-        hls.currentLevel = topIdx;
-        hls.nextLevel = topIdx;
-        hls.loadLevel = topIdx;
-        setActiveRendition(hls.levels[topIdx]?.height ? `${hls.levels[topIdx].height}p (Source)` : "Original");
-      } else {
-        setActiveRendition("Original (Source)");
-      }
-      dispatch(
-        setToast({
-          type: "info",
-          message: "Video stream locked to Original Source Quality (No Limit).",
-        })
-      );
-      setShowQualityMenu(false);
-      resetControlsTimeout();
-      return;
-    }
+    if (!video) return;
 
     // Check Free Tier plan restriction for 720p and 1080p (Free tier locked to 480p max)
-    if ((targetQuality.startsWith("1080") || targetQuality.startsWith("720")) && plan === "free") {
-      setUpgradeTargetQuality(targetQuality.startsWith("1080") ? "1080p Full HD" : "720p HD");
+    const isHdQuality =
+      targetQuality.startsWith("1080") ||
+      targetQuality.startsWith("720") ||
+      targetQuality === "original";
+
+    if (isHdQuality && plan === "free") {
+      setUpgradeTargetQuality(
+        targetQuality.startsWith("1080") ? "1080p Full HD" : "720p HD"
+      );
       setShowUpgradePrompt(true);
       setShowQualityMenu(false);
       resetControlsTimeout();
       return;
     }
 
+    // Save exact playback timestamp and playback state BEFORE any level adjustments
+    const savedTime = video.currentTime;
+    const wasPlaying = !video.paused;
+
     setSelectedQuality(targetQuality);
 
-    if (hls && hls.levels && hls.levels.length > 0) {
-      const targetHeight = parseInt(targetQuality, 10);
-      let matchIdx = hls.levels.findIndex((lvl) => Math.abs((lvl.height || 0) - targetHeight) <= 25);
-      if (matchIdx === -1) {
-        const expectedBitrates = { 240: 200000, 360: 400000, 480: 800000, 720: 1800000, 1080: 3500000 };
-        const exp = expectedBitrates[targetHeight];
-        if (exp) {
-          matchIdx = hls.levels.reduce((closest, lvl, idx) => {
-            if (closest === -1) return idx;
-            const diff1 = Math.abs((lvl.bitrate || 0) - exp);
-            const diff2 = Math.abs((hls.levels[closest].bitrate || 0) - exp);
-            return diff1 < diff2 ? idx : closest;
-          }, -1);
+    if (targetQuality === "auto") {
+      setActiveRendition("Auto");
+      if (hls && hls.levels && hls.levels.length > 0) {
+        if (plan === "free") {
+          let maxFreeLevelIndex = -1;
+          hls.levels.forEach((lvl, idx) => {
+            const h = lvl.height || 0;
+            const normH =
+              h <= 200 ? 240 : h <= 300 ? 360 : h <= 500 ? 480 : h <= 750 ? 720 : 1080;
+            if (normH <= 480) {
+              maxFreeLevelIndex = Math.max(maxFreeLevelIndex, idx);
+            }
+          });
+          hls.autoLevelCapping = maxFreeLevelIndex !== -1 ? maxFreeLevelIndex : 0;
+        } else {
+          hls.autoLevelCapping = -1;
         }
+        hls.currentLevel = -1; // Re-engage automatic ABR
+        hls.nextLevel = -1;
       }
-
-      if (matchIdx !== -1) {
-        // Lock manual level so ABR is disabled and does NOT bounce back to 1080p!
-        hls.currentLevel = matchIdx;
-        hls.loadLevel = matchIdx;
-        hls.nextLevel = matchIdx;
-        const actualH = hls.levels[matchIdx]?.height || targetHeight;
-        const fps = hls.levels[matchIdx]?.attrs?.["FRAME-RATE"] ? Math.round(hls.levels[matchIdx].attrs["FRAME-RATE"]) : 60;
-        setActiveRendition(`${actualH}p @ ${fps}fps`);
-      }
-    } else if (!hls) {
-      setActiveRendition(targetQuality);
       dispatch(
         setToast({
           type: "info",
-          message: `Direct MP4 mode active. Cloud HLS transcoding is required for multi-bitrate ${targetQuality} switching.`,
+          message:
+            plan === "free"
+              ? "Adaptive Engine active (Free Tier capped at 480p SD)."
+              : "Adaptive Bitrate Engine engaged (Optimal playback).",
+        })
+      );
+    } else {
+      // Manual Quality Selection
+      if (hls && hls.levels && hls.levels.length > 0) {
+        let matchIdx = -1;
+        if (
+          typeof targetLevelIndex === "number" &&
+          targetLevelIndex >= 0 &&
+          targetLevelIndex < hls.levels.length
+        ) {
+          matchIdx = targetLevelIndex;
+        } else {
+          const targetHeight = parseInt(targetQuality, 10);
+          matchIdx = hls.levels.findIndex((lvl) => {
+            const rawH = lvl.height || 0;
+            const normH =
+              rawH <= 200 ? 240 : rawH <= 300 ? 360 : rawH <= 500 ? 480 : rawH <= 750 ? 720 : 1080;
+            return normH === targetHeight || Math.abs(rawH - targetHeight) <= 60;
+          });
+
+          if (matchIdx === -1) {
+            matchIdx = hls.levels.reduce((closest, lvl, idx) => {
+              if (closest === -1) return idx;
+              const diff1 = Math.abs((lvl.height || 0) - targetHeight);
+              const diff2 = Math.abs((hls.levels[closest].height || 0) - targetHeight);
+              return diff1 < diff2 ? idx : closest;
+            }, -1);
+          }
+        }
+
+        if (matchIdx !== -1) {
+          // Switch to exact level without buffer destruction
+          hls.currentLevel = matchIdx;
+          hls.nextLevel = matchIdx;
+          const lvl = hls.levels[matchIdx];
+          const rawH = lvl?.height || parseInt(targetQuality, 10);
+          const normH =
+            rawH <= 200 ? 240 : rawH <= 300 ? 360 : rawH <= 500 ? 480 : rawH <= 750 ? 720 : 1080;
+          const fps = lvl?.attrs?.["FRAME-RATE"]
+            ? Math.round(lvl.attrs["FRAME-RATE"])
+            : 60;
+          setActiveRendition(`${normH}p @ ${fps}fps`);
+        }
+      } else if (!hls) {
+        setActiveRendition(targetQuality);
+      }
+
+      dispatch(
+        setToast({
+          type: "info",
+          message: `Video stream locked to ${targetQuality}.`,
         })
       );
     }
 
-    if (onChangeQuality && file?.id) {
-      onChangeQuality(file.id, targetQuality);
+    // Critical: Timestamp preservation across quality switch
+    // Guard against Hls.js buffer flush or browser video element seeking to 0:00
+    if (savedTime > 0) {
+      if (Math.abs(video.currentTime - savedTime) > 0.5) {
+        video.currentTime = savedTime;
+      }
+      if (wasPlaying && video.paused) {
+        video.play().catch(() => {});
+      }
+
+      // Next tick / RAF verification
+      requestAnimationFrame(() => {
+        if (video && savedTime > 0 && Math.abs(video.currentTime - savedTime) > 0.5) {
+          video.currentTime = savedTime;
+          if (wasPlaying && video.paused) {
+            video.play().catch(() => {});
+          }
+        }
+      });
+
+      // Temporary 1.2s timeupdate guard
+      const protectTimestamp = () => {
+        if (video && savedTime > 0 && video.currentTime < 0.5 && savedTime >= 1.0) {
+          video.currentTime = savedTime;
+          if (wasPlaying && video.paused) {
+            video.play().catch(() => {});
+          }
+        }
+      };
+      video.addEventListener("timeupdate", protectTimestamp);
+      setTimeout(() => {
+        video.removeEventListener("timeupdate", protectTimestamp);
+      }, 1200);
     }
 
-    dispatch(
-      setToast({
-        type: "info",
-        message: `Video stream locked to ${targetQuality}.`,
-      })
-    );
+    if (onChangeQuality) {
+      onChangeQuality(targetQuality);
+    }
+
     setShowQualityMenu(false);
     resetControlsTimeout();
   };
@@ -992,10 +1086,10 @@ const VideoPlayerModal = ({ file, isOpen, onClose, onChangeQuality }) => {
     dispatch(
       setToast({
         type: "success",
-        message: "🎉 Upgraded to Pro Cloud! 1080p Full HD & Original Source streaming unlocked.",
+        message: "🎉 Upgraded to Pro Cloud! 1080p Full HD & High-Bitrate streaming unlocked.",
       })
     );
-    const target = upgradeTargetQuality.includes("Original") ? "original" : upgradeTargetQuality.includes("1080") ? "1080p" : "720p";
+    const target = upgradeTargetQuality.includes("1080") ? "1080p" : "720p";
     setTimeout(() => {
       handleQualitySelect(target);
     }, 150);
@@ -1004,18 +1098,11 @@ const VideoPlayerModal = ({ file, isOpen, onClose, onChangeQuality }) => {
   const progressPercent = duration ? (currentTime / duration) * 100 : 0;
   const bufferedPercent = duration ? (bufferedEnd / duration) * 100 : 0;
 
-  // Fallback qualities if levels not yet parsed (6-tier ladder)
+  // Fallback qualities if levels not yet parsed (5-tier ladder)
   const renderedQualities =
     availableLevels.length > 0
       ? availableLevels
       : [
-          {
-            label: "Original (Source Quality - No Limit)",
-            value: "original",
-            bitrate: "8.0+ Mbps",
-            fps: 60,
-            isLocked: plan === "free",
-          },
           {
             label: "1080p Full HD",
             value: "1080p",
@@ -1033,25 +1120,27 @@ const VideoPlayerModal = ({ file, isOpen, onClose, onChangeQuality }) => {
           {
             label: "480p SD",
             value: "480p",
-            bitrate: "800 Kbps",
-            fps: 30,
+            bitrate: "800 kbps",
+            fps: 60,
             isLocked: false,
           },
           {
             label: "360p Low",
             value: "360p",
-            bitrate: "400 Kbps",
+            bitrate: "400 kbps",
             fps: 30,
             isLocked: false,
           },
           {
-            label: "240p Ultra-Low (3G)",
+            label: "240p Ultra-Low",
             value: "240p",
-            bitrate: "200 Kbps",
-            fps: 24,
+            bitrate: "200 kbps",
+            fps: 30,
             isLocked: false,
           },
         ];
+
+  if (!isOpen || !file) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6 bg-black/85 backdrop-blur-md animate-in fade-in duration-200 select-none">
@@ -1073,7 +1162,7 @@ const VideoPlayerModal = ({ file, isOpen, onClose, onChangeQuality }) => {
               <Film className="w-4 h-4 stroke-[2]" />
             </div>
             <div className="min-w-0">
-              <h3 className="text-sm font-semibold text-white truncate drop-shadow-md">{file.name}</h3>
+              <h3 className="text-sm font-semibold text-white truncate drop-shadow-md">{activeFile?.name || file?.name || "Video"}</h3>
               <p className="text-xs text-slate-300 flex items-center gap-2 mt-0.5 font-mono drop-shadow-sm">
                 <span className="flex items-center gap-1.5 text-emerald-400">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -1081,11 +1170,11 @@ const VideoPlayerModal = ({ file, isOpen, onClose, onChangeQuality }) => {
                     ? (selectedQuality === "auto"
                         ? (plan === "free" ? "Auto (480p SD)" : "Auto ABR")
                         : "Locked")
-                    : "Direct MP4"}
+                    : "Direct MP4 (Transcoding in cloud...)"}
                 </span>
                 <span className="text-white/30">•</span>
                 <span className="text-blue-300 font-medium">
-                  {hlsRef.current ? activeRendition : "Original Source"}
+                  {hlsRef.current ? activeRendition : "Original 4K"}
                 </span>
                 <span className="text-white/30">•</span>
                 <span className="text-slate-400">{Math.round(liveFps)} FPS</span>
@@ -1094,6 +1183,8 @@ const VideoPlayerModal = ({ file, isOpen, onClose, onChangeQuality }) => {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+
+
             {/* Stream Diagnostics HUD Toggle */}
             <button
               onClick={() => setShowDiagnostics((prev) => !prev)}
@@ -1161,10 +1252,16 @@ const VideoPlayerModal = ({ file, isOpen, onClose, onChangeQuality }) => {
                 }
               }
             }}
-            onWaiting={() => setIsBuffering(true)}
+            onWaiting={() => {
+              if (videoRef.current && !videoRef.current.paused) {
+                setIsBuffering(true);
+              }
+            }}
             onStalled={() => {
-              console.warn("[VideoPlayerModal] Media download stalled on 3G cellular network");
-              setIsBuffering(true);
+              // Benign stall on Range chunks: only set buffering if video is starved and unpaused
+              if (videoRef.current && videoRef.current.readyState < 3 && !videoRef.current.paused) {
+                setIsBuffering(true);
+              }
             }}
             onPlaying={() => {
               setIsBuffering(false);
@@ -1380,16 +1477,26 @@ const VideoPlayerModal = ({ file, isOpen, onClose, onChangeQuality }) => {
           {showDiagnostics && (
             <div
               onClick={(e) => e.stopPropagation()}
-              className="absolute top-4 left-4 p-3.5 rounded-2xl bg-slate-950/90 border border-slate-800/90 backdrop-blur-md shadow-2xl z-30 font-mono text-xs w-72 pointer-events-auto animate-in fade-in slide-in-from-top-2 duration-150"
+              className="absolute top-16 left-4 p-3.5 rounded-2xl bg-slate-950/90 border border-slate-800/90 backdrop-blur-md shadow-2xl z-30 font-mono text-xs w-72 pointer-events-auto animate-in fade-in slide-in-from-top-2 duration-150"
             >
               <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2.5">
                 <span className="font-semibold text-white flex items-center gap-1.5">
                   <Activity className="w-3.5 h-3.5 text-[#1a73e8]" />
                   Engine Diagnostics
                 </span>
-                <span className="text-[10px] text-emerald-400 bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-800/50">
-                  LIVE
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-emerald-400 bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-800/50">
+                    LIVE
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowDiagnostics(false)}
+                    className="text-slate-400 hover:text-white p-0.5 rounded transition-colors"
+                    title="Close Diagnostics (d)"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-1.5 text-[11px]">
@@ -1640,7 +1747,7 @@ const VideoPlayerModal = ({ file, isOpen, onClose, onChangeQuality }) => {
                       {renderedQualities.map((q) => (
                         <button
                           key={q.value}
-                          onClick={() => handleQualitySelect(q.value)}
+                          onClick={() => handleQualitySelect(q.value, q.levelIndex)}
                           className={`w-full px-3 py-2 text-left flex items-center justify-between hover:bg-slate-800 transition-colors ${
                             selectedQuality === q.value
                               ? "text-[#1a73e8] font-bold bg-blue-950/20"

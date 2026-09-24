@@ -9,6 +9,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import { getOrRenewIdToken } from "../features/auth/api/authApi.jsx";
+import axiosInstance from "../shared/api/axiosClient.jsx";
 
 // Minimum S3 multipart upload chunk size: 5MB
 export const MULTIPART_CHUNK_SIZE = 5 * 1024 * 1024;
@@ -27,6 +28,31 @@ const getApiBaseUrl = () => {
   return envUrl.replace(/\/+$/, "");
 };
 
+/** Resolve robust MIME type from file.type or file extension */
+export function resolveMimeType(file) {
+  if (file.type && file.type !== "application/octet-stream" && file.type !== "binary/octet-stream") {
+    return file.type.toLowerCase();
+  }
+  const ext = (file.name || "").split(".").pop().toLowerCase();
+  const mimeMap = {
+    mp4: "video/mp4",
+    mov: "video/quicktime",
+    mkv: "video/x-matroska",
+    webm: "video/webm",
+    avi: "video/x-msvideo",
+    m4v: "video/mp4",
+    "3gp": "video/3gpp",
+    ts: "video/mp2t",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    webp: "image/webp",
+    gif: "image/gif",
+    pdf: "application/pdf",
+  };
+  return mimeMap[ext] || "application/octet-stream";
+}
+
 /**
  * Low-level function to upload a file via S3 multipart chunks.
  *
@@ -42,42 +68,96 @@ export async function uploadFileMultipart(file, options = {}) {
 
   const idToken = await getOrRenewIdToken();
   if (!idToken) {
-    throw new Error("Authentication required. Please sign in again.");
+    throw new Error("Your authentication session has expired. Please sign in again.");
   }
 
-  const apiBase = getApiBaseUrl();
-  const endpoint = apiBase ? `${apiBase}/upload-url` : "/upload-url";
-  const authHeaders = {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${idToken}`,
-  };
+  const detectedMime = resolveMimeType(file);
 
-  // Step 1: Initiate S3 Multipart Upload
-  const initRes = await fetch(endpoint, {
-    method: "POST",
-    headers: authHeaders,
-    body: JSON.stringify({
-      action: "initiate_multipart",
-      file_name: file.name,
-      file_type: (file.type || "application/octet-stream").toLowerCase(),
-      file_size: file.size,
-    }),
-    signal,
-  });
-
-  if (!initRes.ok) {
-    let errMessage = `Failed to initiate multipart upload (HTTP ${initRes.status})`;
-    try {
-      const data = await initRes.json();
-      if (data?.error) errMessage = data.error;
-    } catch (_) {}
-    throw new Error(errMessage);
+  // Step 1: Initiate S3 Multipart Upload via authenticated Axios client
+  let initData;
+  try {
+    const initRes = await axiosInstance.post(
+      "/upload-url",
+      {
+        action: "initiate_multipart",
+        file_name: file.name,
+        file_type: detectedMime,
+        file_size: file.size,
+      },
+      { signal }
+    );
+    initData = initRes.data;
+  } catch (err) {
+    if (err.response?.status === 401) {
+      throw new Error("Your authentication session has expired (HTTP 401). Please sign in again.");
+    }
+    const msg = err.response?.data?.error || err.message || `Failed to initiate multipart upload (${err.response?.status || "network error"}).`;
+    throw new Error(msg);
   }
-
-  const initData = await initRes.json();
   const uploadId = initData.upload_id || initData.uploadId;
-  const s3Key = initData.s3_key || initData.file_key || initData.fileKey;
+  const s3Key = initData.s3_key || initData.file_key || initData.fileKey || initData.s3_raw_key;
   const fileId = initData.file_id || initData.fileId;
+
+  // Seamless fallback: If backend returns direct presigned PUT URL (S3 supports up to 5 GB single-part PUT)
+  if (!uploadId && initData.upload_url) {
+    const uploadUrl = initData.upload_url;
+    const resolvedFileId = fileId || `file_${Date.now()}`;
+    const resolvedS3Key = s3Key || `raw/${file.name}`;
+
+    // Inspect signed headers
+    let signedHeaders = [];
+    try {
+      const urlObj = new URL(uploadUrl);
+      const signedParam = urlObj.searchParams.get("X-Amz-SignedHeaders");
+      if (signedParam) signedHeaders = signedParam.toLowerCase().split(";");
+    } catch (_) {}
+
+    await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      onXhrCreated?.(xhr);
+
+      if (signal) {
+        signal.addEventListener("abort", () => xhr.abort(), { once: true });
+      }
+
+      xhr.upload.onprogress = (evt) => {
+        if (evt.lengthComputable && evt.total > 0) {
+          const percent = Math.min(99, Math.round((evt.loaded / evt.total) * 100));
+          onProgress?.(percent, xhr);
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          onProgress?.(100, xhr);
+          resolve();
+        } else {
+          reject(new Error(`S3 direct upload failed with HTTP ${xhr.status}. Check CORS/permissions.`));
+        }
+      };
+
+      xhr.onerror = () => reject(new Error("Network error during S3 upload. Check internet connection or CORS."));
+      xhr.onabort = () => reject(new Error("Upload cancelled by user."));
+
+      xhr.open("PUT", uploadUrl, true);
+      onProgress?.(0, xhr);
+
+      const contentType = detectedMime;
+      if (signedHeaders.length === 0 || signedHeaders.includes("content-type")) {
+        xhr.setRequestHeader("Content-Type", contentType);
+      }
+      xhr.send(file);
+    });
+
+    return {
+      file_id: resolvedFileId,
+      s3_key: resolvedS3Key,
+      file_name: file.name,
+      file_size: file.size,
+      file_type: detectedMime,
+      status: "PENDING_PROCESSING",
+    };
+  }
 
   if (!uploadId || !s3Key) {
     throw new Error("Backend did not return valid multipart upload identifiers.");
@@ -108,24 +188,26 @@ export async function uploadFileMultipart(file, options = {}) {
       }
 
       try {
-        // Fetch presigned URL for this specific part (routed through S3 Transfer Acceleration)
-        const partUrlRes = await fetch(endpoint, {
-          method: "POST",
-          headers: authHeaders,
-          body: JSON.stringify({
-            action: "part_url",
-            file_key: s3Key,
-            upload_id: uploadId,
-            part_number: partNumber,
-          }),
-          signal,
-        });
-
-        if (!partUrlRes.ok) {
-          throw new Error(`Failed to get presigned URL for part ${partNumber} (HTTP ${partUrlRes.status})`);
+        // Fetch presigned URL for this specific part via authenticated Axios client
+        let partUrlData;
+        try {
+          const partUrlRes = await axiosInstance.post(
+            "/upload-url",
+            {
+              action: "part_url",
+              file_key: s3Key,
+              upload_id: uploadId,
+              part_number: partNumber,
+            },
+            { signal }
+          );
+          partUrlData = partUrlRes.data;
+        } catch (err) {
+          if (err.response?.status === 401) {
+            throw new Error("Your authentication session has expired. Please sign in again.");
+          }
+          throw new Error(`Failed to get presigned URL for part ${partNumber}: ${err.message}`);
         }
-
-        const partUrlData = await partUrlRes.json();
         const presignedUrl = partUrlData.presigned_url || partUrlData.presignedUrl;
         if (!presignedUrl) {
           throw new Error(`Presigned URL missing for part ${partNumber}`);
@@ -200,27 +282,25 @@ export async function uploadFileMultipart(file, options = {}) {
     }
   }
 
-  // Step 3: Complete Multipart Upload
-  const completeRes = await fetch(endpoint, {
-    method: "POST",
-    headers: authHeaders,
-    body: JSON.stringify({
-      action: "complete_multipart",
-      file_key: s3Key,
-      upload_id: uploadId,
-      file_id: fileId,
-      parts: completedParts,
-    }),
-    signal,
-  });
-
-  if (!completeRes.ok) {
-    let errMessage = `Failed to finalize multipart upload (HTTP ${completeRes.status})`;
-    try {
-      const data = await completeRes.json();
-      if (data?.error) errMessage = data.error;
-    } catch (_) {}
-    throw new Error(errMessage);
+  // Step 3: Complete Multipart Upload via authenticated Axios client
+  try {
+    await axiosInstance.post(
+      "/upload-url",
+      {
+        action: "complete_multipart",
+        file_key: s3Key,
+        upload_id: uploadId,
+        file_id: fileId,
+        parts: completedParts,
+      },
+      { signal }
+    );
+  } catch (err) {
+    if (err.response?.status === 401) {
+      throw new Error("Your authentication session has expired. Please sign in again.");
+    }
+    const msg = err.response?.data?.error || err.message || `Failed to finalize multipart upload (${err.response?.status || "network error"}).`;
+    throw new Error(msg);
   }
 
   onProgress?.(100);
