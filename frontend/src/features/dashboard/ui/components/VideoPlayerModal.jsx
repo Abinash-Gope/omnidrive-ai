@@ -1703,80 +1703,70 @@ const VideoPlayerModal = ({ file, isOpen, onClose, onChangeQuality }) => {
                   </button>
 
                   {showQualityMenu && (
-                    <div className="absolute bottom-full right-0 mb-2 w-64 rounded-xl bg-slate-900 border border-slate-700 shadow-2xl overflow-hidden py-1 text-xs z-30">
-                      <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-800/80 flex items-center justify-between">
-                        <span>Quality & Bitrate</span>
+                    <div className="absolute bottom-full right-0 mb-3 w-48 rounded-2xl bg-slate-900/95 backdrop-blur-xl border border-white/10 shadow-[0_12px_40px_rgba(0,0,0,0.85)] overflow-hidden p-1.5 text-xs z-30 animate-in fade-in slide-in-from-bottom-2 duration-150">
+                      <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400 border-b border-white/10 flex items-center justify-between">
+                        <span>Quality</span>
                         {plan === "free" && (
-                          <span className="text-[10px] text-amber-400 font-normal">Free: 480p Max (Upgrade for HD)</span>
+                          <span className="text-[10px] text-amber-400/90 font-medium">Free: 480p max</span>
                         )}
                       </div>
 
-                      {!hlsRef.current && (
-                        <div className="px-3 py-1.5 bg-blue-500/10 border-b border-blue-500/20 text-[10px] text-blue-300 flex items-center gap-1.5">
-                          <Zap className="w-3 h-3 text-amber-400 shrink-0" />
-                          <span>Direct MP4 • Cloud HLS transcode in progress</span>
-                        </div>
-                      )}
-
-                      {/* Auto Adaptive FPS Option */}
-                      <button
-                        onClick={() => handleQualitySelect("auto")}
-                        className={`w-full px-3 py-2 text-left flex items-center justify-between hover:bg-slate-800 transition-colors border-b border-slate-800/60 ${
-                          selectedQuality === "auto"
-                            ? "text-[#1a73e8] font-bold bg-blue-950/20"
-                            : "text-white"
-                        }`}
-                      >
-                        <div>
-                          <div className="flex items-center gap-1.5 font-medium">
-                            <Zap className="w-3.5 h-3.5 text-amber-400" />
-                            <span>
-                              {plan === "free" ? "Auto (Adaptive up to 480p SD)" : "Auto (Adaptive FPS)"}
-                            </span>
-                          </div>
-                          <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                            {plan === "free"
-                              ? "Capped at 480p • Zero buffering on 3G"
-                              : "Optimal buffer & hardware sync up to 1080p"}
-                          </div>
-                        </div>
-                        {selectedQuality === "auto" && <Check className="w-4 h-4 text-[#1a73e8]" />}
-                      </button>
-
-                      {/* Rendition Levels */}
-                      {renderedQualities.map((q) => (
+                      <div className="py-1 space-y-0.5">
+                        {/* Auto Quality Option */}
                         <button
-                          key={q.value}
-                          onClick={() => handleQualitySelect(q.value, q.levelIndex)}
-                          className={`w-full px-3 py-2 text-left flex items-center justify-between hover:bg-slate-800 transition-colors ${
-                            selectedQuality === q.value
-                              ? "text-[#1a73e8] font-bold bg-blue-950/20"
-                              : q.isLocked
-                              ? "text-slate-400 hover:text-slate-300"
-                              : "text-white"
+                          type="button"
+                          onClick={() => handleQualitySelect("auto")}
+                          className={`w-full px-3 py-2 text-left rounded-xl flex items-center justify-between hover:bg-white/10 transition-colors ${
+                            selectedQuality === "auto"
+                              ? "text-blue-400 font-semibold bg-blue-500/10"
+                              : "text-slate-200"
                           }`}
                         >
-                          <div>
-                            <div className="flex items-center gap-1.5 font-medium">
-                              <span>{q.label}</span>
-                              {q.isLocked && (
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                                  <Lock className="w-2.5 h-2.5" />
-                                  Pro
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-[10px] text-slate-400 font-mono mt-0.5 flex items-center gap-2">
-                              <span>{q.bitrate}</span>
-                              <span>•</span>
-                              <span>{q.fps || 60} FPS</span>
-                            </div>
+                          <div className="flex items-center gap-2">
+                            <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+                            <span>Auto</span>
                           </div>
-                          {selectedQuality === q.value && (
-                            <Check className="w-4 h-4 text-[#1a73e8]" />
-                          )}
+                          {selectedQuality === "auto" && <Check className="w-4 h-4 text-blue-400" />}
                         </button>
-                      ))}
+
+                        <div className="my-1 border-t border-white/5" />
+
+                        {/* Rendition Levels (1080p, 720p, 480p, etc.) */}
+                        {renderedQualities.map((q) => {
+                          const isSelected = selectedQuality === q.value;
+                          const isHd = q.value === "1080p" || q.value === "720p";
+                          return (
+                            <button
+                              key={q.value}
+                              type="button"
+                              onClick={() => handleQualitySelect(q.value, q.levelIndex)}
+                              className={`w-full px-3 py-2 text-left rounded-xl flex items-center justify-between hover:bg-white/10 transition-colors ${
+                                isSelected
+                                  ? "text-blue-400 font-semibold bg-blue-500/10"
+                                  : q.isLocked
+                                  ? "text-slate-400 hover:text-slate-200"
+                                  : "text-slate-200"
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span>{q.value}</span>
+                                {isHd && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-white/10 text-slate-300 tracking-wider">
+                                    HD
+                                  </span>
+                                )}
+                                {q.isLocked && (
+                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-medium bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                    <Lock className="w-2.5 h-2.5" />
+                                    Pro
+                                  </span>
+                                )}
+                              </div>
+                              {isSelected && <Check className="w-4 h-4 text-blue-400" />}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>

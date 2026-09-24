@@ -63,6 +63,27 @@ export const getFilesApi = async () => {
           contentTypeLower.includes("pdf") ||
           fileNameLower.endsWith(".pdf");
 
+        const isImageFormat = (url) => {
+          if (!url || typeof url !== "string") return false;
+          if (url.startsWith("data:image/") || url.startsWith("blob:")) return true;
+          if (/\.(mp4|mov|mkv|webm|m3u8|avi)(\?.*)?$/i.test(url)) return false;
+          return /\.(jpe?g|png|webp|gif|svg|avif)(\?.*)?$/i.test(url);
+        };
+
+        const cdnVideoThumbnail = isVideo && fileId
+          ? `https://d3by850sf4vvuz.cloudfront.net/hls/${fileId}/thumbnail.0000000.jpg`
+          : null;
+
+        const resolvedThumb = isVideo
+          ? (isImageFormat(item.thumbnail_url)
+              ? item.thumbnail_url
+              : isImageFormat(item.thumbnailUrl)
+              ? item.thumbnailUrl
+              : (item.hls_master_url || item.hlsUrl || item.status === "COMPLETED")
+              ? cdnVideoThumbnail
+              : (cachedThumb || cdnVideoThumbnail || null))
+          : (item.thumbnail_url || item.download_url || cachedThumb || null);
+
         return {
           id: fileId,
           name: fileName,
@@ -92,11 +113,8 @@ export const getFilesApi = async () => {
                 model: "OmniDrive Neural Engine",
               }
             : item.summary || null,
-          // Resolve thumbnail: for images prefer thumbnail_url -> download_url -> cachedThumb.
-          // For videos, NEVER set raw .mp4 download_url as thumbnail (it breaks <img> tags).
-          thumbnail: isVideo
-            ? (item.thumbnail_url || cachedThumb || null)
-            : (item.thumbnail_url || item.download_url || cachedThumb || null),
+          thumbnail: resolvedThumb,
+          thumbnail_url: resolvedThumb,
           // Expose raw download_url so players and preview components can stream directly
           downloadUrl: item.download_url || null,
           hlsUrl: item.hls_master_url || item.hls_url || null,
