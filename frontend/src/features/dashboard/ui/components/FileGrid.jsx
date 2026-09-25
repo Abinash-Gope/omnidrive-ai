@@ -20,6 +20,9 @@ import {
   ArrowUpZA,
   HardDrive,
   Folder,
+  FileCode,
+  Music,
+  Archive,
 } from "lucide-react";
 import FileCard from "./FileCard.jsx";
 import FileGridSkeleton from "./FileGridSkeleton.jsx";
@@ -87,7 +90,10 @@ const FileGrid = ({
     { id: "all", label: "All Files" },
     { id: "video", label: "Videos (HLS)", icon: Film },
     { id: "image", label: "Images (Vision AI)", icon: ImageIcon },
-    { id: "pdf", label: "PDFs (GenAI Summary)", icon: FileText },
+    { id: "document", label: "Documents (PDF, Office)", icon: FileText },
+    { id: "code", label: "Code & Data", icon: FileCode },
+    { id: "audio", label: "Audio", icon: Music },
+    { id: "archive", label: "Archives", icon: Archive },
   ];
 
   const sortOptions = [

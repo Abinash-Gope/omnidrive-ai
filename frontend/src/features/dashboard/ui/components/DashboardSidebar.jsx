@@ -140,7 +140,6 @@ const DashboardSidebar = ({
             ref={fileInputRef}
             onChange={handleFileChange}
             className="hidden"
-            accept="video/*,image/*,application/pdf"
             multiple
           />
           <button

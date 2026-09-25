@@ -460,37 +460,37 @@ const PdfStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
   return (
     <div
       style={{ maxHeight: "calc(100vh - 105px)" }}
-      className="w-full h-full max-w-5xl flex flex-col rounded-3xl border border-white/10 bg-slate-900/80 backdrop-blur-2xl shadow-2xl overflow-hidden relative select-none"
+      className="w-full h-full max-w-5xl flex flex-col rounded-3xl border border-slate-200/80 dark:border-white/10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-3xl shadow-2xl overflow-hidden relative select-none"
     >
       {/* Standardized Studio In-Stage Header Toolbar */}
-      <div className="h-12 px-4 sm:px-5 bg-slate-900/90 border-b border-white/10 flex items-center justify-between text-slate-300 shrink-0 z-30">
+      <div className="h-12 px-4 sm:px-5 bg-white/85 dark:bg-slate-900/85 border-b border-slate-200/80 dark:border-white/10 flex items-center justify-between text-slate-700 dark:text-slate-300 shrink-0 z-30 backdrop-blur-xl">
         {/* Left: Format & Pagination */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <FileText className="w-4 h-4 text-purple-400 shrink-0" />
-          <span className="font-semibold text-white text-xs truncate max-w-[150px] sm:max-w-xs font-sans">
+          <FileText className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
+          <span className="font-semibold text-slate-900 dark:text-white text-xs truncate max-w-[150px] sm:max-w-xs font-sans">
             {fileName}
           </span>
-          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-purple-500/15 text-purple-300 border border-purple-500/30 font-mono shrink-0">
+          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 font-mono shrink-0">
             PDF
           </span>
 
           {/* Page Navigator */}
-          <div className="flex items-center gap-1 bg-black/40 border border-white/10 rounded-xl px-2 py-0.5 shrink-0">
+          <div className="flex items-center gap-1 bg-slate-100/90 dark:bg-black/40 border border-slate-200/80 dark:border-white/10 rounded-xl px-2 py-0.5 shrink-0">
             <button
               onClick={prevPage}
               disabled={pageNumber <= 1}
-              className="p-1 rounded-lg hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent text-slate-300 transition-colors"
+              className="p-1 rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent text-slate-700 dark:text-slate-300 transition-colors"
               title="Previous Page (←)"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
             </button>
-            <span className="text-[11px] font-mono text-slate-200 px-1">
+            <span className="text-[11px] font-mono text-slate-700 dark:text-slate-200 px-1">
               Page {pageNumber} {totalPages ? `of ${totalPages}` : ""}
             </span>
             <button
               onClick={nextPage}
               disabled={totalPages ? pageNumber >= totalPages : false}
-              className="p-1 rounded-lg hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent text-slate-300 transition-colors"
+              className="p-1 rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent text-slate-700 dark:text-slate-300 transition-colors"
               title="Next Page (→)"
             >
               <ChevronRight className="w-3.5 h-3.5" />
@@ -501,31 +501,31 @@ const PdfStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
         {/* Right: Actions (Zoom, AI Drawer Toggle, Share, Download, Close) */}
         <div className="flex items-center gap-1.5 sm:gap-2">
           {/* Zoom controls */}
-          <div className="flex items-center bg-black/40 border border-white/10 rounded-xl p-0.5">
+          <div className="flex items-center bg-slate-100/90 dark:bg-black/40 border border-slate-200/80 dark:border-white/10 rounded-xl p-0.5">
             <button
               onClick={zoomOut}
-              className="p-1.5 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white transition-colors"
+              className="p-1.5 rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
               title="Zoom Out (-)"
             >
               <ZoomOut className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={fitToScreen}
-              className="px-2 py-0.5 text-[11px] font-mono text-slate-300 hover:text-white"
+              className="px-2 py-0.5 text-[11px] font-mono text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
               title="Click to toggle Fit / 100%"
             >
               {Math.round(scale * 100)}%
             </button>
             <button
               onClick={zoomIn}
-              className="p-1.5 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white transition-colors"
+              className="p-1.5 rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
               title="Zoom In (+)"
             >
               <ZoomIn className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={fitToScreen}
-              className="p-1.5 rounded-lg hover:bg-white/10 text-purple-300 hover:text-white transition-colors border-l border-white/10 ml-0.5"
+              className="p-1.5 rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/10 text-purple-600 dark:text-purple-300 hover:text-purple-800 dark:hover:text-white transition-colors border-l border-slate-200/80 dark:border-white/10 ml-0.5"
               title="Fit to Window"
             >
               <Maximize2 className="w-3.5 h-3.5" />
@@ -538,11 +538,11 @@ const PdfStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${
               showAiDrawer
                 ? "bg-purple-600 text-white border-purple-500 shadow-md shadow-purple-500/30"
-                : "bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border-purple-500/30"
+                : "bg-purple-500/10 hover:bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/30"
             }`}
             title="Toggle Document Intelligence & AI Chat"
           >
-            <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
+            <Sparkles className="w-3.5 h-3.5 text-amber-500 dark:text-amber-300 animate-pulse" />
             <span className="hidden sm:inline font-sans">AI Insights</span>
           </button>
 
@@ -553,7 +553,7 @@ const PdfStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                 e.stopPropagation();
                 onShare();
               }}
-              className="p-1.5 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-slate-300 hover:text-white transition-colors"
+              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
               title="Copy share link"
             >
               <Share2 className="w-3.5 h-3.5" />
@@ -568,7 +568,7 @@ const PdfStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
               target="_blank"
               rel="noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="p-1.5 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-slate-300 hover:text-white transition-colors"
+              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
               title="Download PDF document"
             >
               <Download className="w-3.5 h-3.5" />
@@ -582,7 +582,7 @@ const PdfStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                 e.stopPropagation();
                 onClose();
               }}
-              className="p-1.5 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-white/80 hover:text-white transition-colors"
+              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-white/80 hover:text-slate-900 dark:hover:text-white transition-colors"
               title="Close viewer (Esc)"
             >
               <X className="w-4 h-4" />
@@ -601,13 +601,13 @@ const PdfStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
           onWheel={handleWheel}
-          className={`flex-1 h-full overflow-auto bg-slate-950/70 custom-scrollbar select-none relative ${
+          className={`flex-1 h-full overflow-auto bg-slate-100/60 dark:bg-slate-950/70 backdrop-blur-md custom-scrollbar select-none relative ${
             isDragging ? "cursor-grabbing" : "cursor-grab"
           }`}
         >
           {/* Floating Pan Hint when zoomed in */}
           {scale > 1.0 && (
-            <div className="sticky top-3 left-3 z-20 pointer-events-none w-fit ml-3 mt-3 flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/80 border border-white/10 text-[11px] text-purple-300 backdrop-blur-md shadow-lg">
+            <div className="sticky top-3 left-3 z-20 pointer-events-none w-fit ml-3 mt-3 flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/90 dark:bg-slate-900/80 border border-slate-200/80 dark:border-white/10 text-[11px] text-purple-700 dark:text-purple-300 backdrop-blur-md shadow-lg">
               <span>✋ Drag anywhere to pan</span>
             </div>
           )}
@@ -616,7 +616,7 @@ const PdfStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
           <div className="w-max min-w-full min-h-full flex flex-col items-start justify-start p-6 sm:p-12 pb-32 box-border">
             {/* Document Sheet Canvas Card */}
             <div
-              className={`shrink-0 mx-auto shadow-2xl rounded-xl overflow-hidden border border-white/15 bg-white/5 transition-transform duration-100 ${
+              className={`shrink-0 mx-auto shadow-2xl rounded-xl overflow-hidden border border-slate-200/80 dark:border-white/15 bg-white dark:bg-white/5 transition-transform duration-100 ${
                 isDragging ? "pointer-events-none shadow-purple-500/20" : ""
               }`}
             >
@@ -632,16 +632,16 @@ const PdfStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
 
         {/* Collapsible Executive AI Insights Right Drawer */}
         {showAiDrawer && (
-          <div className="w-80 sm:w-96 md:w-[420px] h-full bg-slate-900/95 border-l border-white/10 backdrop-blur-2xl flex flex-col shrink-0 animate-in slide-in-from-right duration-200 z-30 shadow-2xl">
+          <div className="w-80 sm:w-96 md:w-[420px] h-full bg-white/90 dark:bg-slate-900/90 border-l border-slate-200/80 dark:border-white/10 backdrop-blur-3xl flex flex-col shrink-0 animate-in slide-in-from-right duration-200 z-30 shadow-2xl">
             {/* Drawer Header Toolbar with Tab Switcher */}
-            <div className="px-4 py-2.5 border-b border-white/10 flex items-center justify-between shrink-0 bg-slate-900/90">
-              <div className="flex items-center gap-1 bg-black/40 border border-white/10 rounded-xl p-0.5">
+            <div className="px-4 py-2.5 border-b border-slate-200/80 dark:border-white/10 flex items-center justify-between shrink-0 bg-white/80 dark:bg-slate-900/90">
+              <div className="flex items-center gap-1 bg-slate-100/90 dark:bg-black/40 border border-slate-200/80 dark:border-white/10 rounded-xl p-0.5">
                 <button
                   onClick={() => setActiveTab("summary")}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                     activeTab === "summary"
                       ? "bg-purple-600 text-white shadow-xs"
-                      : "text-slate-400 hover:text-white"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                   }`}
                 >
                   <BarChart3 className="w-3.5 h-3.5" />
@@ -652,7 +652,7 @@ const PdfStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                     activeTab === "chat"
                       ? "bg-blue-600 text-white shadow-xs"
-                      : "text-slate-400 hover:text-white"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                   }`}
                 >
                   <MessageSquare className="w-3.5 h-3.5" />
@@ -662,7 +662,7 @@ const PdfStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
 
               <button
                 onClick={() => setShowAiDrawer(false)}
-                className="p-1.5 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
                 title="Close Drawer"
               >
                 <X className="w-4 h-4" />
@@ -673,16 +673,16 @@ const PdfStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
             {activeTab === "summary" && (
               <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar text-xs">
                 {/* Engine Header Status Badge */}
-                <div className="p-3.5 rounded-2xl bg-gradient-to-r from-purple-950/40 to-indigo-950/40 border border-purple-500/20 flex items-center justify-between">
+                <div className="p-3.5 rounded-2xl bg-purple-500/10 dark:bg-gradient-to-r dark:from-purple-950/40 dark:to-indigo-950/40 border border-purple-500/20 flex items-center justify-between">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="w-9 h-9 rounded-xl bg-purple-600 text-white flex items-center justify-center shadow-lg shadow-purple-600/30 shrink-0">
                       <BrainCircuit className="w-5 h-5" />
                     </div>
                     <div className="min-w-0">
-                      <h4 className="text-xs font-bold text-white flex items-center gap-1 truncate">
+                      <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1 truncate">
                         Generative AI Extraction
                       </h4>
-                      <p className="text-[10px] text-purple-300 font-mono truncate">
+                      <p className="text-[10px] text-purple-700 dark:text-purple-300 font-mono truncate">
                         {sanitizeModelName(aiSummary?.model)}
                       </p>
                     </div>
@@ -691,7 +691,7 @@ const PdfStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                   <button
                     onClick={() => handleSynthesizeSummary(true)}
                     disabled={isSynthesizing}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 text-purple-200 text-[10px] font-semibold transition-colors disabled:opacity-50 shrink-0"
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 text-purple-700 dark:text-purple-200 text-[10px] font-semibold transition-colors disabled:opacity-50 shrink-0"
                     title="Re-run AI Analysis"
                   >
                     <RefreshCw className={`w-3 h-3 ${isSynthesizing ? "animate-spin" : ""}`} />
@@ -701,15 +701,15 @@ const PdfStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
 
                 {/* Synthesis Loading State */}
                 {isSynthesizing ? (
-                  <div className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-3">
-                    <div className="flex items-center gap-2 text-purple-300 font-medium">
+                  <div className="p-5 rounded-2xl bg-slate-50/80 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 space-y-3">
+                    <div className="flex items-center gap-2 text-purple-700 dark:text-purple-300 font-medium">
                       <Loader2 className="w-4 h-4 animate-spin" />
                       <span>OmniDrive AI is analyzing document...</span>
                     </div>
 
                     {isExtractingText && extractionProgress?.total && (
                       <div className="space-y-1">
-                        <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                        <div className="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
                           <div
                             className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full transition-all duration-300"
                             style={{
@@ -719,15 +719,15 @@ const PdfStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                             }}
                           />
                         </div>
-                        <p className="text-[10px] text-slate-400 font-mono text-right">
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono text-right">
                           Extracting page {extractionProgress.current} of {extractionProgress.total}
                         </p>
                       </div>
                     )}
 
                     {streamingText && (
-                      <div className="p-3 rounded-xl bg-black/40 border border-purple-500/20 text-[11px] text-slate-300 leading-relaxed font-sans">
-                        <div className="flex items-center gap-1 text-[10px] font-bold text-purple-400 uppercase tracking-wider mb-1">
+                      <div className="p-3 rounded-xl bg-white/90 dark:bg-black/40 border border-purple-500/30 text-[11px] text-slate-800 dark:text-slate-300 leading-relaxed font-sans shadow-xs">
+                        <div className="flex items-center gap-1 text-[10px] font-bold text-purple-700 dark:text-purple-400 uppercase tracking-wider mb-1">
                           <Bot className="w-3 h-3" /> Live Generation
                         </div>
                         <p className="whitespace-pre-wrap">{streamingText}</p>
@@ -737,25 +737,25 @@ const PdfStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                 ) : (
                   <>
                     {/* Executive Summary Card */}
-                    <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-2.5">
-                      <div className="flex items-center justify-between text-[11px] font-semibold text-purple-300">
+                    <div className="bg-slate-50/80 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 rounded-2xl p-4 space-y-2.5">
+                      <div className="flex items-center justify-between text-[11px] font-semibold text-purple-700 dark:text-purple-300">
                         <span className="flex items-center gap-1.5">
                           <BookOpen className="w-3.5 h-3.5" />
                           Executive Brief
                         </span>
                         <button
                           onClick={handleCopySummary}
-                          className="hover:text-white transition-colors"
+                          className="hover:text-slate-900 dark:hover:text-white transition-colors"
                           title="Copy summary text"
                         >
                           {copiedSummary ? (
-                            <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            <Check className="w-3.5 h-3.5 text-emerald-500" />
                           ) : (
                             <Copy className="w-3.5 h-3.5 text-slate-400" />
                           )}
                         </button>
                       </div>
-                      <p className="text-slate-200 leading-relaxed text-xs">
+                      <p className="text-slate-700 dark:text-slate-200 leading-relaxed text-xs">
                         {aiSummary?.executive ||
                           "Synthesizing high-level executive findings from document..."}
                       </p>
@@ -764,17 +764,17 @@ const PdfStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                     {/* Key Takeaways & Findings System */}
                     {aiSummary?.takeaways && aiSummary.takeaways.length > 0 && (
                       <div className="space-y-2">
-                        <span className="text-slate-400 text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5">
-                          <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="text-slate-500 dark:text-slate-400 text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5">
+                          <CheckCircle className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
                           Key Takeaways & Findings
                         </span>
                         <div className="space-y-2">
                           {aiSummary.takeaways.map((item, idx) => (
                             <div
                               key={idx}
-                              className="flex items-start gap-2.5 p-3 rounded-xl bg-white/5 border border-white/10 text-slate-200"
+                              className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-50/80 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 text-slate-700 dark:text-slate-200"
                             >
-                              <div className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono text-[10px] flex items-center justify-center shrink-0 mt-0.5 font-bold">
+                              <div className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 font-mono text-[10px] flex items-center justify-center shrink-0 mt-0.5 font-bold">
                                 {idx + 1}
                               </div>
                               <p className="text-[11px] leading-relaxed flex-1">{item}</p>
@@ -785,20 +785,20 @@ const PdfStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                     )}
 
                     {/* DOCUMENT INTELLIGENCE & TOPIC DISTRIBUTION CHART SYSTEM */}
-                    <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3.5">
+                    <div className="bg-slate-50/80 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 rounded-2xl p-4 space-y-3.5">
                       <div className="flex items-center justify-between">
-                        <span className="text-slate-300 text-xs font-bold flex items-center gap-1.5">
-                          <BarChart3 className="w-4 h-4 text-cyan-400" />
+                        <span className="text-slate-800 dark:text-slate-300 text-xs font-bold flex items-center gap-1.5">
+                          <BarChart3 className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
                           Topic Distribution & Density Chart
                         </span>
-                        <span className="text-[10px] font-mono text-cyan-300 bg-cyan-500/15 border border-cyan-500/30 px-2 py-0.5 rounded-md">
+                        <span className="text-[10px] font-mono text-cyan-700 dark:text-cyan-300 bg-cyan-500/15 border border-cyan-500/30 px-2 py-0.5 rounded-md">
                           Verified Content
                         </span>
                       </div>
 
                       {/* Segmented Gradient Distribution Bar */}
                       <div className="space-y-1.5">
-                        <div className="h-3 w-full rounded-full bg-slate-800 overflow-hidden flex shadow-inner">
+                        <div className="h-3 w-full rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden flex shadow-inner">
                           {analytics.sections.map((sec, i) => (
                             <div
                               key={i}
@@ -820,7 +820,7 @@ const PdfStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                           <div key={i} className="flex items-center justify-between text-[11px]">
                             <div className="flex items-center gap-2 truncate pr-2">
                               <span className={`w-2 h-2 rounded-full ${sec.color} shrink-0`} />
-                              <span className="text-slate-300 truncate">{sec.name}</span>
+                              <span className="text-slate-700 dark:text-slate-300 truncate">{sec.name}</span>
                             </div>
                             <span className={`font-mono font-semibold ${sec.textCol} shrink-0`}>
                               {sec.weight}%
@@ -833,37 +833,37 @@ const PdfStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                     {/* Technical Health & Readability Metrics Grid */}
                     <div className="grid grid-cols-2 gap-2.5">
                       {/* Metric 1: Complexity Index */}
-                      <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex flex-col justify-between">
-                        <div className="flex items-center justify-between text-slate-400 text-[10px]">
+                      <div className="p-3.5 rounded-2xl bg-slate-50/80 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 flex flex-col justify-between">
+                        <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-[10px]">
                           <span className="flex items-center gap-1">
-                            <Gauge className="w-3.5 h-3.5 text-purple-400" /> Complexity
+                            <Gauge className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" /> Complexity
                           </span>
-                          <span className="font-mono text-purple-300">{analytics.complexityScore}/100</span>
+                          <span className="font-mono text-purple-700 dark:text-purple-300">{analytics.complexityScore}/100</span>
                         </div>
                         <div className="mt-2">
-                          <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                          <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
                             <div
                               style={{ width: `${analytics.complexityScore}%` }}
                               className="h-full bg-purple-500 rounded-full"
                             />
                           </div>
-                          <span className="text-[10px] text-slate-400 mt-1 block">
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 block">
                             Enterprise Technical Grade
                           </span>
                         </div>
                       </div>
 
                       {/* Metric 2: Estimated Read Time & Volume */}
-                      <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex flex-col justify-between">
-                        <div className="flex items-center justify-between text-slate-400 text-[10px]">
+                      <div className="p-3.5 rounded-2xl bg-slate-50/80 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 flex flex-col justify-between">
+                        <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-[10px]">
                           <span className="flex items-center gap-1">
-                            <Clock className="w-3.5 h-3.5 text-blue-400" /> Read Time
+                            <Clock className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" /> Read Time
                           </span>
-                          <span className="font-mono text-blue-300">~{analytics.readingTime} min</span>
+                          <span className="font-mono text-blue-700 dark:text-blue-300">~{analytics.readingTime} min</span>
                         </div>
                         <div className="mt-2">
-                          <p className="text-xs font-bold text-white">{analytics.words} words</p>
-                          <span className="text-[10px] text-slate-400 block">
+                          <p className="text-xs font-bold text-slate-900 dark:text-white">{analytics.words} words</p>
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400 block">
                             {analytics.pages} total pages analyzed
                           </span>
                         </div>
@@ -871,15 +871,15 @@ const PdfStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                     </div>
 
                     {/* Key Technical Concept Pills */}
-                    <div className="bg-white/5 border border-white/10 rounded-2xl p-3.5 space-y-2">
-                      <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
-                        <Tag className="w-3 h-3 text-purple-400" /> Extracted Concepts & Entities
+                    <div className="bg-slate-50/80 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 rounded-2xl p-3.5 space-y-2">
+                      <span className="text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
+                        <Tag className="w-3 h-3 text-purple-600 dark:text-purple-400" /> Extracted Concepts & Entities
                       </span>
                       <div className="flex flex-wrap gap-1.5">
                         {analytics.tags.map((tag, idx) => (
                           <span
                             key={idx}
-                            className="px-2.5 py-1 rounded-lg bg-black/40 border border-white/10 text-[10px] text-slate-300 font-mono"
+                            className="px-2.5 py-1 rounded-lg bg-white/90 dark:bg-black/40 border border-slate-200/80 dark:border-white/10 text-[10px] text-slate-700 dark:text-slate-300 font-mono shadow-2xs"
                           >
                             {tag}
                           </span>
@@ -890,7 +890,7 @@ const PdfStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                     {/* Switch to Chat Callout Button */}
                     <button
                       onClick={() => setActiveTab("chat")}
-                      className="w-full py-2.5 px-4 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-blue-300 text-xs font-semibold flex items-center justify-center gap-2 transition-all group"
+                      className="w-full py-2.5 px-4 rounded-xl bg-blue-600/10 hover:bg-blue-600/20 dark:bg-blue-600/20 dark:hover:bg-blue-600/30 border border-blue-500/30 text-blue-700 dark:text-blue-300 text-xs font-semibold flex items-center justify-center gap-2 transition-all group"
                     >
                       <MessageSquare className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
                       <span>Ask follow-up questions in AI Chat →</span>
@@ -902,17 +902,17 @@ const PdfStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
 
             {/* TAB 2: INTERACTIVE AI CHAT WITH PDF */}
             {activeTab === "chat" && (
-              <div className="flex flex-col flex-1 min-h-0 bg-slate-900/60">
+              <div className="flex flex-col flex-1 min-h-0 bg-slate-50/50 dark:bg-slate-900/60">
                 {/* Chat Top Sub-bar */}
-                <div className="px-4 py-2 border-b border-white/10 flex items-center justify-between text-slate-400 text-[11px] shrink-0">
-                  <span className="flex items-center gap-1.5 text-blue-300">
+                <div className="px-4 py-2 border-b border-slate-200/80 dark:border-white/10 flex items-center justify-between text-slate-600 dark:text-slate-400 text-[11px] shrink-0">
+                  <span className="flex items-center gap-1.5 text-blue-700 dark:text-blue-300 font-medium">
                     <MessageSquare className="w-3.5 h-3.5" />
                     Document Q&A Assistant
                   </span>
                   {messages.length > 1 && (
                     <button
                       onClick={handleClearChat}
-                      className="hover:text-rose-400 flex items-center gap-1 text-[10px] transition-colors"
+                      className="hover:text-rose-500 flex items-center gap-1 text-[10px] transition-colors"
                       title="Clear chat history"
                     >
                       <RotateCcw className="w-3 h-3" />
@@ -946,16 +946,16 @@ const PdfStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                         className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 leading-relaxed text-xs ${
                           msg.role === "user"
                             ? "bg-blue-600 text-white rounded-tr-xs"
-                            : "bg-white/10 border border-white/10 text-slate-200 rounded-tl-xs"
+                            : "bg-white/95 dark:bg-white/10 border border-slate-200/80 dark:border-white/10 text-slate-800 dark:text-slate-200 rounded-tl-xs shadow-xs"
                         }`}
                       >
                         {msg.loading ? (
-                          <span className="flex items-center gap-2 text-slate-400 font-mono">
-                            <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-400" />
+                          <span className="flex items-center gap-2 text-slate-500 dark:text-slate-400 font-mono">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-600 dark:text-purple-400" />
                             Analyzing document…
                           </span>
                         ) : msg.error ? (
-                          <span className="flex items-center gap-1.5 text-rose-400">
+                          <span className="flex items-center gap-1.5 text-rose-500">
                             <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                             {msg.text}
                           </span>
@@ -975,7 +975,7 @@ const PdfStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                       <button
                         key={idx}
                         onClick={() => sendMessage(s)}
-                        className="text-[10px] px-2.5 py-1 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/30 hover:bg-blue-500/25 transition-colors text-left"
+                        className="text-[10px] px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/30 hover:bg-blue-500/20 transition-colors text-left"
                       >
                         {s}
                       </button>
@@ -984,8 +984,8 @@ const PdfStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                 )}
 
                 {/* Chat Input Bar */}
-                <div className="p-3 border-t border-white/10 bg-slate-900/90 shrink-0">
-                  <div className="flex items-center gap-2 bg-black/40 border border-white/15 rounded-2xl px-3 py-1.5 focus-within:border-blue-500 transition-colors">
+                <div className="p-3 border-t border-slate-200/80 dark:border-white/10 bg-white/85 dark:bg-slate-900/90 shrink-0">
+                  <div className="flex items-center gap-2 bg-slate-100/90 dark:bg-black/40 border border-slate-200/80 dark:border-white/15 rounded-2xl px-3 py-1.5 focus-within:border-blue-500 transition-colors">
                     <input
                       ref={inputRef}
                       type="text"
@@ -999,12 +999,12 @@ const PdfStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                       }}
                       placeholder="Ask anything about this document..."
                       disabled={isSending}
-                      className="flex-1 bg-transparent text-xs text-white placeholder-slate-500 outline-none leading-relaxed disabled:opacity-50"
+                      className="flex-1 bg-transparent text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 outline-none leading-relaxed disabled:opacity-50"
                     />
                     <button
                       onClick={() => sendMessage()}
                       disabled={!inputValue.trim() || isSending}
-                      className="w-7 h-7 rounded-xl bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center shrink-0 transition-colors disabled:opacity-30 disabled:hover:bg-blue-600"
+                      className="w-7 h-7 rounded-xl bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center shrink-0 transition-colors disabled:opacity-30 disabled:hover:bg-blue-600 shadow-xs"
                     >
                       <Send className="w-3.5 h-3.5" />
                     </button>

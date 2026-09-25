@@ -84,7 +84,16 @@ export const calculateStorageFromFiles = (files = [], totalGB = 15.0) => {
       imagesBytes += bytes;
     } else if (mime.includes("video") || /\.(mp4|mov|mkv|avi)$/i.test(name)) {
       videosBytes += bytes;
-    } else if (mime.includes("pdf") || /\.(pdf|doc|docx|txt)$/i.test(name)) {
+    } else if (
+      mime.includes("pdf") ||
+      mime.includes("officedocument") ||
+      mime.includes("wordprocessingml") ||
+      mime.includes("presentationml") ||
+      mime.includes("spreadsheetml") ||
+      mime.includes("msword") ||
+      mime.includes("powerpoint") ||
+      /\.(pdf|docx?|dotx?|docm|pptx?|potx?|ppsx?|pptm|xlsx?|xltx?|xlsm|odt|ods|odp|rtf|txt|pages|key|numbers|epub)$/i.test(name)
+    ) {
       documentsBytes += bytes;
     } else {
       otherBytes += bytes;

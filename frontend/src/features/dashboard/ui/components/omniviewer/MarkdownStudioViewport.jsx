@@ -31,7 +31,7 @@ const renderMarkdown = (text) => {
         elements.push(
           <pre
             key={`code-${i}`}
-            className="p-4 rounded-xl bg-black/60 border border-slate-800 text-purple-300 font-mono text-xs overflow-x-auto my-3"
+            className="p-4 rounded-xl bg-slate-100 dark:bg-black/60 border border-slate-200 dark:border-slate-800 text-purple-700 dark:text-purple-300 font-mono text-xs overflow-x-auto my-3"
           >
             <code>{codeBuffer.join("\n")}</code>
           </pre>
@@ -54,7 +54,7 @@ const renderMarkdown = (text) => {
       elements.push(
         <h1
           key={i}
-          className="text-2xl font-extrabold text-white mt-6 mb-3 pb-2 border-b border-slate-800"
+          className="text-2xl font-extrabold text-slate-900 dark:text-white mt-6 mb-3 pb-2 border-b border-slate-200 dark:border-slate-800"
         >
           {line.replace("# ", "")}
         </h1>
@@ -63,7 +63,7 @@ const renderMarkdown = (text) => {
     }
     if (line.startsWith("## ")) {
       elements.push(
-        <h2 key={i} className="text-xl font-bold text-white mt-5 mb-2 pb-1">
+        <h2 key={i} className="text-xl font-bold text-slate-900 dark:text-white mt-5 mb-2 pb-1">
           {line.replace("## ", "")}
         </h2>
       );
@@ -71,7 +71,7 @@ const renderMarkdown = (text) => {
     }
     if (line.startsWith("### ")) {
       elements.push(
-        <h3 key={i} className="text-base font-semibold text-blue-400 mt-4 mb-2">
+        <h3 key={i} className="text-base font-semibold text-blue-600 dark:text-blue-400 mt-4 mb-2">
           {line.replace("### ", "")}
         </h3>
       );
@@ -83,7 +83,7 @@ const renderMarkdown = (text) => {
       elements.push(
         <blockquote
           key={i}
-          className="border-l-4 border-[#1a73e8] pl-4 py-1 text-slate-300 italic bg-blue-500/5 rounded-r-lg my-2 text-sm"
+          className="border-l-4 border-[#1a73e8] pl-4 py-1 text-slate-700 dark:text-slate-300 italic bg-blue-500/5 rounded-r-lg my-2 text-sm"
         >
           {line.replace("> ", "")}
         </blockquote>
@@ -103,7 +103,7 @@ const renderMarkdown = (text) => {
             readOnly
             className="rounded accent-[#1a73e8] w-4 h-4"
           />
-          <span className={isChecked ? "line-through text-slate-500" : "text-slate-200"}>
+          <span className={isChecked ? "line-through text-slate-400 dark:text-slate-500" : "text-slate-800 dark:text-slate-200"}>
             {textVal}
           </span>
         </div>
@@ -114,7 +114,7 @@ const renderMarkdown = (text) => {
     // Unordered lists
     if (line.startsWith("- ") || line.startsWith("* ")) {
       elements.push(
-        <li key={i} className="ml-5 list-disc text-slate-300 my-1 text-sm leading-relaxed">
+        <li key={i} className="ml-5 list-disc text-slate-700 dark:text-slate-300 my-1 text-sm leading-relaxed">
           {line.replace(/^[-*] /, "")}
         </li>
       );
@@ -129,7 +129,7 @@ const renderMarkdown = (text) => {
 
     // Regular paragraph
     elements.push(
-      <p key={i} className="text-slate-300 text-sm leading-relaxed my-1">
+      <p key={i} className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed my-1">
         {line}
       </p>
     );
@@ -218,20 +218,20 @@ const MarkdownStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
   return (
     <div
       style={{ maxHeight: "calc(100vh - 105px)" }}
-      className="w-full h-full max-w-5xl flex flex-col rounded-3xl border border-white/10 bg-slate-900/80 backdrop-blur-2xl shadow-2xl overflow-hidden relative select-text"
+      className="w-full h-full max-w-5xl flex flex-col rounded-3xl border border-slate-200/80 dark:border-white/10 bg-white/85 dark:bg-slate-900/80 backdrop-blur-3xl shadow-2xl overflow-hidden relative select-text"
     >
       {/* Standardized Studio In-Stage Header Toolbar */}
-      <div className="h-12 px-4 sm:px-5 bg-slate-900/90 border-b border-white/10 flex items-center justify-between text-slate-300 shrink-0 z-20">
+      <div className="h-12 px-4 sm:px-5 bg-white/85 dark:bg-slate-900/85 border-b border-slate-200/80 dark:border-white/10 flex items-center justify-between text-slate-700 dark:text-slate-300 shrink-0 z-20 backdrop-blur-xl">
         {/* Left: Format & Document Metrics */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <FileText className="w-4 h-4 text-purple-400 shrink-0" />
-          <span className="font-semibold text-white text-xs truncate max-w-[160px] sm:max-w-xs font-sans">
+          <FileText className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
+          <span className="font-semibold text-slate-900 dark:text-white text-xs truncate max-w-[160px] sm:max-w-xs font-sans">
             {file.name}
           </span>
-          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-purple-500/15 text-purple-300 border border-purple-500/30 font-mono shrink-0">
+          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 font-mono shrink-0">
             MARKDOWN
           </span>
-          <span className="text-slate-400 text-[11px] font-mono hidden sm:inline">
+          <span className="text-slate-500 dark:text-slate-400 text-[11px] font-mono hidden sm:inline">
             {content.split(/\s+/).filter(Boolean).length} words
           </span>
         </div>
@@ -239,13 +239,13 @@ const MarkdownStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
         {/* Right: Actions (Preview/Raw toggle, Copy, Share, Download, Close) */}
         <div className="flex items-center gap-1.5 sm:gap-2">
           {/* Mode Switcher */}
-          <div className="flex items-center bg-black/40 border border-white/10 rounded-xl p-0.5">
+          <div className="flex items-center bg-slate-100/90 dark:bg-black/40 border border-slate-200/80 dark:border-white/10 rounded-xl p-0.5">
             <button
               onClick={() => setMode("rendered")}
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
                 mode === "rendered"
                   ? "bg-[#1a73e8] text-white shadow-xs"
-                  : "text-slate-400 hover:text-white"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
               <Eye className="w-3.5 h-3.5" />
@@ -256,7 +256,7 @@ const MarkdownStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
                 mode === "raw"
                   ? "bg-[#1a73e8] text-white shadow-xs"
-                  : "text-slate-400 hover:text-white"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
               <Code className="w-3.5 h-3.5" />
@@ -267,12 +267,12 @@ const MarkdownStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
           {/* Copy Button */}
           <button
             onClick={handleCopy}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-white text-xs font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-white text-xs font-medium transition-colors"
           >
             {copied ? (
               <>
-                <Check className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="text-emerald-400">Copied</span>
+                <Check className="w-3.5 h-3.5 text-emerald-500" />
+                <span className="text-emerald-500">Copied</span>
               </>
             ) : (
               <>
@@ -289,7 +289,7 @@ const MarkdownStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                 e.stopPropagation();
                 onShare();
               }}
-              className="p-1.5 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-slate-300 hover:text-white transition-colors"
+              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
               title="Copy share link"
             >
               <Share2 className="w-3.5 h-3.5" />
@@ -304,7 +304,7 @@ const MarkdownStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
               target="_blank"
               rel="noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="p-1.5 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-slate-300 hover:text-white transition-colors"
+              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
               title="Download markdown file"
             >
               <Download className="w-3.5 h-3.5" />
@@ -318,7 +318,7 @@ const MarkdownStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                 e.stopPropagation();
                 onClose();
               }}
-              className="p-1.5 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-white/80 hover:text-white transition-colors"
+              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-white/80 hover:text-slate-900 dark:hover:text-white transition-colors"
               title="Close (Esc)"
             >
               <X className="w-4 h-4" />
@@ -328,12 +328,12 @@ const MarkdownStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
       </div>
 
       {/* Document Content Viewport */}
-      <div className="flex-1 overflow-auto p-6 md:p-10 flex justify-center">
+      <div className="flex-1 overflow-auto p-6 md:p-10 flex justify-center bg-slate-50/60 dark:bg-transparent backdrop-blur-xs">
         <div className="max-w-3xl w-full">
           {mode === "rendered" ? (
             <div className="space-y-1">{renderMarkdown(content)}</div>
           ) : (
-            <pre className="font-mono text-xs text-slate-300 whitespace-pre-wrap leading-6">
+            <pre className="font-mono text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-6">
               {content}
             </pre>
           )}

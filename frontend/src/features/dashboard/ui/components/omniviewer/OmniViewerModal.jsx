@@ -10,6 +10,7 @@ import CodeStudioViewport from "./CodeStudioViewport.jsx";
 import CsvDataStudioViewport from "./CsvDataStudioViewport.jsx";
 import MarkdownStudioViewport from "./MarkdownStudioViewport.jsx";
 import AudioStudioViewport from "./AudioStudioViewport.jsx";
+import DocumentStudioViewport from "./DocumentStudioViewport.jsx";
 import BinaryFileViewport from "./BinaryFileViewport.jsx";
 import OmniViewerFilmstrip from "./OmniViewerFilmstrip.jsx";
 
@@ -26,6 +27,17 @@ const getFileCategory = (file) => {
   }
   if (type === "pdf" || name.endsWith(".pdf")) {
     return "pdf";
+  }
+  if (
+    type === "document" ||
+    type === "presentation" ||
+    type === "word" ||
+    type === "spreadsheet" ||
+    /\.(docx?|dotx?|docm|pptx?|potx?|ppsx?|pptm|xlsx?|xltx?|xlsm|odt|ods|odp|rtf|pages|key|numbers|epub)$/i.test(
+      name
+    )
+  ) {
+    return "document";
   }
   if (type === "image" || /\.(jpe?g|png|webp|gif|svg|bmp|ico|heic|tiff?)$/i.test(name)) {
     return "image";
@@ -130,6 +142,8 @@ const OmniViewerModal = ({
         handleNext();
       } else if (e.key.toLowerCase() === "f" && !e.ctrlKey && !e.metaKey) {
         toggleFullscreen();
+      } else if (e.key.toLowerCase() === "h" && !e.ctrlKey && !e.metaKey) {
+        setIsFilmstripCollapsed((prev) => !prev);
       }
     };
 
@@ -143,14 +157,14 @@ const OmniViewerModal = ({
   const downloadLink = currentFile.downloadUrl || currentFile.download_url || null;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-slate-950/90 backdrop-blur-2xl select-none animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex flex-col bg-white/40 dark:bg-slate-950/85 backdrop-blur-3xl backdrop-saturate-150 select-none animate-in fade-in duration-200">
       {/* Center Dynamic Cinema Viewport Stage */}
       <div className="relative flex-1 min-h-0 w-full overflow-hidden flex items-center justify-center p-2 sm:p-5">
         {/* Previous Navigation Floating Arrow */}
         {hasPrev && (
           <button
             onClick={handlePrev}
-            className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-40 w-11 h-11 rounded-full bg-slate-900/85 hover:bg-[#1a73e8] border border-white/15 text-white flex items-center justify-center backdrop-blur-md shadow-2xl transition-all hover:scale-110 active:scale-95 group"
+            className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-40 w-11 h-11 rounded-full bg-white/80 dark:bg-slate-900/80 hover:bg-[#1a73e8] dark:hover:bg-[#1a73e8] border border-slate-200/80 dark:border-white/15 text-slate-700 dark:text-white hover:text-white dark:hover:text-white flex items-center justify-center backdrop-blur-xl shadow-2xl transition-all hover:scale-110 active:scale-95 group"
             title="Previous File (←)"
           >
             <ChevronLeft className="w-6 h-6 group-hover:-translate-x-0.5 transition-transform" />
@@ -172,6 +186,14 @@ const OmniViewerModal = ({
           )}
           {category === "pdf" && (
             <PdfStudioViewport
+              file={currentFile}
+              onClose={onClose}
+              onShare={handleShare}
+              downloadLink={downloadLink}
+            />
+          )}
+          {category === "document" && (
+            <DocumentStudioViewport
               file={currentFile}
               onClose={onClose}
               onShare={handleShare}
@@ -232,7 +254,7 @@ const OmniViewerModal = ({
         {hasNext && (
           <button
             onClick={handleNext}
-            className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-40 w-11 h-11 rounded-full bg-slate-900/85 hover:bg-[#1a73e8] border border-white/15 text-white flex items-center justify-center backdrop-blur-md shadow-2xl transition-all hover:scale-110 active:scale-95 group"
+            className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-40 w-11 h-11 rounded-full bg-white/80 dark:bg-slate-900/80 hover:bg-[#1a73e8] dark:hover:bg-[#1a73e8] border border-slate-200/80 dark:border-white/15 text-slate-700 dark:text-white hover:text-white dark:hover:text-white flex items-center justify-center backdrop-blur-xl shadow-2xl transition-all hover:scale-110 active:scale-95 group"
             title="Next File (→)"
           >
             <ChevronRight className="w-6 h-6 group-hover:translate-x-0.5 transition-transform" />

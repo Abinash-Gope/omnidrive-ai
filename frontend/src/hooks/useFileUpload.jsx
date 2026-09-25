@@ -8,6 +8,8 @@ import {
 import {
   uploadFileMultipart,
   MULTIPART_CHUNK_SIZE,
+  resolveMimeType,
+  inferFileTypeCategory,
 } from "./useResumableUpload.js";
 
 /**
@@ -15,30 +17,9 @@ import {
  * File: src/hooks/useFileUpload.jsx
  *
  * Supports multi-file queued uploads with bounded concurrency (2 at a time).
- *
- * Exposed API:
- *   filesQueue      — array of { id, file, name, size, type, progress, status, error, result }
- *   overallProgress — aggregate 0-100 value across all files (byte-weighted)
- *   isUploading     — true while any file is actively uploading
- *   isAllDone       — true when every queued file has completed or failed
- *   hasError        — true if at least one file failed
- *   stageFiles(files)      — add File[] to the staging queue (before upload starts)
- *   removeFile(id)         — remove a file from the staging queue
- *   clearQueue()           — reset everything
- *   startUpload(onFileComplete) — begin processing the queue (concurrency 2)
- *   retryFailed(onFileComplete) — retry files whose status is "error"
- *
- * Legacy single-file API (used by useDashboard executePipeline):
- *   uploadFile(file) — async, returns result, sets uploadProgress / isSuccess / error
- *   uploadProgress
- *   isSuccess
- *   error
- *   uploadedData
- *   resetUpload()
+ * Supports ALL file formats (Videos, Images, PDFs, Code, CSV, Audio, Markdown, Docs, Archives).
  */
 
-// Supported MIME type groups
-const ACCEPTED_TYPES = ["image/", "video/", "application/pdf"];
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024 * 1024; // 5 GB guard
 const CONCURRENCY = 2;
 
@@ -46,23 +27,27 @@ let _nextId = 1;
 const nextId = () => `uf_${_nextId++}_${Date.now()}`;
 
 /** Build a queue item from a raw File */
-const makeQueueItem = (file) => ({
-  id: nextId(),
-  file,
-  name: file.name,
-  size: file.size,
-  type: file.type || "",
-  progress: 0,
-  status: "pending", // "pending" | "uploading" | "completed" | "error"
-  error: null,
-  result: null,
-});
+const makeQueueItem = (file) => {
+  const mime = resolveMimeType(file);
+  const cat = inferFileTypeCategory(file.name, mime);
+  return {
+    id: nextId(),
+    file,
+    name: file.name,
+    size: file.size,
+    type: cat,
+    mimeType: mime,
+    progress: 0,
+    status: "pending", // "pending" | "uploading" | "completed" | "error"
+    error: null,
+    result: null,
+  };
+};
 
-/** True if the file passes type/size guard */
+/** True if the file passes size and valid name guard (supports all file formats) */
 const isFileAccepted = (file) => {
-  const mime = file.type || "";
-  const accepted = ACCEPTED_TYPES.some((t) => mime.startsWith(t));
-  return accepted && file.size <= MAX_FILE_SIZE_BYTES;
+  if (!file || !file.name) return false;
+  return file.size <= MAX_FILE_SIZE_BYTES;
 };
 
 // ---------------------------------------------------------------------------
@@ -75,6 +60,9 @@ async function uploadSingleFile(file, onProgress) {
       thumbData = await generateThumbnail(file);
     }
   } catch (_) {}
+
+  const resolvedContentType = resolveMimeType(file);
+  const inferredCategory = inferFileTypeCategory(file.name, resolvedContentType);
 
   // Delegate files > 5MB to S3 Transfer-Accelerated 5MB chunked multipart uploads
   if (file.size > MULTIPART_CHUNK_SIZE) {
@@ -100,7 +88,8 @@ async function uploadSingleFile(file, onProgress) {
       s3_key: mpResult.s3_key,
       file_name: file.name,
       file_size: file.size,
-      file_type: file.type,
+      file_type: inferredCategory,
+      content_type: resolvedContentType,
       thumbnail: thumbData?.dataUrl || null,
       dimensions: thumbData
         ? { width: thumbData.width, height: thumbData.height, format: thumbData.format }
@@ -112,7 +101,7 @@ async function uploadSingleFile(file, onProgress) {
   try {
     const res = await axiosInstance.post("/upload-url", {
       file_name: file.name,
-      content_type: (file.type || "application/octet-stream").toLowerCase(),
+      content_type: resolvedContentType,
       file_size: file.size || 0,
     });
     data = res.data;
@@ -171,7 +160,7 @@ async function uploadSingleFile(file, onProgress) {
     onProgress?.(0, xhr);
 
     if (signedHeaders.length === 0 || signedHeaders.includes("content-type")) {
-      xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+      xhr.setRequestHeader("Content-Type", resolvedContentType);
     }
     if (signedHeaders.includes("x-amz-meta-file_id") && file_id) {
       xhr.setRequestHeader("x-amz-meta-file_id", file_id);
@@ -188,7 +177,8 @@ async function uploadSingleFile(file, onProgress) {
     s3_key,
     file_name: file.name,
     file_size: file.size,
-    file_type: file.type,
+    file_type: inferredCategory,
+    content_type: resolvedContentType,
     thumbnail: thumbData?.dataUrl || null,
     dimensions: thumbData
       ? { width: thumbData.width, height: thumbData.height, format: thumbData.format }

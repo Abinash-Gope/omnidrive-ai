@@ -58,10 +58,34 @@ export const getFilesApi = async () => {
           /\.(mp4|mov|mkv|webm|avi|m4v|3gp|flv|wmv)$/i.test(fileNameLower);
         const isImage =
           contentTypeLower.startsWith("image/") ||
-          /\.(jpe?g|png|webp|gif|svg|bmp|ico)$/i.test(fileNameLower);
+          /\.(jpe?g|png|webp|gif|svg|bmp|ico|avif)$/i.test(fileNameLower);
         const isPdf =
           contentTypeLower.includes("pdf") ||
           fileNameLower.endsWith(".pdf");
+        const isDoc =
+          /\.(docx?|dotx?|docm|pptx?|potx?|ppsx?|pptm|xlsx?|xltx?|xlsm|odt|ods|odp|rtf|pages|key|numbers|epub)$/i.test(
+            fileNameLower
+          ) ||
+          contentTypeLower.includes("wordprocessingml") ||
+          contentTypeLower.includes("presentationml") ||
+          contentTypeLower.includes("spreadsheetml") ||
+          contentTypeLower.includes("msword") ||
+          contentTypeLower.includes("ms-powerpoint") ||
+          contentTypeLower.includes("ms-excel");
+        const isCsv =
+          contentTypeLower.includes("csv") ||
+          /\.(csv|tsv)$/i.test(fileNameLower);
+        const isCode =
+          /\.(js|jsx|ts|tsx|py|json|html|css|sql|sh|bash|yml|yaml|env|xml|c|cpp|h|java|rs|go|php)$/i.test(
+            fileNameLower
+          );
+        const isAudio =
+          contentTypeLower.startsWith("audio/") ||
+          /\.(mp3|wav|aac|ogg|flac|m4a|wma)$/i.test(fileNameLower);
+        const isMarkdown =
+          /\.(md|markdown|txt|log)$/i.test(fileNameLower);
+        const isArchive =
+          /\.(zip|tar|gz|rar|7z|exe|bin|iso)$/i.test(fileNameLower);
 
         const isImageFormat = (url) => {
           if (!url || typeof url !== "string") return false;
@@ -97,7 +121,19 @@ export const getFilesApi = async () => {
             ? "image"
             : isPdf
             ? "pdf"
-            : "other",
+            : isDoc
+            ? "document"
+            : isCsv
+            ? "csv"
+            : isCode
+            ? "code"
+            : isAudio
+            ? "audio"
+            : isMarkdown
+            ? "markdown"
+            : isArchive
+            ? "archive"
+            : "binary",
           sizeBytes: item.file_size ? Number(item.file_size) : 0,
           size: item.file_size
             ? (item.file_size < 1024 * 1024

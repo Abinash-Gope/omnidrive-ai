@@ -35,6 +35,7 @@ export function resolveMimeType(file) {
   }
   const ext = (file.name || "").split(".").pop().toLowerCase();
   const mimeMap = {
+    // Video
     mp4: "video/mp4",
     mov: "video/quicktime",
     mkv: "video/x-matroska",
@@ -43,14 +44,138 @@ export function resolveMimeType(file) {
     m4v: "video/mp4",
     "3gp": "video/3gpp",
     ts: "video/mp2t",
+    // Images
     jpg: "image/jpeg",
     jpeg: "image/jpeg",
     png: "image/png",
     webp: "image/webp",
     gif: "image/gif",
+    svg: "image/svg+xml",
+    bmp: "image/bmp",
+    ico: "image/x-icon",
+    // PDF & Documents
     pdf: "application/pdf",
+    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    doc: "application/msword",
+    dot: "application/msword",
+    dotx: "application/vnd.openxmlformats-officedocument.wordprocessingml.template",
+    docm: "application/vnd.ms-word.document.macroEnabled.12",
+    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    xls: "application/vnd.ms-excel",
+    xlt: "application/vnd.ms-excel",
+    xltx: "application/vnd.openxmlformats-officedocument.spreadsheetml.template",
+    xlsm: "application/vnd.ms-excel.sheet.macroEnabled.12",
+    pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ppt: "application/vnd.ms-powerpoint",
+    pot: "application/vnd.ms-powerpoint",
+    potx: "application/vnd.openxmlformats-officedocument.presentationml.template",
+    pps: "application/vnd.ms-powerpoint",
+    ppsx: "application/vnd.openxmlformats-officedocument.presentationml.slideshow",
+    pptm: "application/vnd.ms-powerpoint.presentation.macroEnabled.12",
+    odt: "application/vnd.oasis.opendocument.text",
+    ods: "application/vnd.oasis.opendocument.spreadsheet",
+    odp: "application/vnd.oasis.opendocument.presentation",
+    rtf: "application/rtf",
+    pages: "application/vnd.apple.pages",
+    key: "application/vnd.apple.keynote",
+    numbers: "application/vnd.apple.numbers",
+    epub: "application/epub+zip",
+    // Tabular Data / CSV
+    csv: "text/csv",
+    tsv: "text/tab-separated-values",
+    // Code & Markup
+    js: "text/javascript",
+    jsx: "text/javascript",
+    ts: "text/typescript",
+    tsx: "text/typescript",
+    py: "text/x-python",
+    json: "application/json",
+    html: "text/html",
+    css: "text/css",
+    sql: "application/sql",
+    sh: "application/x-sh",
+    bash: "application/x-sh",
+    yml: "text/yaml",
+    yaml: "text/yaml",
+    env: "text/plain",
+    xml: "application/xml",
+    c: "text/x-c",
+    cpp: "text/x-c++",
+    h: "text/x-c",
+    java: "text/x-java",
+    rs: "text/x-rust",
+    go: "text/x-go",
+    php: "application/x-httpd-php",
+    // Markdown & Text
+    md: "text/markdown",
+    markdown: "text/markdown",
+    txt: "text/plain",
+    log: "text/plain",
+    // Audio
+    mp3: "audio/mpeg",
+    wav: "audio/wav",
+    ogg: "audio/ogg",
+    aac: "audio/aac",
+    flac: "audio/flac",
+    m4a: "audio/mp4",
+    wma: "audio/x-ms-wma",
+    // Archives
+    zip: "application/zip",
+    tar: "application/x-tar",
+    gz: "application/gzip",
+    rar: "application/vnd.rar",
+    "7z": "application/x-7z-compressed",
   };
   return mimeMap[ext] || "application/octet-stream";
+}
+
+/** Determine high-level file type category for routing, badges, and viewports */
+export function inferFileTypeCategory(fileName = "", mimeType = "") {
+  const name = (fileName || "").toLowerCase();
+  const mime = (mimeType || "").toLowerCase();
+
+  if (mime.startsWith("video/") || /\.(mp4|mov|mkv|webm|avi|m4v|3gp|flv|wmv)$/i.test(name)) {
+    return "video";
+  }
+  if (mime.startsWith("image/") || /\.(jpe?g|png|webp|gif|svg|bmp|ico|avif)$/i.test(name)) {
+    return "image";
+  }
+  if (mime.includes("pdf") || name.endsWith(".pdf")) {
+    return "pdf";
+  }
+  if (
+    /\.(docx?|dotx?|docm|pptx?|potx?|ppsx?|pptm|xlsx?|xltx?|xlsm|odt|ods|odp|rtf|pages|key|numbers|epub)$/i.test(
+      name
+    ) ||
+    mime.includes("wordprocessingml") ||
+    mime.includes("presentationml") ||
+    mime.includes("spreadsheetml") ||
+    mime.includes("msword") ||
+    mime.includes("ms-powerpoint") ||
+    mime.includes("ms-excel")
+  ) {
+    return "document";
+  }
+  if (mime.includes("csv") || /\.(csv|tsv)$/i.test(name)) {
+    return "csv";
+  }
+  if (
+    /\.(js|jsx|ts|tsx|py|json|html|css|sql|sh|bash|yml|yaml|env|xml|c|cpp|h|java|rs|go|php)$/i.test(
+      name
+    )
+  ) {
+    return "code";
+  }
+  if (mime.startsWith("audio/") || /\.(mp3|wav|aac|ogg|flac|m4a|wma)$/i.test(name)) {
+    return "audio";
+  }
+  if (/\.(md|markdown|txt|log)$/i.test(name)) {
+    return "markdown";
+  }
+  if (/\.(zip|tar|gz|rar|7z|exe|bin|iso)$/i.test(name)) {
+    return "archive";
+  }
+  return "binary";
 }
 
 /**

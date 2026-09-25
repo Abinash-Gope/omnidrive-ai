@@ -59,6 +59,10 @@ import {
   findThumbnailMetadata,
 } from "../utils/thumbnailCache.jsx";
 import {
+  resolveMimeType,
+  inferFileTypeCategory,
+} from "../../../hooks/useResumableUpload.js";
+import {
   fetchCloudPreferences,
   saveCloudPreferences,
 } from "../../auth/api/cloudPreferencesService.jsx";
@@ -199,9 +203,8 @@ export const useDashboard = () => {
   const handleUploadFile = async (file) => {
     if (!file) return;
 
-    let inferredType = "pdf";
-    if (file.type?.startsWith("video/") || file.name.endsWith(".mp4")) inferredType = "video";
-    else if (file.type?.startsWith("image/") || /\.(jpg|jpeg|png|webp)$/i.test(file.name)) inferredType = "image";
+    const resolvedContentType = resolveMimeType(file);
+    const inferredType = inferFileTypeCategory(file.name, resolvedContentType);
 
     // Instant client-side thumbnail generation
     let thumbData = null;
@@ -217,13 +220,7 @@ export const useDashboard = () => {
       name: file.name,
       type: inferredType,
       size: `${(file.size / (1024 * 1024) || 3.5).toFixed(1)} MB`,
-      contentType:
-        file.type ||
-        (inferredType === "image"
-          ? "image/jpeg"
-          : inferredType === "video"
-          ? "video/mp4"
-          : "application/pdf"),
+      contentType: resolvedContentType,
       fileSize: file.size || 1024,
       rawFile: file,
       thumbnail: thumbData?.dataUrl || null,
@@ -374,8 +371,35 @@ export const useDashboard = () => {
       if (!matchesSearch) return false;
 
       // Base media type filter
-      if (filterType !== "all" && f.type !== filterType) {
-        return false;
+      if (filterType !== "all") {
+        if (filterType === "document" || filterType === "pdf") {
+          const isDoc =
+            f.type === "pdf" ||
+            f.type === "document" ||
+            /\.(pdf|docx?|dotx?|docm|pptx?|potx?|ppsx?|pptm|xlsx?|xltx?|xlsm|odt|ods|odp|rtf|pages|key|numbers|epub)$/i.test(
+              f.name || ""
+            );
+          if (!isDoc) return false;
+        } else if (filterType === "code") {
+          const isCode =
+            f.type === "code" ||
+            f.type === "csv" ||
+            f.type === "markdown" ||
+            /\.(js|jsx|ts|tsx|py|json|html|css|sql|sh|bash|yml|yaml|env|xml|c|cpp|h|java|rs|go|php|csv|tsv|md|txt)$/i.test(
+              f.name || ""
+            );
+          if (!isCode) return false;
+        } else if (filterType === "audio") {
+          const isAudio =
+            f.type === "audio" || /\.(mp3|wav|aac|ogg|flac|m4a|wma)$/i.test(f.name || "");
+          if (!isAudio) return false;
+        } else if (filterType === "archive") {
+          const isArchive =
+            f.type === "archive" || /\.(zip|tar|gz|rar|7z|exe|bin|iso)$/i.test(f.name || "");
+          if (!isArchive) return false;
+        } else if (f.type !== filterType) {
+          return false;
+        }
       }
 
       // If filtering images, apply smart category & tag filters

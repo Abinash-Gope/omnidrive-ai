@@ -96,7 +96,7 @@ const AudioStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
   return (
     <div
       style={{ maxHeight: "calc(100vh - 105px)" }}
-      className="w-full h-full max-w-5xl flex flex-col rounded-3xl border border-white/10 bg-slate-900/80 backdrop-blur-2xl shadow-2xl overflow-hidden relative select-none"
+      className="w-full h-full max-w-5xl flex flex-col rounded-3xl border border-slate-200/80 dark:border-white/10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-3xl shadow-2xl overflow-hidden relative select-none"
     >
       <audio
         ref={audioRef}
@@ -107,18 +107,18 @@ const AudioStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
       />
 
       {/* Standardized Studio In-Stage Header Toolbar */}
-      <div className="h-12 px-4 sm:px-5 bg-slate-900/90 border-b border-white/10 flex items-center justify-between text-slate-300 shrink-0 z-20">
+      <div className="h-12 px-4 sm:px-5 bg-white/85 dark:bg-slate-900/85 border-b border-slate-200/80 dark:border-white/10 flex items-center justify-between text-slate-700 dark:text-slate-300 shrink-0 z-20 backdrop-blur-xl">
         {/* Left: Format & Track Metrics */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <Music className="w-4 h-4 text-cyan-400 shrink-0" />
-          <span className="font-semibold text-white text-xs truncate max-w-[160px] sm:max-w-xs font-sans">
+          <Music className="w-4 h-4 text-cyan-600 dark:text-cyan-400 shrink-0" />
+          <span className="font-semibold text-slate-900 dark:text-white text-xs truncate max-w-[160px] sm:max-w-xs font-sans">
             {fileName}
           </span>
-          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 font-mono shrink-0">
+          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30 font-mono shrink-0">
             AUDIO
           </span>
           {duration > 0 && (
-            <span className="text-slate-400 text-[11px] font-mono hidden sm:inline">
+            <span className="text-slate-500 dark:text-slate-400 text-[11px] font-mono hidden sm:inline">
               {formatTime(duration)}
             </span>
           )}
@@ -129,7 +129,7 @@ const AudioStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
           {/* Speed Toggle */}
           <button
             onClick={handleSpeedToggle}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-slate-300 hover:text-white transition-all text-xs font-mono"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all text-xs font-mono"
             title="Playback Speed"
           >
             <Gauge className="w-3.5 h-3.5 text-slate-400" />
@@ -137,17 +137,17 @@ const AudioStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
           </button>
 
           {/* Volume Control */}
-          <div className="flex items-center gap-1.5 bg-black/40 border border-white/10 rounded-xl px-2.5 py-1">
+          <div className="flex items-center gap-1.5 bg-slate-100/90 dark:bg-black/40 border border-slate-200/80 dark:border-white/10 rounded-xl px-2.5 py-1">
             <button
               onClick={() => handleVolumeChange(isMuted ? 1 : 0)}
-              className="text-slate-400 hover:text-white transition-colors"
+              className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
             >
               {isMuted || volume === 0 ? (
-                <VolumeX className="w-3.5 h-3.5 text-rose-400" />
+                <VolumeX className="w-3.5 h-3.5 text-rose-500" />
               ) : volume < 0.5 ? (
                 <Volume1 className="w-3.5 h-3.5" />
               ) : (
-                <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
+                <Volume2 className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
               )}
             </button>
             <input
@@ -157,7 +157,7 @@ const AudioStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
               step="0.05"
               value={isMuted ? 0 : volume}
               onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-              className="w-14 sm:w-16 accent-cyan-400 cursor-pointer h-1"
+              className="w-14 sm:w-16 accent-cyan-500 cursor-pointer h-1"
             />
           </div>
 
@@ -168,7 +168,7 @@ const AudioStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                 e.stopPropagation();
                 onShare();
               }}
-              className="p-1.5 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-slate-300 hover:text-white transition-colors"
+              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
               title="Copy share link"
             >
               <Share2 className="w-3.5 h-3.5" />
@@ -183,7 +183,7 @@ const AudioStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
               target="_blank"
               rel="noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="p-1.5 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-slate-300 hover:text-white transition-colors"
+              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
               title="Download audio file"
             >
               <Download className="w-3.5 h-3.5" />
@@ -197,7 +197,7 @@ const AudioStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                 e.stopPropagation();
                 onClose();
               }}
-              className="p-1.5 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-white/80 hover:text-white transition-colors"
+              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-white/80 hover:text-slate-900 dark:hover:text-white transition-colors"
               title="Close (Esc)"
             >
               <X className="w-4 h-4" />
@@ -207,31 +207,31 @@ const AudioStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
       </div>
 
       {/* Main Center Audio Visualizer Stage */}
-      <div className="flex-1 w-full min-h-0 relative flex flex-col items-center justify-center p-6 bg-slate-950/70 overflow-y-auto custom-scrollbar">
+      <div className="flex-1 w-full min-h-0 relative flex flex-col items-center justify-center p-6 bg-slate-100/60 dark:bg-slate-950/70 backdrop-blur-md overflow-y-auto custom-scrollbar">
         {/* Center Vinyl / Waveform Studio Graphic */}
-        <div className="relative w-48 h-48 sm:w-56 sm:h-56 rounded-full bg-gradient-to-tr from-slate-900 via-cyan-950 to-slate-900 border-4 border-white/10 shadow-[0_0_50px_rgba(6,182,212,0.2)] flex items-center justify-center mb-6">
+        <div className="relative w-48 h-48 sm:w-56 sm:h-56 rounded-full bg-gradient-to-tr from-slate-200 via-cyan-100 to-slate-200 dark:from-slate-900 dark:via-cyan-950 dark:to-slate-900 border-4 border-slate-300/80 dark:border-white/10 shadow-[0_0_50px_rgba(6,182,212,0.2)] flex items-center justify-center mb-6">
           <div
-            className={`w-36 h-36 sm:w-44 sm:h-44 rounded-full border border-white/10 flex items-center justify-center ${
+            className={`w-36 h-36 sm:w-44 sm:h-44 rounded-full border border-slate-300 dark:border-white/10 flex items-center justify-center ${
               isPlaying ? "animate-spin [animation-duration:8s]" : ""
             }`}
           >
-            <div className="w-18 h-18 sm:w-20 sm:h-20 rounded-full bg-slate-950 border-2 border-cyan-500/40 flex items-center justify-center shadow-inner">
-              <Music className="w-8 h-8 text-cyan-400" />
+            <div className="w-18 h-18 sm:w-20 sm:h-20 rounded-full bg-white dark:bg-slate-950 border-2 border-cyan-500/40 flex items-center justify-center shadow-inner">
+              <Music className="w-8 h-8 text-cyan-600 dark:text-cyan-400" />
             </div>
           </div>
 
           {/* Pulsing Aura */}
           {isPlaying && (
-            <div className="absolute inset-0 rounded-full border border-cyan-400/30 animate-ping [animation-duration:3s] pointer-events-none" />
+            <div className="absolute inset-0 rounded-full border border-cyan-500/40 animate-ping [animation-duration:3s] pointer-events-none" />
           )}
         </div>
 
         {/* Track Title */}
         <div className="text-center max-w-md mb-4">
-          <h3 className="text-sm sm:text-base font-bold text-white truncate drop-shadow-md mb-1">
+          <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white truncate drop-shadow-xs mb-1">
             {fileName}
           </h3>
-          <p className="text-xs text-slate-400 font-mono">
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
             {file.size || "Original Master"} • 48 kHz High-Fidelity
           </p>
         </div>
@@ -250,7 +250,7 @@ const AudioStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                 className={`w-1 rounded-full transition-all duration-150 ${
                   isPlaying
                     ? "bg-gradient-to-t from-cyan-500 to-blue-400"
-                    : "bg-slate-800"
+                    : "bg-slate-300 dark:bg-slate-800"
                 }`}
               />
             );
@@ -261,17 +261,17 @@ const AudioStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
         <div className="w-full max-w-md mb-4 px-2">
           <div
             onClick={handleSeek}
-            className="relative w-full h-2 bg-white/15 hover:h-2.5 rounded-full cursor-pointer transition-all flex items-center"
+            className="relative w-full h-2 bg-slate-200 dark:bg-white/15 hover:h-2.5 rounded-full cursor-pointer transition-all flex items-center"
           >
             <div
               style={{ width: `${progress}%` }}
-              className="absolute top-0 bottom-0 left-0 bg-cyan-400 rounded-full shadow-[0_0_10px_rgba(6,182,212,0.6)]"
+              className="absolute top-0 bottom-0 left-0 bg-cyan-500 rounded-full shadow-[0_0_10px_rgba(6,182,212,0.6)]"
             >
-              <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3.5 h-3.5 rounded-full bg-white shadow-md border-2 border-cyan-400" />
+              <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3.5 h-3.5 rounded-full bg-white shadow-md border-2 border-cyan-500" />
             </div>
           </div>
 
-          <div className="flex justify-between items-center text-[11px] font-mono text-slate-400 mt-2">
+          <div className="flex justify-between items-center text-[11px] font-mono text-slate-500 dark:text-slate-400 mt-2">
             <span>{formatTime(currentTime)}</span>
             <span>{formatTime(duration)}</span>
           </div>

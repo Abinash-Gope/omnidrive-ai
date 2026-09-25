@@ -194,20 +194,20 @@ const CodeStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
   return (
     <div
       style={{ maxHeight: "calc(100vh - 105px)" }}
-      className="w-full h-full max-w-5xl flex flex-col rounded-3xl border border-white/10 bg-slate-900/80 backdrop-blur-2xl shadow-2xl overflow-hidden relative font-mono text-xs select-text"
+      className="w-full h-full max-w-5xl flex flex-col rounded-3xl border border-slate-200/80 dark:border-white/10 bg-white/85 dark:bg-slate-900/80 backdrop-blur-3xl shadow-2xl overflow-hidden relative font-mono text-xs select-text"
     >
       {/* Standardized Studio In-Stage Header Toolbar */}
-      <div className="h-12 px-4 sm:px-5 bg-slate-900/90 border-b border-white/10 flex items-center justify-between text-slate-300 shrink-0 z-20">
+      <div className="h-12 px-4 sm:px-5 bg-white/85 dark:bg-slate-900/85 border-b border-slate-200/80 dark:border-white/10 flex items-center justify-between text-slate-700 dark:text-slate-300 shrink-0 z-20 backdrop-blur-xl">
         {/* Left: Format & Code Metrics */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <FileCode className="w-4 h-4 text-cyan-400 shrink-0" />
-          <span className="font-semibold text-white text-xs truncate max-w-[160px] sm:max-w-xs font-sans">
+          <FileCode className="w-4 h-4 text-cyan-600 dark:text-cyan-400 shrink-0" />
+          <span className="font-semibold text-slate-900 dark:text-white text-xs truncate max-w-[160px] sm:max-w-xs font-sans">
             {fileName}
           </span>
-          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shrink-0">
+          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30 shrink-0">
             {language}
           </span>
-          <span className="text-slate-400 text-[11px] hidden sm:inline">
+          <span className="text-slate-500 dark:text-slate-400 text-[11px] hidden sm:inline">
             {lines.length} lines • {content.length} bytes
           </span>
         </div>
@@ -222,7 +222,7 @@ const CodeStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
               placeholder="Search code..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 pr-3 py-1 rounded-xl bg-black/40 border border-white/10 text-white placeholder-slate-500 text-[11px] focus:outline-hidden focus:border-cyan-500 w-36"
+              className="pl-8 pr-3 py-1 rounded-xl bg-slate-100/90 dark:bg-black/40 border border-slate-200/80 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 text-[11px] focus:outline-hidden focus:border-cyan-500 w-36"
             />
           </div>
 
@@ -231,8 +231,8 @@ const CodeStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
             onClick={() => setWordWrap(!wordWrap)}
             className={`p-1.5 rounded-xl border transition-colors ${
               wordWrap
-                ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/40"
-                : "border-white/10 hover:bg-white/10 text-slate-300"
+                ? "bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 border-cyan-500/40"
+                : "bg-slate-100/80 dark:bg-white/5 border-slate-200/70 dark:border-white/10 hover:bg-slate-200/80 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300"
             }`}
             title="Toggle Word Wrap"
           >
@@ -242,12 +242,12 @@ const CodeStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
           {/* Copy Button */}
           <button
             onClick={handleCopy}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-white text-xs font-sans font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-white text-xs font-sans font-medium transition-colors"
           >
             {copied ? (
               <>
-                <Check className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="text-emerald-400">Copied!</span>
+                <Check className="w-3.5 h-3.5 text-emerald-500" />
+                <span className="text-emerald-500">Copied!</span>
               </>
             ) : (
               <>
@@ -264,7 +264,7 @@ const CodeStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                 e.stopPropagation();
                 onShare();
               }}
-              className="p-1.5 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-slate-300 hover:text-white transition-colors"
+              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
               title="Copy share link"
             >
               <Share2 className="w-3.5 h-3.5" />
@@ -279,7 +279,7 @@ const CodeStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
               target="_blank"
               rel="noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="p-1.5 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-slate-300 hover:text-white transition-colors"
+              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
               title="Download source code"
             >
               <Download className="w-3.5 h-3.5" />
@@ -293,7 +293,7 @@ const CodeStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                 e.stopPropagation();
                 onClose();
               }}
-              className="p-1.5 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-white/80 hover:text-white transition-colors"
+              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-white/80 hover:text-slate-900 dark:hover:text-white transition-colors"
               title="Close (Esc)"
             >
               <X className="w-4 h-4" />
@@ -303,9 +303,9 @@ const CodeStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
       </div>
 
       {/* Code Text Viewport with Line Numbers */}
-      <div className="flex-1 overflow-auto p-4 flex">
+      <div className="flex-1 overflow-auto p-4 flex bg-slate-50/60 dark:bg-transparent backdrop-blur-xs">
         {/* Line Numbers Gutter */}
-        <div className="select-none text-right pr-4 text-slate-600 font-mono text-xs border-r border-slate-800/80 shrink-0">
+        <div className="select-none text-right pr-4 text-slate-400 dark:text-slate-600 font-mono text-xs border-r border-slate-300/80 dark:border-slate-800/80 shrink-0">
           {lines.map((_, i) => (
             <div key={i} className="leading-6">
               {i + 1}

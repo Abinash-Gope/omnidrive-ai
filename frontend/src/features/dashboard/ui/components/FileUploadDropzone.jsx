@@ -72,7 +72,6 @@ const FileUploadDropzone = ({ onUploadFile }) => {
         multiple
         onChange={handleFileChange}
         className="hidden"
-        accept="video/*,image/*,application/pdf"
       />
 
       <div className="flex flex-col sm:flex-row items-center justify-between gap-5 text-center sm:text-left">
@@ -83,28 +82,31 @@ const FileUploadDropzone = ({ onUploadFile }) => {
           </div>
           <div>
             <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5 justify-center sm:justify-start">
-              <span>Drop files here to trigger AI pipelines</span>
+              <span>Drop files here to upload to OmniDrive AI</span>
               <Sparkles className="w-3.5 h-3.5 text-amber-500" />
             </h4>
             <p className="text-xs text-slate-500 mt-0.5">
-              Select multiple files — each goes through vision safety, video transcoding, and AI document summarization
+              Supports Videos, Photos, Word & PPT Docs, PDFs, Code, CSV Data, Audio, and Archives
             </p>
           </div>
         </div>
 
         {/* Right: Supported format badges */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap justify-center sm:justify-end">
           <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 text-[11px] font-medium border border-blue-100 dark:border-blue-900">
             <Film className="w-3 h-3" />
-            <span>MP4 / MOV</span>
+            <span>Video & Audio</span>
           </div>
           <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 text-[11px] font-medium border border-emerald-100 dark:border-emerald-900">
             <Camera className="w-3 h-3" />
-            <span>JPG / PNG</span>
+            <span>Images</span>
           </div>
           <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 text-[11px] font-medium border border-purple-100 dark:border-purple-900">
             <FileText className="w-3 h-3" />
-            <span>PDF</span>
+            <span>DOCX / PPTX / PDF</span>
+          </div>
+          <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 text-[11px] font-medium border border-indigo-100 dark:border-indigo-900">
+            <span>Code & CSV</span>
           </div>
         </div>
       </div>

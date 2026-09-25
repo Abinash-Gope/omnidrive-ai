@@ -394,12 +394,12 @@ const VideoStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
         onMouseMove={resetControlsTimeout}
         onClick={togglePlayPause}
         style={{ maxHeight: "calc(100vh - 105px)" }}
-        className="relative w-full max-w-5xl aspect-video rounded-3xl overflow-hidden shadow-2xl border border-white/10 bg-black flex items-center justify-center group cursor-pointer"
+        className="relative w-full max-w-5xl aspect-video rounded-3xl overflow-hidden shadow-2xl border border-white/20 dark:border-white/15 bg-black/90 dark:bg-black/95 backdrop-blur-3xl flex items-center justify-center group cursor-pointer ring-1 ring-black/10 dark:ring-white/10"
       >
         {/* Floating Minimalist Top Header Overlay (Auto-Hides with Controls) */}
         <div
           onClick={(e) => e.stopPropagation()}
-          className={`absolute top-0 inset-x-0 bg-gradient-to-b from-black/90 via-black/40 to-transparent pt-4 pb-12 px-5 flex items-center justify-between z-30 transition-opacity duration-300 pointer-events-auto ${
+          className={`absolute top-0 inset-x-0 bg-gradient-to-b from-black/85 via-black/45 to-transparent backdrop-blur-xs pt-4 pb-12 px-5 flex items-center justify-between z-30 transition-opacity duration-300 pointer-events-auto ${
             showControls ? "opacity-100" : "opacity-0 !pointer-events-none"
           }`}
         >
@@ -607,7 +607,7 @@ const VideoStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
         {/* Bottom Player Controls Overlay Bar (Auto-Hides with Controls) */}
         <div
           onClick={(e) => e.stopPropagation()}
-          className={`absolute bottom-0 inset-x-0 bg-gradient-to-t from-black via-black/85 to-transparent pt-12 pb-3.5 px-5 flex flex-col gap-2 z-20 transition-opacity duration-300 ${
+          className={`absolute bottom-0 inset-x-0 bg-gradient-to-t from-black via-black/85 to-transparent backdrop-blur-xs pt-12 pb-3.5 px-5 flex flex-col gap-2 z-20 transition-opacity duration-300 ${
             showControls ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
         >

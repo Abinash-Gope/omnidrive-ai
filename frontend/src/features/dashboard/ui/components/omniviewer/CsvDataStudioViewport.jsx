@@ -170,20 +170,20 @@ const CsvDataStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
   return (
     <div
       style={{ maxHeight: "calc(100vh - 105px)" }}
-      className="w-full h-full max-w-5xl flex flex-col rounded-3xl border border-white/10 bg-slate-900/80 backdrop-blur-2xl shadow-2xl overflow-hidden relative select-text font-mono text-xs"
+      className="w-full h-full max-w-5xl flex flex-col rounded-3xl border border-slate-200/80 dark:border-white/10 bg-white/85 dark:bg-slate-900/80 backdrop-blur-3xl shadow-2xl overflow-hidden relative select-text font-mono text-xs"
     >
       {/* Standardized Studio In-Stage Header Toolbar */}
-      <div className="h-12 px-4 sm:px-5 bg-slate-900/90 border-b border-white/10 flex items-center justify-between text-slate-300 shrink-0 z-20">
+      <div className="h-12 px-4 sm:px-5 bg-white/85 dark:bg-slate-900/85 border-b border-slate-200/80 dark:border-white/10 flex items-center justify-between text-slate-700 dark:text-slate-300 shrink-0 z-20 backdrop-blur-xl">
         {/* Left: Format & Spreadsheet Metrics */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <FileSpreadsheet className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span className="font-semibold text-white text-xs truncate max-w-[160px] sm:max-w-xs font-sans">
+          <FileSpreadsheet className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          <span className="font-semibold text-slate-900 dark:text-white text-xs truncate max-w-[160px] sm:max-w-xs font-sans">
             {file.name}
           </span>
-          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shrink-0">
+          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 shrink-0">
             {isTsv ? "TSV TABLE" : "CSV DATA"}
           </span>
-          <span className="text-slate-400 text-[11px] hidden sm:inline">
+          <span className="text-slate-500 dark:text-slate-400 text-[11px] hidden sm:inline">
             {filteredRows.length} rows • {data.headers.length} columns
           </span>
         </div>
@@ -198,20 +198,20 @@ const CsvDataStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
               placeholder="Filter rows..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 pr-3 py-1 rounded-xl bg-black/40 border border-white/10 text-white placeholder-slate-500 text-[11px] focus:outline-hidden focus:border-emerald-500 w-36 sm:w-44"
+              className="pl-8 pr-3 py-1 rounded-xl bg-slate-100/90 dark:bg-black/40 border border-slate-200/80 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 text-[11px] focus:outline-hidden focus:border-emerald-500 w-36 sm:w-44"
             />
           </div>
 
           {/* Copy Table TSV */}
           <button
             onClick={handleCopyTable}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-white text-xs font-sans font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-white text-xs font-sans font-medium transition-colors"
             title="Copy table data to clipboard"
           >
             {copied ? (
               <>
-                <Check className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="text-emerald-400">Copied!</span>
+                <Check className="w-3.5 h-3.5 text-emerald-500" />
+                <span className="text-emerald-500">Copied!</span>
               </>
             ) : (
               <>
@@ -228,7 +228,7 @@ const CsvDataStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                 e.stopPropagation();
                 onShare();
               }}
-              className="p-1.5 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-slate-300 hover:text-white transition-colors"
+              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
               title="Copy share link"
             >
               <Share2 className="w-3.5 h-3.5" />
@@ -243,7 +243,7 @@ const CsvDataStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
               target="_blank"
               rel="noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="p-1.5 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-slate-300 hover:text-white transition-colors"
+              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
               title="Download CSV file"
             >
               <Download className="w-3.5 h-3.5" />
@@ -257,7 +257,7 @@ const CsvDataStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                 e.stopPropagation();
                 onClose();
               }}
-              className="p-1.5 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-white/80 hover:text-white transition-colors"
+              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-white/80 hover:text-slate-900 dark:hover:text-white transition-colors"
               title="Close (Esc)"
             >
               <X className="w-4 h-4" />
@@ -267,23 +267,23 @@ const CsvDataStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
       </div>
 
       {/* Spreadsheet Data Grid */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto bg-slate-50/60 dark:bg-transparent backdrop-blur-xs">
         <table className="w-full border-collapse text-left">
           {/* Sticky Header */}
-          <thead className="sticky top-0 bg-slate-900 border-b border-slate-700 z-10">
+          <thead className="sticky top-0 bg-slate-100/95 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 z-10 backdrop-blur-md">
             <tr>
-              <th className="py-2.5 px-3 text-[10px] text-slate-500 font-bold uppercase border-r border-slate-800 w-12 text-center">
+              <th className="py-2.5 px-3 text-[10px] text-slate-500 font-bold uppercase border-r border-slate-200 dark:border-slate-800 w-12 text-center">
                 #
               </th>
               {data.headers.map((h, i) => (
                 <th
                   key={i}
                   onClick={() => handleSort(i)}
-                  className="py-2.5 px-4 text-xs font-bold text-slate-200 border-r border-slate-800/80 hover:bg-slate-800/60 cursor-pointer select-none transition-colors"
+                  className="py-2.5 px-4 text-xs font-bold text-slate-800 dark:text-slate-200 border-r border-slate-200 dark:border-slate-800/80 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 cursor-pointer select-none transition-colors"
                 >
                   <div className="flex items-center justify-between gap-1.5">
                     <span className="truncate max-w-[200px]">{h || `Col ${i + 1}`}</span>
-                    <ArrowUpDown className="w-3 h-3 text-slate-500 hover:text-emerald-400 shrink-0" />
+                    <ArrowUpDown className="w-3 h-3 text-slate-400 dark:text-slate-500 hover:text-emerald-500 shrink-0" />
                   </div>
                 </th>
               ))}
@@ -291,22 +291,22 @@ const CsvDataStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
           </thead>
 
           {/* Table Body */}
-          <tbody className="divide-y divide-slate-800/60">
+          <tbody className="divide-y divide-slate-200/60 dark:divide-slate-800/60">
             {filteredRows.slice(0, 500).map((row, rIdx) => (
               <tr
                 key={rIdx}
-                className="hover:bg-slate-900/60 transition-colors group"
+                className="hover:bg-blue-50/60 dark:hover:bg-slate-900/60 transition-colors group"
               >
-                <td className="py-2 px-3 text-[10px] font-mono text-slate-600 text-center border-r border-slate-800/60 bg-slate-950 group-hover:bg-slate-900/80">
+                <td className="py-2 px-3 text-[10px] font-mono text-slate-500 dark:text-slate-600 text-center border-r border-slate-200/60 dark:border-slate-800/60 bg-slate-100/60 dark:bg-slate-950 group-hover:bg-blue-100/40 dark:group-hover:bg-slate-900/80">
                   {rIdx + 1}
                 </td>
                 {data.headers.map((_, cIdx) => (
                   <td
                     key={cIdx}
-                    className="py-2 px-4 text-xs text-slate-300 border-r border-slate-800/40 truncate max-w-[320px]"
+                    className="py-2 px-4 text-xs text-slate-800 dark:text-slate-300 border-r border-slate-200/40 dark:border-slate-800/40 truncate max-w-[320px]"
                     title={row[cIdx] || ""}
                   >
-                    {row[cIdx] || <span className="text-slate-600">—</span>}
+                    {row[cIdx] || <span className="text-slate-400 dark:text-slate-600">—</span>}
                   </td>
                 ))}
               </tr>

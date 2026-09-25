@@ -7,6 +7,10 @@ import {
   Film,
   Camera,
   FileText,
+  FileSpreadsheet,
+  FileCode,
+  Music,
+  Archive,
   Loader2,
   CheckCircle2,
   RefreshCw,
@@ -39,18 +43,40 @@ const formatSize = (bytes) => {
 };
 
 const getFileCategory = (file) => {
-  const type = file?.type || "";
-  if (type.startsWith("video/")) return "video";
-  if (type.startsWith("image/")) return "image";
-  if (type.includes("pdf")) return "pdf";
+  const type = (file?.type || "").toLowerCase();
+  const name = (file?.name || "").toLowerCase();
+  if (type.startsWith("video/") || /\.(mp4|mov|mkv|webm|avi|m4v|3gp|flv|wmv)$/i.test(name)) return "video";
+  if (type.startsWith("image/") || /\.(jpe?g|png|webp|gif|svg|bmp|ico|avif)$/i.test(name)) return "image";
+  if (type.includes("pdf") || name.endsWith(".pdf")) return "pdf";
+  if (type.includes("csv") || /\.(csv|tsv)$/i.test(name)) return "csv";
+  if (/\.(js|jsx|ts|tsx|py|json|html|css|sql|sh|bash|yml|yaml|env|xml|c|cpp|h|java|rs|go|php)$/i.test(name)) return "code";
+  if (type.startsWith("audio/") || /\.(mp3|wav|aac|ogg|flac|m4a|wma)$/i.test(name)) return "audio";
+  if (
+    type.includes("word") ||
+    type.includes("presentation") ||
+    type.includes("spreadsheet") ||
+    type.includes("officedocument") ||
+    /\.(md|markdown|txt|log|docx?|dotx?|docm|xlsx?|xltx?|xlsm|pptx?|potx?|ppsx?|pptm|odt|ods|odp|rtf|pages|key|numbers|epub)$/i.test(name)
+  ) return "doc";
+  if (/\.(zip|tar|gz|rar|7z|exe|bin|iso)$/i.test(name)) return "archive";
   return "other";
 };
 
 const FileTypeIcon = ({ file, className = "w-4 h-4" }) => {
   const cat = getFileCategory(file);
+  const name = (file?.name || "").toLowerCase();
   if (cat === "video") return <Film className={className} />;
   if (cat === "image") return <Camera className={className} />;
   if (cat === "pdf") return <FileText className={className} />;
+  if (cat === "csv") return <FileSpreadsheet className={className} />;
+  if (cat === "code") return <FileCode className={className} />;
+  if (cat === "audio") return <Music className={className} />;
+  if (cat === "doc") {
+    if (/\.(pptx?|potx?|ppsx?|pptm|odp|key)$/i.test(name)) return <Presentation className={className} />;
+    if (/\.(xlsx?|xltx?|xlsm|ods|numbers)$/i.test(name)) return <FileSpreadsheet className={className} />;
+    return <FileText className={className} />;
+  }
+  if (cat === "archive") return <Archive className={className} />;
   return <File className={className} />;
 };
 
@@ -58,6 +84,11 @@ const categoryColors = {
   video: "bg-blue-100/80 dark:bg-blue-950/80 text-blue-600 dark:text-blue-400",
   image: "bg-emerald-100/80 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400",
   pdf: "bg-purple-100/80 dark:bg-purple-950/80 text-purple-600 dark:text-purple-400",
+  csv: "bg-teal-100/80 dark:bg-teal-950/80 text-teal-600 dark:text-teal-400",
+  code: "bg-indigo-100/80 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400",
+  audio: "bg-cyan-100/80 dark:bg-cyan-950/80 text-cyan-600 dark:text-cyan-400",
+  doc: "bg-amber-100/80 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400",
+  archive: "bg-rose-100/80 dark:bg-rose-950/80 text-rose-600 dark:text-rose-400",
   other: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400",
 };
 
@@ -377,14 +408,14 @@ const UploadModal = ({ isOpen, onClose, onUploadComplete, stagedFiles, onClearSt
     >
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-slate-900/60 backdrop-blur-md transition-opacity duration-300"
+        className="fixed inset-0 bg-slate-900/30 dark:bg-slate-950/80 backdrop-blur-xl transition-opacity duration-300"
         onClick={handleClose}
         aria-hidden="true"
       />
 
       {/* Modal Surface */}
       <div
-        className="relative w-full max-w-lg bg-white dark:bg-[#0f172a] rounded-3xl shadow-2xl border border-slate-200/80 dark:border-slate-800 p-6 sm:p-8 z-10"
+        className="relative w-full max-w-lg bg-white/95 dark:bg-[#0f172a]/95 backdrop-blur-2xl rounded-3xl shadow-2xl border border-slate-200/80 dark:border-slate-800 p-6 sm:p-8 z-10"
         onClick={(e) => e.stopPropagation()}
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
@@ -399,19 +430,18 @@ const UploadModal = ({ isOpen, onClose, onUploadComplete, stagedFiles, onClearSt
                 <UploadCloud className="w-7 h-7 stroke-[2] animate-bounce" />
               </div>
               <p className="text-sm font-bold text-[#1a73e8]">Drop files to add to queue</p>
-              <p className="text-xs text-slate-400 mt-1">Supports MP4, MOV, JPG, PNG, PDF</p>
+              <p className="text-xs text-slate-400 mt-1">Supports All Media, Code, CSV, Docs & Archives</p>
             </div>
           </div>
         )}
 
-        {/* Hidden file inputs */}
+        {/* Hidden file inputs — allow all file formats */}
         <input
           ref={dropZoneInputRef}
           type="file"
           multiple
           onChange={handleFileChange}
           className="hidden"
-          accept="video/*,image/*,application/pdf"
         />
         <input
           ref={addMoreInputRef}
@@ -419,7 +449,6 @@ const UploadModal = ({ isOpen, onClose, onUploadComplete, stagedFiles, onClearSt
           multiple
           onChange={handleFileChange}
           className="hidden"
-          accept="video/*,image/*,application/pdf"
         />
 
         {/* Header */}
@@ -436,7 +465,7 @@ const UploadModal = ({ isOpen, onClose, onUploadComplete, stagedFiles, onClearSt
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 {totalCount > 0
                   ? `${totalCount} file${totalCount !== 1 ? "s" : ""} • ${formatSize(totalStagedBytes)}`
-                  : "Drag & drop or browse files — supports MP4, MOV, JPG, PNG, PDF"}
+                  : "Drag & drop or browse files — supports Code, CSV, Media, PDFs & Archives"}
               </p>
             </div>
           </div>
@@ -492,17 +521,23 @@ const UploadModal = ({ isOpen, onClose, onUploadComplete, stagedFiles, onClearSt
               <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
                 {isDragOver
                   ? "Files will be staged for AI processing"
-                  : "Select multiple files — each goes through the full AWS AI pipeline"}
+                  : "Select files of any format — full enterprise storage & AI analysis"}
               </p>
-              <div className="flex items-center justify-center gap-2 mt-4 pt-3 border-t border-slate-200/60 dark:border-slate-800/80">
+              <div className="flex items-center justify-center gap-2 mt-4 pt-3 border-t border-slate-200/60 dark:border-slate-800/80 flex-wrap">
                 <span className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-blue-100/70 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200/50 dark:border-blue-800/50">
-                  🎬 MP4 / MOV
+                  🎬 Videos
                 </span>
                 <span className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-emerald-100/70 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-800/50">
-                  📷 JPG / PNG
+                  📷 Images
                 </span>
                 <span className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-purple-100/70 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/50 dark:border-purple-800/50">
-                  📑 PDF
+                  📑 DOCX / PPTX / PDF
+                </span>
+                <span className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-teal-100/70 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 border border-teal-200/50 dark:border-teal-800/50">
+                  📊 CSV / Data
+                </span>
+                <span className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-indigo-100/70 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-800/50">
+                  💻 Code & Text
                 </span>
               </div>
             </div>

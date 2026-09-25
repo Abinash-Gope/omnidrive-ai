@@ -16,6 +16,12 @@ import {
   RotateCcw,
   FolderPlus,
   FolderMinus,
+  FileSpreadsheet,
+  FileCode,
+  Music,
+  Archive,
+  Presentation,
+  File as FileGenericIcon,
 } from "lucide-react";
 import FileStatusBadge from "./FileStatusBadge.jsx";
 import PdfPreview from "./PdfPreview.jsx";
@@ -56,6 +62,23 @@ const FileCard = ({
   const isVideo = file.type === "video" || /\.(mp4|mov|mkv|webm|avi|m4v)$/i.test(fileNameLower);
   const isImage = file.type === "image" || /\.(jpe?g|png|webp|gif|svg|bmp|avif)$/i.test(fileNameLower);
   const isPdf = file.type === "pdf" || fileNameLower.endsWith(".pdf");
+  const isDoc =
+    file.type === "document" ||
+    /\.(docx?|dotx?|docm|pptx?|potx?|ppsx?|pptm|xlsx?|xltx?|xlsm|odt|ods|odp|rtf|pages|key|numbers|epub)$/i.test(
+      fileNameLower
+    );
+  const isPpt = /\.(pptx?|potx?|ppsx?|pptm|key)$/i.test(fileNameLower);
+  const isWord = /\.(docx?|dotx?|docm|odt|rtf|pages)$/i.test(fileNameLower);
+  const isExcel = /\.(xlsx?|xltx?|xlsm|ods|numbers)$/i.test(fileNameLower);
+  const isCsv = file.type === "csv" || /\.(csv|tsv)$/i.test(fileNameLower);
+  const isCode =
+    file.type === "code" ||
+    /\.(js|jsx|ts|tsx|py|json|html|css|sql|sh|bash|yml|yaml|env|xml|c|cpp|h|java|rs|go|php)$/i.test(
+      fileNameLower
+    );
+  const isAudio = file.type === "audio" || /\.(mp3|wav|aac|ogg|flac|m4a|wma)$/i.test(fileNameLower);
+  const isMarkdown = file.type === "markdown" || /\.(md|markdown|txt|log)$/i.test(fileNameLower);
+  const isArchive = file.type === "archive" || /\.(zip|tar|gz|rar|7z|exe|bin|iso)$/i.test(fileNameLower);
 
   // Close menu on outside click
   useEffect(() => {
@@ -76,7 +99,15 @@ const FileCard = ({
   const getFileIcon = () => {
     if (isVideo) return <Film className="w-5 h-5 text-blue-600 dark:text-blue-400" />;
     if (isImage) return <Camera className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />;
-    return <FileText className="w-5 h-5 text-purple-600 dark:text-purple-400" />;
+    if (isPdf) return <FileText className="w-5 h-5 text-purple-600 dark:text-purple-400" />;
+    if (isPpt) return <Presentation className="w-5 h-5 text-orange-600 dark:text-orange-400" />;
+    if (isWord) return <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />;
+    if (isExcel || isCsv) return <FileSpreadsheet className="w-5 h-5 text-teal-600 dark:text-teal-400" />;
+    if (isDoc) return <FileText className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />;
+    if (isCode) return <FileCode className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />;
+    if (isAudio) return <Music className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />;
+    if (isArchive) return <Archive className="w-5 h-5 text-amber-600 dark:text-amber-400" />;
+    return <FileGenericIcon className="w-5 h-5 text-slate-600 dark:text-slate-400" />;
   };
 
   if (viewMode === "list") {
@@ -104,7 +135,7 @@ const FileCard = ({
               <VideoPreview file={file} isCompact={true} />
             ) : isPdf && file.downloadUrl ? (
               <PdfPreview url={file.downloadUrl} pageNumber={1} scale={0.5} className="w-full h-full" fitParent={true} objectFit="cover" onPageCount={setRealPageCount} />
-            ) : (file.thumbnail_url || file.thumbnail || file.downloadUrl) && !isPdf ? (
+            ) : isImage && (file.thumbnail_url || file.thumbnail || file.downloadUrl) ? (
               <img
                 src={file.thumbnail_url || file.thumbnail || file.downloadUrl}
                 alt={file.name}
@@ -329,8 +360,24 @@ const FileCard = ({
             <div className="w-12 h-12 rounded-full bg-white/95 dark:bg-slate-900/95 text-[#1a73e8] shadow-lg flex items-center justify-center backdrop-blur-md">
               {isImage ? (
                 <Sparkles className="w-6 h-6 text-emerald-500" />
-              ) : (
+              ) : isPdf ? (
                 <FileText className="w-6 h-6 text-purple-500" />
+              ) : isPpt ? (
+                <Presentation className="w-6 h-6 text-orange-500" />
+              ) : isWord ? (
+                <FileText className="w-6 h-6 text-blue-500" />
+              ) : isExcel || isCsv ? (
+                <FileSpreadsheet className="w-6 h-6 text-teal-500" />
+              ) : isDoc ? (
+                <FileText className="w-6 h-6 text-indigo-500" />
+              ) : isCode ? (
+                <FileCode className="w-6 h-6 text-indigo-500" />
+              ) : isAudio ? (
+                <Music className="w-6 h-6 text-cyan-500" />
+              ) : isArchive ? (
+                <Archive className="w-6 h-6 text-amber-500" />
+              ) : (
+                <FileGenericIcon className="w-6 h-6 text-blue-500" />
               )}
             </div>
           </div>

@@ -28,20 +28,20 @@ const BinaryFileViewport = ({ file, onClose, onShare, downloadLink }) => {
   return (
     <div
       style={{ maxHeight: "calc(100vh - 105px)" }}
-      className="w-full h-full max-w-5xl flex flex-col rounded-3xl border border-white/10 bg-slate-900/80 backdrop-blur-2xl shadow-2xl overflow-hidden relative select-none"
+      className="w-full h-full max-w-5xl flex flex-col rounded-3xl border border-slate-200/80 dark:border-white/10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-3xl shadow-2xl overflow-hidden relative select-none"
     >
       {/* Standardized Studio In-Stage Header Toolbar */}
-      <div className="h-12 px-4 sm:px-5 bg-slate-900/90 border-b border-white/10 flex items-center justify-between text-slate-300 shrink-0 z-20">
+      <div className="h-12 px-4 sm:px-5 bg-white/85 dark:bg-slate-900/85 border-b border-slate-200/80 dark:border-white/10 flex items-center justify-between text-slate-700 dark:text-slate-300 shrink-0 z-20 backdrop-blur-xl">
         {/* Left: Format & Archive Details */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <Archive className="w-4 h-4 text-amber-400 shrink-0" />
-          <span className="font-semibold text-white text-xs truncate max-w-[160px] sm:max-w-xs font-sans">
+          <Archive className="w-4 h-4 text-amber-500 dark:text-amber-400 shrink-0" />
+          <span className="font-semibold text-slate-900 dark:text-white text-xs truncate max-w-[160px] sm:max-w-xs font-sans">
             {fileName}
           </span>
-          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-500/15 text-amber-300 border border-amber-500/30 font-mono shrink-0">
+          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 font-mono shrink-0">
             {ext} ARCHIVE
           </span>
-          <span className="text-slate-400 text-[11px] font-mono hidden sm:inline">
+          <span className="text-slate-500 dark:text-slate-400 text-[11px] font-mono hidden sm:inline">
             {file.size || "Original Size"}
           </span>
         </div>
@@ -55,7 +55,7 @@ const BinaryFileViewport = ({ file, onClose, onShare, downloadLink }) => {
                 e.stopPropagation();
                 onShare();
               }}
-              className="p-1.5 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-slate-300 hover:text-white transition-colors"
+              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
               title="Copy share link"
             >
               <Share2 className="w-3.5 h-3.5" />
@@ -83,7 +83,7 @@ const BinaryFileViewport = ({ file, onClose, onShare, downloadLink }) => {
                 e.stopPropagation();
                 onClose();
               }}
-              className="p-1.5 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-white/80 hover:text-white transition-colors"
+              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-white/80 hover:text-slate-900 dark:hover:text-white transition-colors"
               title="Close (Esc)"
             >
               <X className="w-4 h-4" />
@@ -93,50 +93,50 @@ const BinaryFileViewport = ({ file, onClose, onShare, downloadLink }) => {
       </div>
 
       {/* Main Center Telemetry Stage */}
-      <div className="flex-1 w-full min-h-0 relative flex items-center justify-center p-6 bg-slate-950/70 overflow-y-auto custom-scrollbar">
+      <div className="flex-1 w-full min-h-0 relative flex items-center justify-center p-6 bg-slate-100/60 dark:bg-slate-950/70 backdrop-blur-md overflow-y-auto custom-scrollbar">
         {/* Enterprise Telemetry Card */}
-        <div className="relative max-w-md w-full rounded-2xl bg-slate-900/90 border border-white/10 p-6 sm:p-8 shadow-2xl backdrop-blur-xl flex flex-col items-center text-center">
+        <div className="relative max-w-md w-full rounded-2xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-white/10 p-6 sm:p-8 shadow-2xl backdrop-blur-xl flex flex-col items-center text-center">
           {/* Format Badge */}
-          <div className="w-18 h-18 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center shadow-inner mb-4">
+          <div className="w-18 h-18 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-500 dark:text-amber-400 flex items-center justify-center shadow-inner mb-4">
             <Archive className="w-9 h-9 stroke-[1.5]" />
           </div>
 
-          <h3 className="text-base font-bold text-white mb-1 truncate max-w-full">
+          <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1 truncate max-w-full">
             {fileName}
           </h3>
-          <p className="text-xs text-slate-400 font-mono mb-5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mb-5">
             {ext} Binary Package • {file.size || "Unknown Size"}
           </p>
 
           {/* Metadata Details Grid */}
-          <div className="w-full bg-black/40 rounded-xl p-3.5 border border-white/5 space-y-2.5 font-mono text-xs text-left mb-6">
-            <div className="flex items-center justify-between text-slate-300">
+          <div className="w-full bg-slate-50 dark:bg-black/40 rounded-xl p-3.5 border border-slate-200/70 dark:border-white/5 space-y-2.5 font-mono text-xs text-left mb-6">
+            <div className="flex items-center justify-between text-slate-700 dark:text-slate-300">
               <span className="text-slate-500 flex items-center gap-1.5">
                 <HardDrive className="w-3.5 h-3.5" />
                 S3 Storage:
               </span>
-              <span className="text-emerald-400 font-semibold">Standard AWS S3</span>
+              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Standard AWS S3</span>
             </div>
 
-            <div className="flex items-center justify-between text-slate-300">
+            <div className="flex items-center justify-between text-slate-700 dark:text-slate-300">
               <span className="text-slate-500 flex items-center gap-1.5">
                 <ShieldCheck className="w-3.5 h-3.5" />
                 Integrity:
               </span>
               <span
-                className="text-slate-300 truncate max-w-[180px]"
+                className="text-slate-700 dark:text-slate-300 truncate max-w-[180px]"
                 title={file.id || "Verified"}
               >
                 SHA-256 Verified
               </span>
             </div>
 
-            <div className="flex items-center justify-between text-slate-300">
+            <div className="flex items-center justify-between text-slate-700 dark:text-slate-300">
               <span className="text-slate-500 flex items-center gap-1.5">
                 <FileBadge className="w-3.5 h-3.5" />
                 Format:
               </span>
-              <span className="text-amber-300 uppercase">{ext} File</span>
+              <span className="text-amber-600 dark:text-amber-300 uppercase">{ext} File</span>
             </div>
           </div>
 
