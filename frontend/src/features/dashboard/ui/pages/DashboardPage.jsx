@@ -9,6 +9,7 @@ import PipelineDrawer from "../components/PipelineDrawer.jsx";
 import VideoPlayerModal from "../components/VideoPlayerModal.jsx";
 import ImageAiModal from "../components/ImageAiModal.jsx";
 import PdfSummaryModal from "../components/PdfSummaryModal.jsx";
+import OmniViewerModal from "../components/omniviewer/OmniViewerModal.jsx";
 import UploadModal from "../../../../components/UploadModal.jsx";
 import DeleteConfirmModal from "../components/DeleteConfirmModal.jsx";
 import DeleteFolderModal from "../components/DeleteFolderModal.jsx";
@@ -428,30 +429,13 @@ const DashboardPage = () => {
         onClose={handleClosePipeline}
       />
 
-      {/* Multimodal Preview Modals */}
-      <VideoPlayerModal
+      {/* Unified All-Format Studio Modal */}
+      <OmniViewerModal
         file={previewModal?.file}
-        isOpen={Boolean(
-          previewModal?.isOpen &&
-            previewModal?.file &&
-            (previewModal.file.type === "video" ||
-              /\.(mp4|mov|mkv|webm|avi|m4v|3gp|flv|wmv)$/i.test(previewModal.file.name || ""))
-        )}
+        isOpen={Boolean(previewModal?.isOpen && previewModal?.file)}
         onClose={handleClosePreview}
-        onChangeQuality={handleChangeQuality}
-      />
-
-      <ImageAiModal
-        file={previewModal?.file}
-        isOpen={previewModal?.isOpen && previewModal?.file?.type === "image"}
-        onClose={handleClosePreview}
-      />
-
-      <PdfSummaryModal
-        key={previewModal?.file?.id || previewModal?.file?.file_id || previewModal?.file?.s3Key || previewModal?.file?.name || "pdf-modal"}
-        file={previewModal?.file}
-        isOpen={previewModal?.isOpen && previewModal?.file?.type === "pdf"}
-        onClose={handleClosePreview}
+        files={files}
+        onSelectFile={handleOpenPreview}
       />
 
 

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { Film, Play } from "lucide-react";
 import { findThumbnail, saveThumbnail } from "../../utils/thumbnailCache.jsx";
 
@@ -32,33 +32,37 @@ const isImageUrl = (url) => {
  * VideoPreview Component
  * Renders high-fidelity video thumbnail previews for grid cards and list views.
  * 
- * Multi-layer preview architecture:
- * 1. CloudFront HLS ABR frame capture (thumbnail.0000000.jpg)
- * 2. Instant client-side cached image thumbnail
- * 3. Dynamic client-side HTML5 canvas frame extraction fallback
- * 4. Smooth muted hover preview snippet
+ * Multi-layer resilient preview architecture:
+ * 1. Verified local cache thumbnail (instant on known browser)
+ * 2. Backend verified image thumbnail (if available)
+ * 3. CloudFront HLS ABR frame capture
+ * 4. Native HTML5 video decoder first-frame poster (#t=0.5) — works in ANY browser
+ * 5. Smooth muted hover preview snippet
+ * 6. Sleek cinematic shimmer fallback — NEVER a broken image icon!
  */
 const VideoPreview = ({ file, isCompact = false, isHovered = false }) => {
   const fileId = file.id || file.file_id;
   const cdnThumb = fileId ? `https://d3by850sf4vvuz.cloudfront.net/hls/${fileId}/thumbnail.0000000.jpg` : null;
 
-  // Build candidate thumbnail URLs in order of priority
+  // Build candidate thumbnail URLs in order of reliability
   const candidates = useMemo(() => {
     const list = [];
+    const cached = findThumbnail(fileId, file.s3Key, file.s3_key, file.name);
+    if (cached && !list.includes(cached)) list.push(cached);
+
     if (isImageUrl(file.thumbnail)) list.push(file.thumbnail);
-    if (isImageUrl(file.thumbnail_url) && file.thumbnail_url !== file.thumbnail) {
+    if (isImageUrl(file.thumbnail_url) && !list.includes(file.thumbnail_url)) {
       list.push(file.thumbnail_url);
     }
     if (cdnThumb && !list.includes(cdnThumb)) list.push(cdnThumb);
-    const cached = findThumbnail(fileId, file.s3Key, file.s3_key, file.name);
-    if (cached && !list.includes(cached)) list.push(cached);
     return list;
   }, [file.thumbnail, file.thumbnail_url, cdnThumb, fileId, file.s3Key, file.s3_key, file.name]);
 
   const [candidateIdx, setCandidateIdx] = useState(0);
+  const [allImagesFailed, setAllImagesFailed] = useState(candidates.length === 0);
   const [capturedThumb, setCapturedThumb] = useState(null);
-  const [hasExtractedFrame, setHasExtractedFrame] = useState(false);
   const [isVideoLoaded, setIsVideoLoaded] = useState(false);
+  const [videoError, setVideoError] = useState(false);
   const [realDuration, setRealDuration] = useState(() => {
     if (typeof file.duration === "number") return formatSeconds(file.duration);
     if (typeof file.duration === "string" && file.duration !== "03:40" && file.duration.includes(":")) {
@@ -70,12 +74,17 @@ const VideoPreview = ({ file, isCompact = false, isHovered = false }) => {
   const videoRef = useRef(null);
   const videoSourceUrl = file.downloadUrl || (typeof file.thumbnail === "string" && file.thumbnail.endsWith(".mp4") ? file.thumbnail : null);
 
-  const activeThumb = candidates[candidateIdx] || capturedThumb || null;
+  // Active static image thumbnail (null if all candidates failed or none exist)
+  const activeThumb = !allImagesFailed && candidates[candidateIdx]
+    ? candidates[candidateIdx]
+    : capturedThumb || null;
 
-  // Handle image load error: fall through to next candidate
+  // Handle image load error: fall through to next candidate or mark all failed
   const handleImageError = () => {
     if (candidateIdx < candidates.length - 1) {
       setCandidateIdx((prev) => prev + 1);
+    } else {
+      setAllImagesFailed(true);
     }
   };
 
@@ -87,65 +96,28 @@ const VideoPreview = ({ file, isCompact = false, isHovered = false }) => {
     }
   };
 
-  // Dynamic Canvas Snapshot Fallback: extract frame client-side if no static image candidate is available
-  useEffect(() => {
-    if (activeThumb || hasExtractedFrame || !videoSourceUrl) return;
-
-    let isCancelled = false;
-    const hiddenVideo = document.createElement("video");
-    hiddenVideo.crossOrigin = "anonymous";
-    hiddenVideo.muted = true;
-    hiddenVideo.preload = "metadata";
-    hiddenVideo.playsInline = true;
-    hiddenVideo.src = videoSourceUrl;
-
-    const onLoadedData = () => {
-      if (isCancelled) return;
-      try {
-        hiddenVideo.currentTime = Math.min(1.0, (hiddenVideo.duration || 1) * 0.1);
-      } catch (_) {}
-    };
-
-    const onSeeked = () => {
-      if (isCancelled) return;
-      try {
-        const w = hiddenVideo.videoWidth || 640;
-        const h = hiddenVideo.videoHeight || 360;
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.min(640, w);
-        canvas.height = Math.round((canvas.width / w) * h);
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.drawImage(hiddenVideo, 0, 0, canvas.width, canvas.height);
-          const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
-          if (!isCancelled && dataUrl && dataUrl.length > 500) {
-            setCapturedThumb(dataUrl);
-            setHasExtractedFrame(true);
-            saveThumbnail([fileId, file.s3Key, file.name], dataUrl);
-          }
+  // Attempt to capture video frame into local cache once video decodes
+  const tryCaptureFrame = useCallback((videoEl) => {
+    if (!videoEl || capturedThumb || findThumbnail(fileId, file.s3Key, file.name)) return;
+    try {
+      const w = videoEl.videoWidth || 640;
+      const h = videoEl.videoHeight || 360;
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.min(640, w);
+      canvas.height = Math.round((canvas.width / w) * h);
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+        if (dataUrl && dataUrl.length > 500) {
+          setCapturedThumb(dataUrl);
+          saveThumbnail([fileId, file.s3Key, file.name], dataUrl);
         }
-      } catch (err) {
-        console.warn("Client-side video frame capture failed:", err);
-      } finally {
-        cleanup();
       }
-    };
-
-    const cleanup = () => {
-      hiddenVideo.pause();
-      hiddenVideo.removeAttribute("src");
-      hiddenVideo.load();
-    };
-
-    hiddenVideo.addEventListener("loadeddata", onLoadedData);
-    hiddenVideo.addEventListener("seeked", onSeeked);
-    hiddenVideo.addEventListener("error", cleanup);
-
-    return () => {
-      isCancelled = true;
-      cleanup();
-    };
-  }, [activeThumb, hasExtractedFrame, videoSourceUrl, fileId, file.s3Key, file.name]);
+    } catch (_) {
+      // CORS canvas taint is fine because the native <video> is already visibly displaying the frame
+    }
+  }, [capturedThumb, fileId, file.s3Key, file.name]);
 
   // Smooth hover video playback
   useEffect(() => {
@@ -184,6 +156,24 @@ const VideoPreview = ({ file, isCompact = false, isHovered = false }) => {
       );
     }
 
+    if (videoSourceUrl && !videoError) {
+      return (
+        <div className="relative w-full h-full rounded-lg overflow-hidden bg-slate-900 flex items-center justify-center">
+          <video
+            src={`${videoSourceUrl}#t=0.5`}
+            preload="metadata"
+            muted
+            playsInline
+            onError={() => setVideoError(true)}
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+            <Play className="w-3 h-3 text-white/90 fill-current" />
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="w-full h-full rounded-lg bg-blue-950/60 text-blue-400 flex items-center justify-center">
         <Film className="w-4 h-4 stroke-[1.75]" />
@@ -194,7 +184,7 @@ const VideoPreview = ({ file, isCompact = false, isHovered = false }) => {
   // Grid View (16:9 Aspect Video Card)
   return (
     <div className="relative w-full h-full bg-slate-950 flex items-center justify-center overflow-hidden select-none group">
-      {/* 1. Visual Thumbnail Image */}
+      {/* 1. Visual Thumbnail Image (only rendered when valid image candidate exists) */}
       {activeThumb ? (
         <img
           src={activeThumb}
@@ -205,7 +195,7 @@ const VideoPreview = ({ file, isCompact = false, isHovered = false }) => {
           decoding="async"
         />
       ) : (
-        /* Cinematic Shimmer Placeholder */
+        /* Cinematic Shimmer Placeholder — Shown while video is loading or if stream is unavailable */
         <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-slate-950 to-blue-950/40 p-4 text-center">
           <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-[#1a73e8] dark:text-blue-400 flex items-center justify-center mb-2 shadow-inner">
             <Film className="w-6 h-6 stroke-[1.5]" />
@@ -214,24 +204,30 @@ const VideoPreview = ({ file, isCompact = false, isHovered = false }) => {
             {file.name || "Video Stream"}
           </span>
           <span className="text-[10px] text-slate-400 font-mono mt-0.5">
-            {file.status === "PROCESSING" ? "Transcoding..." : "Video Media"}
+            {file.status === "PROCESSING" ? "Transcoding..." : "HLS Video Stream"}
           </span>
         </div>
       )}
 
-      {/* 2. Smooth Hover Video Snippet (plays on card hover when source is available) */}
-      {videoSourceUrl && (
+      {/* 2. Native Video First-Frame Poster & Hover Snippet */}
+      {videoSourceUrl && !videoError && (
         <video
           ref={videoRef}
-          src={videoSourceUrl}
+          src={`${videoSourceUrl}#t=0.5`}
           preload="metadata"
           muted
           loop
           playsInline
-          onLoadedData={() => setIsVideoLoaded(true)}
+          onLoadedData={(e) => {
+            setIsVideoLoaded(true);
+            tryCaptureFrame(e.target);
+          }}
+          onError={() => setVideoError(true)}
           onLoadedMetadata={handleMetadata}
           className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 pointer-events-none ${
-            isHovered && isVideoLoaded ? "opacity-100" : "opacity-0"
+            activeThumb
+              ? (isHovered && isVideoLoaded ? "opacity-100" : "opacity-0")
+              : (isVideoLoaded ? "opacity-100" : "opacity-0")
           }`}
         />
       )}

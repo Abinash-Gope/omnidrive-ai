@@ -42,6 +42,7 @@ const FileCard = ({
   const [isCardHovered, setIsCardHovered] = useState(false);
   const [realPageCount, setRealPageCount] = useState(null);
   const [isPdfLoading, setIsPdfLoading] = useState(file.type === "pdf");
+  const [imgError, setImgError] = useState(false);
   const menuRef = useRef(null);
 
   const isInTrash = activeTab === "trash" || Boolean(file.inTrash);
@@ -51,9 +52,10 @@ const FileCard = ({
     else if (file.summary?.pages) setRealPageCount(file.summary.pages);
   }, [file.pages, file.summary?.pages]);
 
-  const isVideo = file.type === "video";
-  const isImage = file.type === "image";
-  const isPdf = file.type === "pdf";
+  const fileNameLower = (file.name || "").toLowerCase();
+  const isVideo = file.type === "video" || /\.(mp4|mov|mkv|webm|avi|m4v)$/i.test(fileNameLower);
+  const isImage = file.type === "image" || /\.(jpe?g|png|webp|gif|svg|bmp|avif)$/i.test(fileNameLower);
+  const isPdf = file.type === "pdf" || fileNameLower.endsWith(".pdf");
 
   // Close menu on outside click
   useEffect(() => {
@@ -271,23 +273,25 @@ const FileCard = ({
             <PdfPreview
               url={file.downloadUrl}
               pageNumber={1}
-              scale={1.5}
+              scale={1.0}
               className="w-full h-full"
               fitParent={true}
               objectFit="cover"
+              objectPosition="top"
               onPageCount={setRealPageCount}
               onLoadingChange={setIsPdfLoading}
             />
             {/* Subtle bottom shadow vignette for smooth transition and badge contrast */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
           </div>
-        ) : (file.thumbnail_url || file.thumbnail || file.downloadUrl) ? (
+        ) : (isImage && (file.thumbnail_url || file.thumbnail || file.downloadUrl) && !imgError) ? (
           <img
             src={file.thumbnail_url || file.thumbnail || file.downloadUrl}
             alt={file.name}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             loading="lazy"
             decoding="async"
+            onError={() => setImgError(true)}
           />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 text-slate-400">

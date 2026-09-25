@@ -79,10 +79,14 @@ export const getFilesApi = async () => {
               ? item.thumbnail_url
               : isImageFormat(item.thumbnailUrl)
               ? item.thumbnailUrl
+              : cachedThumb
+              ? cachedThumb
               : (item.hls_master_url || item.hlsUrl || item.status === "COMPLETED")
               ? cdnVideoThumbnail
-              : (cachedThumb || cdnVideoThumbnail || null))
-          : (item.thumbnail_url || item.download_url || cachedThumb || null);
+              : null)
+          : (isImageFormat(item.thumbnail_url)
+              ? item.thumbnail_url
+              : cachedThumb || (isImageFormat(item.download_url) ? item.download_url : null));
 
         return {
           id: fileId,
