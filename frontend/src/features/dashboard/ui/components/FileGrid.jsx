@@ -1,28 +1,12 @@
-import React, { useMemo, useState, useRef, useEffect } from "react";
+import React, { useMemo } from "react";
 import {
-  Film,
-  FileText,
-  Image as ImageIcon,
   ShieldAlert,
-  Search,
-  Sparkles,
   Inbox,
   Lock,
   Trash2,
   Star,
-  Clock,
   Users,
-  ArrowUpDown,
-  ChevronDown,
-  Check,
-  Calendar,
-  ArrowDownAZ,
-  ArrowUpZA,
-  HardDrive,
   Folder,
-  FileCode,
-  Music,
-  Archive,
 } from "lucide-react";
 import FileCard from "./FileCard.jsx";
 import FileGridSkeleton from "./FileGridSkeleton.jsx";
@@ -69,44 +53,7 @@ const FileGrid = ({
   onOpenAddToFolder,
   onOpenAddToAlbum,
 }) => {
-  const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
-  const sortRef = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (sortRef.current && !sortRef.current.contains(e.target)) {
-        setIsSortMenuOpen(false);
-      }
-    };
-    if (isSortMenuOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [isSortMenuOpen]);
-
-  const filterOptions = [
-    { id: "all", label: "All Files" },
-    { id: "video", label: "Videos (HLS)", icon: Film },
-    { id: "image", label: "Images (Vision AI)", icon: ImageIcon },
-    { id: "document", label: "Documents (PDF, Office)", icon: FileText },
-    { id: "code", label: "Code & Data", icon: FileCode },
-    { id: "audio", label: "Audio", icon: Music },
-    { id: "archive", label: "Archives", icon: Archive },
-  ];
-
-  const sortOptions = [
-    { id: "recent", label: "Recent (Newest)", icon: Clock, desc: "Latest uploads & activity" },
-    { id: "oldest", label: "Oldest First", icon: Calendar, desc: "Earliest uploaded files" },
-    { id: "name-asc", label: "Name (A to Z)", icon: ArrowDownAZ, desc: "Alphabetical order" },
-    { id: "name-desc", label: "Name (Z to A)", icon: ArrowUpZA, desc: "Reverse alphabetical" },
-    { id: "size-desc", label: "Size (Largest)", icon: HardDrive, desc: "Heaviest files first" },
-    { id: "size-asc", label: "Size (Smallest)", icon: HardDrive, desc: "Lightest files first" },
-  ];
-
-  const currentSortOption =
-    sortOptions.find((opt) => opt.id === sortBy) || sortOptions[0];
+  // Extract all images for category tag clustering
 
   // Extract all images for category tag clustering
   const allImages = useMemo(() => {
@@ -179,112 +126,7 @@ const FileGrid = ({
         </div>
       )}
 
-      {/* Filter Category Pills & Sort Control */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 max-w-full">
-          {filterOptions.map((opt) => {
-            const Icon = opt.icon;
-            const isSelected = filterType === opt.id;
-            return (
-              <button
-                key={opt.id}
-                onClick={() => onSelectFilter(opt.id)}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 ${
-                  isSelected
-                    ? "bg-[#1a73e8] text-white shadow-xs"
-                    : "bg-white dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700"
-                }`}
-              >
-                {Icon && <Icon className="w-3.5 h-3.5" />}
-                <span>{opt.label}</span>
-              </button>
-            );
-          })}
-        </div>
 
-        {/* Right side: Search info & Sort Dropdown */}
-        <div className="flex items-center gap-3 ml-auto shrink-0">
-          {searchQuery && (
-            <div className="text-xs text-slate-500 flex items-center gap-2">
-              <span>
-                Search results for: <strong className="text-slate-900 dark:text-white">"{searchQuery}"</strong>
-              </span>
-              <button
-                onClick={onResetSearch}
-                className="text-[#1a73e8] hover:underline font-semibold"
-              >
-                Clear
-              </button>
-            </div>
-          )}
-
-          {/* Sort Menu Dropdown */}
-          <div className="relative" ref={sortRef}>
-            <button
-              type="button"
-              onClick={() => setIsSortMenuOpen((prev) => !prev)}
-              className="h-8 px-3 rounded-full text-xs font-medium flex items-center gap-2 transition-all bg-white dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs hover:border-slate-300 dark:hover:border-slate-600 focus:outline-none select-none"
-              title="Change sort order"
-            >
-              <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 dark:text-slate-400" />
-              <span className="text-slate-500 dark:text-slate-400">Sort:</span>
-              <span className="font-semibold text-slate-800 dark:text-slate-100">{currentSortOption.label}</span>
-              <ChevronDown
-                className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${
-                  isSortMenuOpen ? "rotate-180" : ""
-                }`}
-              />
-            </button>
-
-            {/* Floating Dropdown Card */}
-            {isSortMenuOpen && (
-              <div className="absolute right-0 top-full mt-2 w-60 bg-white/95 dark:bg-[#0f172a]/95 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-slate-700/80 shadow-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-150">
-                <div className="px-3.5 py-1 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
-                  Sort Order
-                </div>
-                <div className="mt-1 space-y-0.5">
-                  {sortOptions.map((opt) => {
-                    const isSelected = sortBy === opt.id;
-                    const Icon = opt.icon;
-                    return (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        onClick={() => {
-                          onSetSortBy?.(opt.id);
-                          setIsSortMenuOpen(false);
-                        }}
-                        className={`w-full px-3.5 py-2 text-left text-xs flex items-center justify-between transition-colors ${
-                          isSelected
-                            ? "bg-[#1a73e8]/10 text-[#1a73e8] dark:text-blue-400 font-semibold"
-                            : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/70"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <Icon
-                            className={`w-4 h-4 shrink-0 ${
-                              isSelected ? "text-[#1a73e8] dark:text-blue-400" : "text-slate-400"
-                            }`}
-                          />
-                          <div className="truncate">
-                            <div>{opt.label}</div>
-                            <div className="text-[10px] text-slate-400 dark:text-slate-500 font-normal">
-                              {opt.desc}
-                            </div>
-                          </div>
-                        </div>
-                        {isSelected && (
-                          <Check className="w-4 h-4 text-[#1a73e8] dark:text-blue-400 shrink-0 ml-2" />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
 
       {/* Pillar 1: Smart AI Category & Rekognition Tag Bar (active when viewing images) */}
       {filterType === "image" && (

@@ -107,7 +107,10 @@ export const generateThumbnail = (file, maxWidth = 800, maxHeight = 600, quality
     }
 
     // Only process image files for the image reader pipeline
-    if (!file.type?.startsWith("image/")) {
+    if (
+      !file.type?.startsWith("image/") &&
+      !/\.(jpe?g|png|webp|gif|svg|bmp|ico|avif|heic|heif|tiff?)$/i.test(file.name || "")
+    ) {
       return resolve(null);
     }
 

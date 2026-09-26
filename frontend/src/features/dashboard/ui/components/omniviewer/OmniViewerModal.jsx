@@ -39,7 +39,7 @@ const getFileCategory = (file) => {
   ) {
     return "document";
   }
-  if (type === "image" || /\.(jpe?g|png|webp|gif|svg|bmp|ico|heic|tiff?)$/i.test(name)) {
+  if (type === "image" || /\.(jpe?g|png|webp|gif|svg|bmp|ico|heic|heif|tiff?|avif|raw|dng|psd)$/i.test(name)) {
     return "image";
   }
   if (/\.(csv|tsv)$/i.test(name)) {

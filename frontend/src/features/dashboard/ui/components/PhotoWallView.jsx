@@ -7,6 +7,7 @@ import {
   Trash2,
   FolderPlus,
 } from "lucide-react";
+import { synthesizeImageLabels } from "../../utils/documentTextExtractor.js";
 
 /**
  * Helper to group photos into chronological timeline buckets
@@ -76,8 +77,8 @@ export const PhotoWallView = ({
 
         return (
           <div key={dateLabel} className="space-y-3">
-            {/* Sticky Date Timeline Header */}
-            <div className="flex items-center justify-between sticky top-16 z-20 py-2 bg-slate-50/90 dark:bg-slate-950/90 backdrop-blur-md">
+            {/* Date Timeline Header */}
+            <div className="flex items-center justify-between py-2 border-b border-slate-200/50 dark:border-slate-800/50">
               <div className="flex items-center gap-2.5">
                 <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-[#1a73e8] dark:text-blue-400 flex items-center justify-center">
                   <Calendar className="w-4 h-4" />
@@ -117,7 +118,7 @@ export const PhotoWallView = ({
                 const photoId = photo.id || photo.file_id;
                 const isSelected = selectedFileIds.includes(photoId);
                 const isStarred = Boolean(photo.isStarred);
-                const primaryLabel = photo.labels?.[0]?.name;
+                const primaryLabel = photo.labels?.[0]?.name || synthesizeImageLabels(photo.name, photo.dimensions)?.[0]?.name;
                 const imageSrc =
                   photo.thumbnail ||
                   photo.thumbnail_url ||

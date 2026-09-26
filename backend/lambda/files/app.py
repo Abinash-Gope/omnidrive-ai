@@ -70,8 +70,8 @@ def enrich_file_urls(item):
             if item.get("status") == "COMPLETED" or item.get("pipeline_step") == "TRANSCODE_COMPLETE":
                 item["thumbnail_url"] = f"https://{CLOUDFRONT_DOMAIN}/hls/{file_id}/thumbnail.0000000.jpg"
                 item["thumbnailUrl"] = item["thumbnail_url"]
-        if "image" in file_type or item.get("thumbnail_s3_key"):
-            thumb_webp = f"https://{CLOUDFRONT_DOMAIN}/thumbnails/{file_id}.webp"
+        if item.get("thumbnail_s3_key"):
+            thumb_webp = f"https://{CLOUDFRONT_DOMAIN}/{item.get('thumbnail_s3_key')}"
             item["thumbnail_url"] = thumb_webp
             item["thumbnailUrl"] = thumb_webp
 

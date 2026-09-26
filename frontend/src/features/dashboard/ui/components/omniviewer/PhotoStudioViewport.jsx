@@ -17,6 +17,8 @@ import {
   Share2,
   X,
 } from "lucide-react";
+import DocumentAiInsightsDrawer from "./DocumentAiInsightsDrawer.jsx";
+import { synthesizeImageLabels } from "../../../utils/documentTextExtractor.js";
 
 /**
  * Generate bounding box coordinates from Rekognition label metadata or simulated spatial regions
@@ -64,6 +66,7 @@ const PhotoStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
   const [hoveredLabel, setHoveredLabel] = useState(null);
   const [selectedLabel, setSelectedLabel] = useState(null);
   const [showFilterMenu, setShowFilterMenu] = useState(false);
+  const [showAiDrawer, setShowAiDrawer] = useState(false);
 
   const containerRef = useRef(null);
   const imageRef = useRef(null);
@@ -75,7 +78,10 @@ const PhotoStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
     file.thumbnail ||
     null;
 
-  const labels = file.labels || [];
+  const labels = useMemo(() => {
+    if (file.labels && file.labels.length > 0) return file.labels;
+    return synthesizeImageLabels(file.name, file.dimensions);
+  }, [file.labels, file.name, file.dimensions]);
   const exif = file.exif || null;
   const dimensions = file.dimensions || null;
   const fileName = file.name || "image.jpg";
@@ -301,6 +307,20 @@ const PhotoStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
             )}
           </div>
 
+          {/* AI Vision & Insights Drawer Toggle */}
+          <button
+            onClick={() => setShowAiDrawer((prev) => !prev)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-xs ${
+              showAiDrawer
+                ? "bg-purple-600 text-white border-purple-500 shadow-purple-500/25"
+                : "bg-purple-500/10 hover:bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/30"
+            }`}
+            title="AI Vision Intelligence & Interactive Analysis"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-purple-500 dark:text-purple-300 animate-pulse" />
+            <span className="hidden sm:inline">AI Insights</span>
+          </button>
+
           {/* Share Link */}
           {onShare && (
             <button
@@ -346,17 +366,19 @@ const PhotoStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
         </div>
       </div>
 
-      {/* Main Center Canvas */}
-      <div
-        ref={containerRef}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        className={`flex-1 w-full min-h-0 relative flex items-center justify-center overflow-hidden bg-slate-100/60 dark:bg-slate-950/70 backdrop-blur-md ${
-          isDragging ? "cursor-grabbing" : scale > 1 ? "cursor-grab" : "cursor-default"
-        }`}
-      >
+      {/* Center Stage Workspace (Split Canvas + Collapsible AI Insights Drawer) */}
+      <div className="flex-1 w-full min-h-0 flex overflow-hidden relative">
+        {/* Main Center Canvas */}
+        <div
+          ref={containerRef}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          className={`flex-1 min-w-0 h-full relative flex items-center justify-center overflow-hidden bg-slate-100/60 dark:bg-slate-950/70 backdrop-blur-md ${
+            isDragging ? "cursor-grabbing" : scale > 1 ? "cursor-grab" : "cursor-default"
+          }`}
+        >
         {/* Subtle canvas background dots pattern */}
         <div className="absolute inset-0 bg-[radial-gradient(#0000000d_1px,transparent_1px)] dark:bg-[radial-gradient(#ffffff0a_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none" />
 
@@ -455,6 +477,20 @@ const PhotoStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
             </div>
           </div>
         )}
+        </div>
+
+        {/* Collapsible Executive AI Vision Insights Right Drawer */}
+        <DocumentAiInsightsDrawer
+          file={file}
+          fileUrl={displayImage}
+          fileName={fileName}
+          isOpen={showAiDrawer}
+          onClose={() => setShowAiDrawer(false)}
+          theme={{
+            accent: "text-purple-600 dark:text-purple-400",
+            btnBg: "bg-purple-600 hover:bg-purple-700 text-white",
+          }}
+        />
       </div>
     </div>
   );

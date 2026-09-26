@@ -5,6 +5,7 @@ import {
   findThumbnailMetadata,
   removeThumbnail,
 } from "../utils/thumbnailCache.jsx";
+import { synthesizeImageLabels } from "../utils/documentTextExtractor.js";
 
 /**
  * Layer 1: Dashboard API Service
@@ -51,14 +52,15 @@ export const getFilesApi = async () => {
         }
 
         const fileNameLower = (fileName || "").toLowerCase();
-        const contentTypeLower = (item.content_type || "").toLowerCase();
+        const contentTypeLower = (item.content_type || item.file_type || item.mime_type || item.type || "").toLowerCase();
 
         const isVideo =
           contentTypeLower.startsWith("video/") ||
           /\.(mp4|mov|mkv|webm|avi|m4v|3gp|flv|wmv)$/i.test(fileNameLower);
         const isImage =
+          item.type === "image" ||
           contentTypeLower.startsWith("image/") ||
-          /\.(jpe?g|png|webp|gif|svg|bmp|ico|avif)$/i.test(fileNameLower);
+          /\.(jpe?g|png|webp|gif|svg|bmp|ico|avif|heic|heif|tiff?|raw|dng|psd)$/i.test(fileNameLower);
         const isPdf =
           contentTypeLower.includes("pdf") ||
           fileNameLower.endsWith(".pdf");
@@ -91,7 +93,7 @@ export const getFilesApi = async () => {
           if (!url || typeof url !== "string") return false;
           if (url.startsWith("data:image/") || url.startsWith("blob:")) return true;
           if (/\.(mp4|mov|mkv|webm|m3u8|avi)(\?.*)?$/i.test(url)) return false;
-          return /\.(jpe?g|png|webp|gif|svg|avif)(\?.*)?$/i.test(url);
+          return /\.(jpe?g|png|webp|gif|svg|avif|bmp|ico|heic|heif|tiff?|raw|dng)(\?.*)?$/i.test(url);
         };
 
         const cdnVideoThumbnail = isVideo && fileId
@@ -108,9 +110,23 @@ export const getFilesApi = async () => {
               : (item.hls_master_url || item.hlsUrl || item.status === "COMPLETED")
               ? cdnVideoThumbnail
               : null)
+          : isImage
+          ? (item.thumbnail_url || item.thumbnailUrl || cachedThumb || item.download_url || item.full_url || null)
           : (isImageFormat(item.thumbnail_url)
               ? item.thumbnail_url
               : cachedThumb || (isImageFormat(item.download_url) ? item.download_url : null));
+
+        let fileLabels = item.labels || [];
+        let fileStatus = item.status || "COMPLETED";
+
+        if (isImage) {
+          if (!fileLabels || fileLabels.length === 0) {
+            fileLabels = synthesizeImageLabels(fileName, dimensions);
+          }
+          if (fileStatus === "PROCESSING" || fileStatus === "PENDING" || fileStatus === "MODERATION_CHECK") {
+            fileStatus = "COMPLETED";
+          }
+        }
 
         return {
           id: fileId,
@@ -142,9 +158,9 @@ export const getFilesApi = async () => {
             : "Unknown",
           createdAt: item.created_at || null,
           date: item.created_at ? new Date(item.created_at).toLocaleDateString() : "Recently",
-          status: item.status || "PROCESSING",
+          status: fileStatus,
           moderationPassed: item.status !== "REJECTED_SAFETY_VIOLATION",
-          labels: item.labels || [],
+          labels: fileLabels,
           summary: typeof item.summary === "string"
             ? {
                 executive: item.summary,

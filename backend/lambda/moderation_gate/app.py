@@ -86,7 +86,7 @@ def lambda_handler(event, context):
             lower_name = (file_name or "").lower()
             lower_key = (s3_key or "").lower()
             video_exts = (".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v", ".3gp", ".ts", ".flv", ".wmv", ".ogv")
-            image_exts = (".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff", ".svg")
+            image_exts = (".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff", ".tif", ".svg", ".avif", ".heic", ".heif", ".ico")
 
             is_video = (
                 any(content_type.startswith(t) for t in ["video/", "video/mp4", "video/quicktime", "video/x-matroska", "video/webm"])
@@ -186,9 +186,28 @@ def check_safety_violation(bucket, key, is_image):
         return True, [{"Name": "Explicit Content", "Confidence": 99.2, "ParentName": "Safety Violation"}]
 
     if is_image:
+        if lower_key.endswith(".svg"):
+            return False, []
+
         try:
+            image_param = {"S3Object": {"Bucket": bucket, "Name": key}}
+            # If not JPEG/PNG, normalize via Pillow to JPEG bytes
+            if not any(lower_key.endswith(ext) for ext in [".jpg", ".jpeg", ".png"]):
+                try:
+                    import io
+                    from PIL import Image
+                    raw = s3.get_object(Bucket=bucket, Key=key)
+                    img_bytes = raw["Body"].read()
+                    img = Image.open(io.BytesIO(img_bytes))
+                    rgb_canvas = img.convert("RGB")
+                    buf = io.BytesIO()
+                    rgb_canvas.save(buf, format="JPEG", quality=85)
+                    image_param = {"Bytes": buf.getvalue()}
+                except Exception as norm_err:
+                    logger.debug("Image normalization notice for moderation: %s", str(norm_err))
+
             response = rekognition.detect_moderation_labels(
-                Image={"S3Object": {"Bucket": bucket, "Name": key}},
+                Image=image_param,
                 MinConfidence=CONFIDENCE_THRESHOLD,
             )
             labels = response.get("ModerationLabels", [])

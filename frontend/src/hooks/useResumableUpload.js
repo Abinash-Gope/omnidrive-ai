@@ -53,6 +53,13 @@ export function resolveMimeType(file) {
     svg: "image/svg+xml",
     bmp: "image/bmp",
     ico: "image/x-icon",
+    avif: "image/avif",
+    tiff: "image/tiff",
+    tif: "image/tiff",
+    heic: "image/heic",
+    heif: "image/heif",
+    raw: "image/x-raw",
+    dng: "image/x-adobe-dng",
     // PDF & Documents
     pdf: "application/pdf",
     docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -137,7 +144,7 @@ export function inferFileTypeCategory(fileName = "", mimeType = "") {
   if (mime.startsWith("video/") || /\.(mp4|mov|mkv|webm|avi|m4v|3gp|flv|wmv)$/i.test(name)) {
     return "video";
   }
-  if (mime.startsWith("image/") || /\.(jpe?g|png|webp|gif|svg|bmp|ico|avif)$/i.test(name)) {
+  if (mime.startsWith("image/") || /\.(jpe?g|png|webp|gif|svg|bmp|ico|avif|heic|heif|tiff?|raw|dng|psd)$/i.test(name)) {
     return "image";
   }
   if (mime.includes("pdf") || name.endsWith(".pdf")) {

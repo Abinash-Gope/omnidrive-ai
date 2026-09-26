@@ -26,6 +26,12 @@ import {
 import FileStatusBadge from "./FileStatusBadge.jsx";
 import PdfPreview from "./PdfPreview.jsx";
 import VideoPreview from "./VideoPreview.jsx";
+import DocxCardPreview from "./previews/DocxCardPreview.jsx";
+import PptxCardPreview from "./previews/PptxCardPreview.jsx";
+import CsvCardPreview from "./previews/CsvCardPreview.jsx";
+import CodeCardPreview from "./previews/CodeCardPreview.jsx";
+import AudioCardPreview from "./previews/AudioCardPreview.jsx";
+import { synthesizeImageLabels } from "../../utils/documentTextExtractor.js";
 
 const FileCard = ({
   file,
@@ -50,8 +56,15 @@ const FileCard = ({
   const [isPdfLoading, setIsPdfLoading] = useState(file.type === "pdf");
   const [imgError, setImgError] = useState(false);
   const menuRef = useRef(null);
+  const hoverTimeoutRef = useRef(null);
 
   const isInTrash = activeTab === "trash" || Boolean(file.inTrash);
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (file.pages) setRealPageCount(file.pages);
@@ -60,7 +73,7 @@ const FileCard = ({
 
   const fileNameLower = (file.name || "").toLowerCase();
   const isVideo = file.type === "video" || /\.(mp4|mov|mkv|webm|avi|m4v)$/i.test(fileNameLower);
-  const isImage = file.type === "image" || /\.(jpe?g|png|webp|gif|svg|bmp|avif)$/i.test(fileNameLower);
+  const isImage = file.type === "image" || /\.(jpe?g|png|webp|gif|svg|bmp|ico|avif|heic|heif|tiff?|raw|dng|psd)$/i.test(fileNameLower);
   const isPdf = file.type === "pdf" || fileNameLower.endsWith(".pdf");
   const isDoc =
     file.type === "document" ||
@@ -79,6 +92,13 @@ const FileCard = ({
   const isAudio = file.type === "audio" || /\.(mp3|wav|aac|ogg|flac|m4a|wma)$/i.test(fileNameLower);
   const isMarkdown = file.type === "markdown" || /\.(md|markdown|txt|log)$/i.test(fileNameLower);
   const isArchive = file.type === "archive" || /\.(zip|tar|gz|rar|7z|exe|bin|iso)$/i.test(fileNameLower);
+
+  const displayLabels =
+    file.labels && file.labels.length > 0
+      ? file.labels
+      : isImage
+      ? synthesizeImageLabels(file.name, file.dimensions)
+      : [];
 
   // Close menu on outside click
   useEffect(() => {
@@ -272,6 +292,21 @@ const FileCard = ({
     );
   }
 
+  const handleCardMouseEnter = () => {
+    if (isVideo) {
+      hoverTimeoutRef.current = setTimeout(() => {
+        setIsCardHovered(true);
+      }, 300);
+    }
+  };
+
+  const handleCardMouseLeave = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    setIsCardHovered(false);
+  };
+
   // Grid View Card
   return (
     <div
@@ -284,23 +319,23 @@ const FileCard = ({
           onOpenPreview(file);
         }
       }}
-      onMouseEnter={() => setIsCardHovered(true)}
-      onMouseLeave={() => setIsCardHovered(false)}
-      className={`group relative bg-white dark:bg-slate-900 border rounded-2xl transition-all duration-300 flex flex-col cursor-pointer select-none ${
+      onMouseEnter={handleCardMouseEnter}
+      onMouseLeave={handleCardMouseLeave}
+      className={`group relative bg-white dark:bg-slate-900 border rounded-2xl transition-all duration-200 flex flex-col cursor-pointer select-none ${
         isSelected
-          ? "border-blue-500 ring-2 ring-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.6)] dark:shadow-[0_0_25px_rgba(59,130,246,0.75)] scale-[0.99] z-20"
-          : "border-slate-200 dark:border-slate-800 hover:border-[#1a73e8]/50 dark:hover:border-blue-500/50 shadow-xs hover:shadow-xl"
+          ? "border-blue-500 ring-2 ring-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.5)] dark:shadow-[0_0_25px_rgba(59,130,246,0.65)] scale-[0.99] z-20"
+          : "border-slate-200/90 dark:border-slate-800 hover:border-[#1a73e8]/60 dark:hover:border-blue-500/60 shadow-xs hover:shadow-lg"
       } ${
         isMenuOpen ? "z-30" : ""
       }`}
     >
-      {/* Thumbnail / Visual Viewport */}
+      {/* Thumbnail / Visual Viewport — Pure, Unobstructed Preview */}
       <div className="relative aspect-video w-full bg-slate-100 dark:bg-slate-800/80 overflow-hidden rounded-t-2xl flex items-center justify-center">
         {isVideo ? (
           <VideoPreview file={file} isHovered={isCardHovered} />
         ) : isPdf && file.downloadUrl ? (
           /* Live PDF page-1 canvas thumbnail */
-          <div className="w-full h-full relative overflow-hidden bg-white dark:bg-slate-900 group-hover:scale-105 transition-transform duration-500">
+          <div className="w-full h-full relative overflow-hidden bg-white dark:bg-slate-900">
             <PdfPreview
               url={file.downloadUrl}
               pageNumber={1}
@@ -312,74 +347,34 @@ const FileCard = ({
               onPageCount={setRealPageCount}
               onLoadingChange={setIsPdfLoading}
             />
-            {/* Subtle bottom shadow vignette for smooth transition and badge contrast */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
+            {/* Subtle bottom shadow vignette for smooth transition */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
           </div>
-        ) : (isImage && (file.thumbnail_url || file.thumbnail || file.downloadUrl) && !imgError) ? (
+        ) : (isImage && (file.thumbnail_url || file.thumbnail || file.downloadUrl || file.download_url) && !imgError) ? (
           <img
-            src={file.thumbnail_url || file.thumbnail || file.downloadUrl}
+            src={file.thumbnail_url || file.thumbnail || file.downloadUrl || file.download_url}
             alt={file.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            className="w-full h-full object-cover"
             loading="lazy"
             decoding="async"
             onError={() => setImgError(true)}
           />
+        ) : isPpt ? (
+          <PptxCardPreview file={file} />
+        ) : isWord ? (
+          <DocxCardPreview file={file} />
+        ) : (isExcel || isCsv) ? (
+          <CsvCardPreview file={file} />
+        ) : isCode ? (
+          <CodeCardPreview file={file} />
+        ) : isAudio ? (
+          <AudioCardPreview file={file} />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 text-slate-400">
             {getFileIcon()}
             <span className="text-[11px] font-mono mt-1 text-slate-400 uppercase">
               {file.type}
             </span>
-          </div>
-        )}
-
-        {/* Gradient Overlay for non-video */}
-        {!isVideo && !isPdf && (
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-        )}
-
-        {/* Top Floating Badge */}
-        <div className="absolute top-2.5 left-2.5 z-10">
-          <FileStatusBadge file={file} />
-        </div>
-
-        {/* PDF Pages Badge — only shown once loaded with verified count */}
-        {isPdf && !isPdfLoading && realPageCount && (
-          <div className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-md bg-purple-950/80 text-purple-200 text-[11px] font-medium flex items-center gap-1 backdrop-blur-xs shadow-xs pointer-events-none animate-fadeIn">
-            <Layers className="w-3 h-3 text-purple-400" />
-            <span>
-              {realPageCount}{" "}
-              {realPageCount === 1 ? "page" : "pages"}
-            </span>
-          </div>
-        )}
-
-        {/* Hover Action Center Button for non-video (VideoPreview already has its own responsive play badge) */}
-        {!isVideo && (
-          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 transform scale-90 group-hover:scale-100 pointer-events-none">
-            <div className="w-12 h-12 rounded-full bg-white/95 dark:bg-slate-900/95 text-[#1a73e8] shadow-lg flex items-center justify-center backdrop-blur-md">
-              {isImage ? (
-                <Sparkles className="w-6 h-6 text-emerald-500" />
-              ) : isPdf ? (
-                <FileText className="w-6 h-6 text-purple-500" />
-              ) : isPpt ? (
-                <Presentation className="w-6 h-6 text-orange-500" />
-              ) : isWord ? (
-                <FileText className="w-6 h-6 text-blue-500" />
-              ) : isExcel || isCsv ? (
-                <FileSpreadsheet className="w-6 h-6 text-teal-500" />
-              ) : isDoc ? (
-                <FileText className="w-6 h-6 text-indigo-500" />
-              ) : isCode ? (
-                <FileCode className="w-6 h-6 text-indigo-500" />
-              ) : isAudio ? (
-                <Music className="w-6 h-6 text-cyan-500" />
-              ) : isArchive ? (
-                <Archive className="w-6 h-6 text-amber-500" />
-              ) : (
-                <FileGenericIcon className="w-6 h-6 text-blue-500" />
-              )}
-            </div>
           </div>
         )}
       </div>
@@ -527,11 +522,11 @@ const FileCard = ({
             </div>
           </div>
 
-          {/* AI Preview Snippet or Tags */}
-          <div className="mt-2 min-h-[32px]">
-            {isImage && file.labels && file.labels.length > 0 ? (
+          {/* AI Preview Snippet, Tags, or Format Telemetry */}
+          <div className="mt-2 min-h-[26px] flex items-center">
+            {isImage ? (
               <div className="flex flex-wrap gap-1">
-                {file.labels.slice(0, 3).map((lbl, idx) => (
+                {displayLabels.slice(0, 3).map((lbl, idx) => (
                   <span
                     key={idx}
                     className="text-[10px] font-medium px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-100 dark:border-emerald-900/50"
@@ -540,31 +535,40 @@ const FileCard = ({
                   </span>
                 ))}
               </div>
-            ) : isImage && file.status === "PROCESSING" ? (
-              <div className="flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="truncate">Vision AI analyzing labels...</span>
-              </div>
-            ) : null}
-
-            {isVideo && (
+            ) : isVideo ? (
               <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#1a73e8]" />
                 <span className="truncate">
                   {file.hlsUrl
-                    ? "HLS multi-bitrate .m3u8 ready"
-                    : file.status === "PROCESSING"
-                    ? "Video transcoding in progress..."
+                    ? "HLS multi-bitrate stream"
                     : file.dimensions?.width && file.dimensions?.height
                     ? `${file.dimensions.width}×${file.dimensions.height} · MP4 video`
                     : "MP4 video stream ready"}
                 </span>
               </div>
-            )}
-
-            {isPdf && file.summary && (
-              <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
-                {file.summary.executive}
+            ) : isPdf ? (
+              <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1 leading-relaxed">
+                {file.summary?.executive || (realPageCount ? `${realPageCount} pages • Document indexed` : "PDF document ready")}
+              </p>
+            ) : isDoc ? (
+              <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                Office document • {fileNameLower.split('.').pop().toUpperCase()} indexed
+              </p>
+            ) : isCsv ? (
+              <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                Dataset table • Structured tabular rows
+              </p>
+            ) : isAudio ? (
+              <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                Audio track • Stereo stream ready
+              </p>
+            ) : isCode ? (
+              <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                Source code • Syntax parsed
+              </p>
+            ) : (
+              <p className="text-xs text-slate-400 truncate">
+                {file.size} • Cloud asset verified
               </p>
             )}
           </div>
@@ -601,10 +605,21 @@ const FileCard = ({
           )}
         </div>
 
-        {/* Footer Meta Row */}
-        <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
-          <span className="font-mono">{file.size}</span>
-          <span className="text-[11px]">{file.date}</span>
+        {/* Footer Meta Row: Anchored Status Badge on Left, Page count & Size & Date on Right */}
+        <div className="mt-3.5 pt-2.5 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs text-slate-400 gap-2">
+          <div className="min-w-0">
+            <FileStatusBadge file={file} />
+          </div>
+          <div className="flex items-center gap-1.5 text-slate-400 font-mono text-[11px] shrink-0">
+            {realPageCount && (
+              <span className="text-purple-600 dark:text-purple-400 font-medium">
+                {realPageCount}p ·
+              </span>
+            )}
+            <span>{file.size}</span>
+            <span>·</span>
+            <span className="hidden sm:inline">{file.date}</span>
+          </div>
         </div>
       </div>
     </div>

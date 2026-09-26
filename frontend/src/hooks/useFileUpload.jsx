@@ -56,7 +56,11 @@ const isFileAccepted = (file) => {
 async function uploadSingleFile(file, onProgress) {
   let thumbData = null;
   try {
-    if (file.type?.startsWith("image/") || file.type?.startsWith("video/")) {
+    if (
+      file.type?.startsWith("image/") ||
+      file.type?.startsWith("video/") ||
+      /\.(jpe?g|png|webp|gif|svg|bmp|ico|avif|heic|heif|tiff?|mp4|mov|webm)$/i.test(file.name || "")
+    ) {
       thumbData = await generateThumbnail(file);
     }
   } catch (_) {}

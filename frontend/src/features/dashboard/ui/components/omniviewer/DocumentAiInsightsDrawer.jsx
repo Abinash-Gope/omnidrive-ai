@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   Sparkles,
   BarChart3,
@@ -50,6 +50,25 @@ const DocumentAiInsightsDrawer = ({
   onClose,
   theme = {},
 }) => {
+  const isImage =
+    file?.type === "image" ||
+    /\.(jpe?g|png|webp|gif|svg|bmp|ico|avif|heic|heif|tiff?|raw|dng|psd)$/i.test(
+      fileName || ""
+    );
+
+  const defaultGreeting = useMemo(
+    () => [
+      {
+        id: "welcome",
+        role: "assistant",
+        text: isImage
+          ? "Hello! I am your OmniDrive Vision AI Assistant. Ask me anything about this image — what objects are present, visual style, colors, composition, or layout."
+          : "Hello! I am your OmniDrive Document Intelligence Assistant. Ask me anything about this document, its findings, data, or action items.",
+      },
+    ],
+    [isImage]
+  );
+
   const [activeTab, setActiveTab] = useState("summary"); // "summary" | "chat"
   const [documentText, setDocumentText] = useState("");
   const [isExtractingText, setIsExtractingText] = useState(false);
@@ -62,7 +81,7 @@ const DocumentAiInsightsDrawer = ({
   const [copiedSummary, setCopiedSummary] = useState(false);
 
   // Chat state
-  const [messages, setMessages] = useState(DEFAULT_GREETING);
+  const [messages, setMessages] = useState(defaultGreeting);
   const [inputMessage, setInputMessage] = useState("");
   const [isChatSending, setIsChatSending] = useState(false);
   const [chatStreamingText, setChatStreamingText] = useState("");
@@ -289,10 +308,10 @@ const DocumentAiInsightsDrawer = ({
               </div>
               <div className="min-w-0">
                 <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1 truncate">
-                  Document Intelligence
+                  {isImage ? "Vision AI Intelligence" : "Document Intelligence"}
                 </h4>
                 <p className="text-[10px] text-purple-700 dark:text-purple-300 font-mono truncate">
-                  {aiSummary?.model || "OmniDrive Neural Engine"}
+                  {isImage ? "Amazon Rekognition & Vision Engine" : (aiSummary?.model || "OmniDrive Neural Engine")}
                 </p>
               </div>
             </div>
@@ -392,30 +411,61 @@ const DocumentAiInsightsDrawer = ({
                 </div>
               )}
 
-              {/* Document Metrics Grid */}
+              {/* Rekognition Visual Objects & Vision AI Tags */}
+              {file?.labels && file.labels.length > 0 && (
+                <div className="space-y-2">
+                  <span className="text-slate-500 dark:text-slate-400 text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
+                    Vision AI Recognized Objects
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {file.labels.map((lbl, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 text-[11px] font-medium"
+                      >
+                        <span>{lbl.name}</span>
+                        {lbl.confidence && (
+                          <span className="text-[9px] opacity-70 font-mono">
+                            {Math.round(lbl.confidence)}%
+                          </span>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Document / Image Metrics Grid */}
               <div className="space-y-2">
                 <span className="text-slate-500 dark:text-slate-400 text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5">
                   <Gauge className="w-3.5 h-3.5 text-blue-500" />
-                  Document Analytics & Telemetry
+                  {isImage ? "Image Analytics & Telemetry" : "Document Analytics & Telemetry"}
                 </span>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="p-2.5 rounded-xl bg-slate-50/80 dark:bg-white/5 border border-slate-200/80 dark:border-white/10">
                     <div className="flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400 mb-0.5">
                       <Clock className="w-3 h-3 text-purple-500" />
-                      <span>Est. Reading Time</span>
+                      <span>{isImage ? "Pixel Resolution" : "Est. Reading Time"}</span>
                     </div>
-                    <span className="font-semibold text-slate-800 dark:text-slate-200 text-xs">
-                      {metrics.readingTimeMinutes} min read
+                    <span className="font-semibold text-slate-800 dark:text-slate-200 text-xs font-mono">
+                      {isImage
+                        ? (file?.dimensions?.width && file?.dimensions?.height
+                            ? `${file.dimensions.width}×${file.dimensions.height} px`
+                            : "High Resolution")
+                        : `${metrics.readingTimeMinutes} min read`}
                     </span>
                   </div>
 
                   <div className="p-2.5 rounded-xl bg-slate-50/80 dark:bg-white/5 border border-slate-200/80 dark:border-white/10">
                     <div className="flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400 mb-0.5">
                       <FileText className="w-3 h-3 text-blue-500" />
-                      <span>Total Words</span>
+                      <span>{isImage ? "Image Format" : "Total Words"}</span>
                     </div>
-                    <span className="font-semibold text-slate-800 dark:text-slate-200 text-xs font-mono">
-                      {metrics.words.toLocaleString()}
+                    <span className="font-semibold text-slate-800 dark:text-slate-200 text-xs font-mono uppercase">
+                      {isImage
+                        ? ((fileName || "").split(".").pop() || "Image")
+                        : metrics.words.toLocaleString()}
                     </span>
                   </div>
 
@@ -542,7 +592,15 @@ const DocumentAiInsightsDrawer = ({
 
           {/* Quick Prompt Suggestion Chips */}
           <div className="px-3 py-1.5 flex gap-1.5 overflow-x-auto no-scrollbar border-t border-slate-200/60 dark:border-white/5 bg-white/60 dark:bg-slate-900/60 shrink-0">
-            {PROMPT_SUGGESTIONS.map((suggestion, idx) => (
+            {(isImage
+              ? [
+                  "Describe visual scene & composition",
+                  "What objects & tags were detected?",
+                  "Analyze colors, lighting & palette",
+                  "Summarize graphic structure & layout",
+                ]
+              : PROMPT_SUGGESTIONS
+            ).map((suggestion, idx) => (
               <button
                 key={idx}
                 onClick={() => handleSendMessage(suggestion)}
@@ -567,7 +625,7 @@ const DocumentAiInsightsDrawer = ({
                 type="text"
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
-                placeholder="Ask about this document..."
+                placeholder={isImage ? "Ask about this image..." : "Ask about this document..."}
                 disabled={isChatSending}
                 className="flex-1 h-9 px-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all"
               />

@@ -15,6 +15,7 @@ import DeleteConfirmModal from "../components/DeleteConfirmModal.jsx";
 import DeleteFolderModal from "../components/DeleteFolderModal.jsx";
 import BulkActionBar from "../components/BulkActionBar.jsx";
 import FolderModal from "../components/FolderModal.jsx";
+import DashboardToolbar from "../components/DashboardToolbar.jsx";
 
 /**
  * Layer 4: DashboardPage (Presentation Component)
@@ -270,132 +271,92 @@ const DashboardPage = () => {
           }}
         />
 
-        {/* Center/Right Content Area - Ultra Clean Layout */}
-        <main
-          onClick={(e) => {
-            // Only clear selection when clicking on the bare background (not on any child element)
-            if (e.target === e.currentTarget && selectedFileIds.length > 0) {
-              handleClearSelection();
-            }
-          }}
-          className="flex-1 overflow-y-auto p-6 lg:p-8 space-y-6 select-none custom-scrollbar min-h-0"
-        >
-          {/* Welcome / Active Folder Header */}
-          <div className="flex items-center justify-between">
-            {headerInfo.isFolder ? (
-              <div className="flex items-center justify-between w-full">
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => handleSetActiveFolderId(null)}
-                    className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex items-center gap-1.5 shadow-xs"
-                  >
-                    <span>←</span>
-                    <span>Back to My Files</span>
-                  </button>
-                  <div>
-                    <div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium">
-                      <span
-                        className="hover:text-[#1a73e8] cursor-pointer"
-                        onClick={() => handleSetActiveFolderId(null)}
-                      >
-                        My Files
-                      </span>
-                      <span>/</span>
-                      <span className="text-slate-700 dark:text-slate-300 font-semibold">
-                        {headerInfo.title}
-                      </span>
-                    </div>
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2 mt-0.5">
-                      <Folder className="w-6 h-6 text-[#1a73e8] fill-[#1a73e8]/20" />
-                      <span>{headerInfo.title}</span>
-                    </h1>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleRequestDeleteFolder(activeFolderId, headerInfo.title)}
-                    className="px-3 py-1.5 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50/70 dark:bg-rose-950/40 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition-colors flex items-center gap-1.5 shadow-xs"
-                    title="Delete this folder"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Delete Folder</span>
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div>
-                <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
-                  {headerInfo.title}
-                </h1>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {headerInfo.subtitle}
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Files Grid / List View */}
-          <FileGrid
-            files={files}
-            allFiles={allFiles}
-            quarantinedFiles={quarantinedFiles}
-            activeTab={activeTab}
+        {/* Center/Right Content Area - Structured Workspace Canvas */}
+        <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+          {/* Top Pinned Toolbar Section: Header info + Filter bar */}
+          <DashboardToolbar
+            headerInfo={headerInfo}
+            activeFolderId={activeFolderId}
+            onSetActiveFolderId={handleSetActiveFolderId}
+            onRequestDeleteFolder={handleRequestDeleteFolder}
             filterType={filterType}
             onSelectFilter={handleSelectFilter}
             sortBy={sortBy}
             onSetSortBy={handleSetSortBy}
             searchQuery={searchQuery}
-            viewMode={viewMode}
-            isLoading={isLoading}
-            onOpenPreview={handleOpenPreview}
-            onDeleteFile={(file) => {
-              if (activeTab === "trash" || file.inTrash) {
-                setFileToDelete(file);
-              } else {
-                handleMoveToTrash(file);
+            onResetSearch={() => handleSearch("")}
+          />
+
+          {/* Scrollable Main Files Canvas */}
+          <main
+            onClick={(e) => {
+              // Only clear selection when clicking on the bare background (not on any child element)
+              if (e.target === e.currentTarget && selectedFileIds.length > 0) {
+                handleClearSelection();
               }
             }}
-            onToggleStar={handleToggleStar}
-            onMoveToTrash={handleMoveToTrash}
-            onRestoreFile={handleRestoreFile}
-            onPermanentDelete={(file) => setFileToDelete(file)}
-            onEmptyTrash={handleEmptyTrash}
-            trashCount={trashCount}
-            onResetSearch={() => handleSearch("")}
-            selectedFileIds={selectedFileIds}
-            onToggleSelect={handleToggleSelect}
-            onSelectAll={handleSelectAll}
-            onClearSelection={handleClearSelection}
-            photoViewMode={photoViewMode}
-            onTogglePhotoViewMode={handleSetPhotoViewMode}
-            activePhotoCategory={activePhotoCategory}
-            onSelectPhotoCategory={handleSetPhotoCategory}
-            activeTagFilter={activeTagFilter}
-            onSelectTagFilter={handleSetActiveTagFilter}
-            folders={folders}
-            activeFolderId={activeFolderId}
-            onSelectFolder={handleSetActiveFolderId}
-            onDeleteFolder={handleRequestDeleteFolder}
-            onRemoveFromFolder={handleRemoveFromFolder}
-            onOpenCreateFolder={() => {
-              setFolderTargetIds([]);
-              setIsFolderModalOpen(true);
-            }}
-            onOpenAddToFolder={(file) => {
-              const ids = file ? [file.id || file.file_id] : selectedFileIds;
-              setFolderTargetIds(ids);
-              setIsFolderModalOpen(true);
-            }}
-            onOpenAddToAlbum={(file) => {
-              const ids = file ? [file.id || file.file_id] : selectedFileIds;
-              setFolderTargetIds(ids);
-              setIsFolderModalOpen(true);
-            }}
-          />
-        </main>
+            className="flex-1 overflow-y-auto px-6 lg:px-8 py-5 space-y-6 select-none custom-scrollbar min-h-0 scroll-smooth"
+          >
+            {/* Files Grid / List View */}
+            <FileGrid
+              files={files}
+              allFiles={allFiles}
+              quarantinedFiles={quarantinedFiles}
+              activeTab={activeTab}
+              filterType={filterType}
+              onSelectFilter={handleSelectFilter}
+              sortBy={sortBy}
+              onSetSortBy={handleSetSortBy}
+              searchQuery={searchQuery}
+              viewMode={viewMode}
+              isLoading={isLoading}
+              onOpenPreview={handleOpenPreview}
+              onDeleteFile={(file) => {
+                if (activeTab === "trash" || file.inTrash) {
+                  setFileToDelete(file);
+                } else {
+                  handleMoveToTrash(file);
+                }
+              }}
+              onToggleStar={handleToggleStar}
+              onMoveToTrash={handleMoveToTrash}
+              onRestoreFile={handleRestoreFile}
+              onPermanentDelete={(file) => setFileToDelete(file)}
+              onEmptyTrash={handleEmptyTrash}
+              trashCount={trashCount}
+              onResetSearch={() => handleSearch("")}
+              selectedFileIds={selectedFileIds}
+              onToggleSelect={handleToggleSelect}
+              onSelectAll={handleSelectAll}
+              onClearSelection={handleClearSelection}
+              photoViewMode={photoViewMode}
+              onTogglePhotoViewMode={handleSetPhotoViewMode}
+              activePhotoCategory={activePhotoCategory}
+              onSelectPhotoCategory={handleSetPhotoCategory}
+              activeTagFilter={activeTagFilter}
+              onSelectTagFilter={handleSetActiveTagFilter}
+              folders={folders}
+              activeFolderId={activeFolderId}
+              onSelectFolder={handleSetActiveFolderId}
+              onDeleteFolder={handleRequestDeleteFolder}
+              onRemoveFromFolder={handleRemoveFromFolder}
+              onOpenCreateFolder={() => {
+                setFolderTargetIds([]);
+                setIsFolderModalOpen(true);
+              }}
+              onOpenAddToFolder={(file) => {
+                const ids = file ? [file.id || file.file_id] : selectedFileIds;
+                setFolderTargetIds(ids);
+                setIsFolderModalOpen(true);
+              }}
+              onOpenAddToAlbum={(file) => {
+                const ids = file ? [file.id || file.file_id] : selectedFileIds;
+                setFolderTargetIds(ids);
+                setIsFolderModalOpen(true);
+              }}
+            />
+          </main>
+        </div>
       </div>
 
       {/* Floating Multi-Selection Bulk Action Bar */}
