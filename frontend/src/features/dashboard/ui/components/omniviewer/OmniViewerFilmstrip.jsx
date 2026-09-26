@@ -76,9 +76,9 @@ const FilmstripCard = ({ file, isActive, onClick }) => {
   return (
     <button
       onClick={onClick}
-      className={`relative w-24 h-16 rounded-xl overflow-hidden shrink-0 transition-all select-none border group ${
+      className={`relative w-24 h-16 rounded-xl overflow-hidden shrink-0 transition-all duration-200 select-none border group hover:scale-[1.04] active:scale-90 cursor-pointer ${
         isActive
-          ? "ring-2 ring-[#1a73e8] ring-offset-2 ring-offset-white dark:ring-offset-slate-900 border-transparent shadow-lg shadow-blue-500/25 z-10 opacity-100"
+          ? "ring-2 ring-[#1a73e8] ring-offset-2 ring-offset-white dark:ring-offset-slate-900 border-transparent shadow-lg shadow-blue-500/25 z-10 opacity-100 scale-100"
           : "border-slate-300/80 dark:border-white/10 hover:border-[#1a73e8]/70 dark:hover:border-white/30 opacity-75 hover:opacity-100 bg-white/80 dark:bg-slate-900/80 shadow-xs"
       }`}
       title={file.name}
@@ -279,7 +279,7 @@ const OmniViewerFilmstrip = ({
       <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-40 animate-in fade-in slide-in-from-bottom-2 duration-200">
         <button
           onClick={onToggleCollapse}
-          className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/90 dark:bg-slate-900/90 hover:bg-white dark:hover:bg-slate-800 text-slate-800 dark:text-white border border-slate-200/90 dark:border-white/15 text-xs font-semibold shadow-2xl backdrop-blur-2xl transition-all hover:scale-105 active:scale-95 group"
+          className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/90 dark:bg-slate-900/90 hover:bg-white dark:hover:bg-slate-800 text-slate-800 dark:text-white border border-slate-200/90 dark:border-white/15 text-xs font-semibold shadow-2xl backdrop-blur-2xl transition-all duration-200 hover:scale-105 active:scale-90 group cursor-pointer"
           title="Show Filmstrip (H)"
         >
           <Film className="w-3.5 h-3.5 text-[#1a73e8]" />
@@ -328,7 +328,7 @@ const OmniViewerFilmstrip = ({
         {/* Hide Button */}
         <button
           onClick={onToggleCollapse}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100/90 dark:bg-white/10 hover:bg-slate-200/90 dark:hover:bg-white/15 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-200/80 dark:border-white/10 text-xs font-medium transition-all shrink-0 backdrop-blur-md active:scale-95 group shadow-xs"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100/90 dark:bg-white/10 hover:bg-slate-200/90 dark:hover:bg-white/15 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-200/80 dark:border-white/10 text-xs font-medium transition-all duration-200 shrink-0 backdrop-blur-md hover:scale-105 active:scale-90 group shadow-xs cursor-pointer"
           title="Hide Filmstrip (H)"
         >
           <ChevronDown className="w-3.5 h-3.5 text-slate-500 group-hover:translate-y-0.5 transition-transform" />

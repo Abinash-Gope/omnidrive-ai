@@ -19,6 +19,7 @@ import {
   Maximize2,
   Minimize2,
 } from "lucide-react";
+import DocumentAiInsightsDrawer from "./DocumentAiInsightsDrawer.jsx";
 
 const DocumentStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
   const [viewMode, setViewMode] = useState("preview"); // "preview" | "details"
@@ -27,6 +28,7 @@ const DocumentStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
   const [iframeError, setIframeError] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isFocusMode, setIsFocusMode] = useState(false);
+  const [showAiDrawer, setShowAiDrawer] = useState(false);
 
   const fileUrl = file.downloadUrl || file.download_url || downloadLink || null;
   const fileName = file.name || "document.docx";
@@ -116,33 +118,36 @@ const DocumentStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
 
   return (
     <div
-      className={`w-full h-full max-w-5xl flex flex-col rounded-3xl border border-slate-200/80 dark:border-white/10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-3xl shadow-2xl overflow-hidden relative select-none animate-in fade-in duration-200 ${
+      className={`w-full h-full max-w-5xl flex flex-col rounded-3xl border border-slate-200/80 dark:border-white/10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-3xl shadow-2xl overflow-hidden relative select-none animate-in fade-in zoom-in-95 duration-200 ${
         isFocusMode ? "max-w-none" : ""
       }`}
     >
       {/* Standardized Studio In-Stage Header Toolbar */}
-      <div className="h-12 px-3 sm:px-5 bg-white/85 dark:bg-slate-900/85 border-b border-slate-200/80 dark:border-white/10 flex items-center justify-between text-slate-700 dark:text-slate-300 shrink-0 z-20 backdrop-blur-xl">
+      <div className="h-12 px-3 sm:px-4 bg-white/85 dark:bg-slate-900/85 border-b border-slate-200/80 dark:border-white/10 flex items-center justify-between text-slate-700 dark:text-slate-300 shrink-0 z-20 backdrop-blur-xl">
         {/* Left: Document Identity & Badges */}
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        <div className="flex-1 min-w-0 flex items-center gap-2 sm:gap-2.5 mr-2">
           <IconComponent className={`w-4 h-4 shrink-0 ${theme.accent}`} />
-          <span className="font-semibold text-slate-900 dark:text-white text-xs truncate max-w-[130px] sm:max-w-xs font-sans">
+          <span
+            className="font-semibold text-slate-900 dark:text-white text-xs truncate font-sans max-w-[260px] sm:max-w-sm md:max-w-md"
+            title={fileName}
+          >
             {fileName}
           </span>
           <span
-            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border font-mono shrink-0 ${theme.bgLight} ${theme.bgDark}`}
+            className={`h-6 px-2 rounded-lg text-[10px] font-bold uppercase border font-mono shrink-0 flex items-center leading-none ${theme.bgLight} ${theme.bgDark}`}
           >
             {theme.badgeText}
           </span>
-          <span className="text-slate-500 dark:text-slate-400 text-[11px] font-mono hidden md:inline">
+          <span className="text-slate-500 dark:text-slate-400 text-[11px] font-mono hidden lg:flex items-center leading-none shrink-0">
             {file.size || "Cloud Document"}
           </span>
         </div>
 
         {/* Right: Actions & Viewport Controls */}
-        <div className="flex items-center gap-1 sm:gap-2">
+        <div className="shrink-0 flex items-center gap-1.5 sm:gap-2">
           {/* Dual Engine Switcher (when in preview mode and online URL available) */}
           {viewMode === "preview" && isOfficeDoc && officeViewerUrl && (
-            <div className="hidden sm:flex items-center bg-slate-100/90 dark:bg-white/10 p-0.5 rounded-xl border border-slate-200/80 dark:border-white/10 text-[11px] mr-1">
+            <div className="hidden sm:flex items-center h-8 bg-slate-100/90 dark:bg-white/10 p-0.5 rounded-xl border border-slate-200/80 dark:border-white/10 text-xs">
               <button
                 onClick={() => {
                   if (engine !== "google") {
@@ -150,7 +155,7 @@ const DocumentStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                     handleRefresh();
                   }
                 }}
-                className={`px-2 py-0.8 rounded-lg font-medium transition-all ${
+                className={`h-full px-2.5 rounded-lg font-medium transition-all duration-150 active:scale-95 hover:scale-[1.02] flex items-center justify-center leading-none ${
                   engine === "google"
                     ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs font-semibold"
                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
@@ -166,56 +171,70 @@ const DocumentStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                     handleRefresh();
                   }
                 }}
-                className={`px-2 py-0.8 rounded-lg font-medium transition-all ${
+                className={`h-full px-2.5 rounded-lg font-medium transition-all duration-150 active:scale-95 hover:scale-[1.02] flex items-center justify-center leading-none ${
                   engine === "office"
                     ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs font-semibold"
                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                 }`}
-                title="Use Microsoft 365 Preview Engine"
+                title="Use Microsoft Office Preview Engine"
               >
-                Microsoft 365
+                Office 365
               </button>
             </div>
           )}
 
           {/* Mode Switcher: Web View vs. Overview */}
           {googleViewerUrl && (
-            <div className="flex items-center bg-slate-100/90 dark:bg-white/10 p-0.5 rounded-xl border border-slate-200/80 dark:border-white/10 text-xs">
+            <div className="flex items-center h-8 bg-slate-100/90 dark:bg-white/10 p-0.5 rounded-xl border border-slate-200/80 dark:border-white/10 text-xs">
               <button
                 onClick={() => {
                   setViewMode("preview");
                   setIframeError(false);
                 }}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-medium transition-all ${
+                className={`h-full flex items-center gap-1.5 px-2.5 rounded-lg font-medium transition-all duration-150 active:scale-95 hover:scale-[1.02] leading-none ${
                   viewMode === "preview"
-                    ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs"
+                    ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs font-semibold"
                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                 }`}
                 title="Online Document Preview"
               >
-                <Eye className="w-3 h-3" />
+                <Eye className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Preview</span>
               </button>
               <button
                 onClick={() => setViewMode("details")}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-medium transition-all ${
+                className={`h-full flex items-center gap-1.5 px-2.5 rounded-lg font-medium transition-all duration-150 active:scale-95 hover:scale-[1.02] leading-none ${
                   viewMode === "details"
-                    ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs"
+                    ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs font-semibold"
                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                 }`}
                 title="Document Info & Actions"
               >
-                <Info className="w-3 h-3" />
+                <Info className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Overview</span>
               </button>
             </div>
           )}
 
+          {/* AI Insights Drawer Toggle Button */}
+          <button
+            onClick={() => setShowAiDrawer(!showAiDrawer)}
+            className={`h-8 flex items-center gap-1.5 px-3 rounded-xl border text-xs font-semibold transition-all duration-200 active:scale-95 hover:scale-105 leading-none shadow-xs hover:shadow-md ${
+              showAiDrawer
+                ? "bg-purple-600 text-white border-purple-500 shadow-purple-500/25"
+                : "bg-purple-500/10 hover:bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/30"
+            }`}
+            title="Toggle Document Intelligence & AI Chat"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-500 dark:text-amber-300 animate-pulse" />
+            <span className="hidden sm:inline font-sans">AI Insights</span>
+          </button>
+
           {/* Refresh Preview */}
           {viewMode === "preview" && currentViewerUrl && (
             <button
               onClick={handleRefresh}
-              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
+              className="w-8 h-8 rounded-xl flex items-center justify-center bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all duration-150 active:scale-90 hover:scale-105"
               title="Refresh Document Preview"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${iframeLoading ? "animate-spin" : ""}`} />
@@ -225,7 +244,7 @@ const DocumentStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
           {/* Focus Mode Toggle */}
           <button
             onClick={() => setIsFocusMode(!isFocusMode)}
-            className="hidden sm:flex p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
+            className="hidden sm:flex w-8 h-8 rounded-xl items-center justify-center bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all duration-150 active:scale-90 hover:scale-105"
             title={isFocusMode ? "Exit Focus Canvas" : "Expand Focus Canvas"}
           >
             {isFocusMode ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
@@ -238,7 +257,7 @@ const DocumentStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                 e.stopPropagation();
                 onShare();
               }}
-              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
+              className="w-8 h-8 rounded-xl flex items-center justify-center bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all duration-150 active:scale-90 hover:scale-105"
               title="Copy share link"
             >
               <Share2 className="w-3.5 h-3.5" />
@@ -251,7 +270,7 @@ const DocumentStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
               href={fileUrl}
               target="_blank"
               rel="noreferrer"
-              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
+              className="w-8 h-8 rounded-xl flex items-center justify-center bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all duration-150 active:scale-90 hover:scale-105"
               title="Open document in new tab"
             >
               <ExternalLink className="w-3.5 h-3.5" />
@@ -265,7 +284,8 @@ const DocumentStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
               download={fileName}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#1a73e8] hover:bg-[#1557b0] text-white text-xs font-medium shadow-md shadow-blue-500/25 transition-colors"
+              className="h-8 flex items-center gap-1.5 px-3 rounded-xl bg-[#1a73e8] hover:bg-[#1557b0] text-white text-xs font-medium shadow-xs shadow-blue-500/25 transition-all duration-150 active:scale-95 hover:scale-105 leading-none"
+              title="Download file"
             >
               <Download className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Download</span>
@@ -279,7 +299,7 @@ const DocumentStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                 e.stopPropagation();
                 onClose();
               }}
-              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-white/80 hover:text-slate-900 dark:hover:text-white transition-colors"
+              className="w-8 h-8 rounded-xl flex items-center justify-center bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-white/80 hover:text-slate-900 dark:hover:text-white transition-all duration-150 active:scale-90 hover:scale-105"
               title="Close (Esc)"
             >
               <X className="w-4 h-4" />
@@ -288,12 +308,14 @@ const DocumentStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
         </div>
       </div>
 
-      {/* Main Stage: Embedded Preview or Document Overview Card */}
-      <div
-        className={`flex-1 w-full min-h-0 relative flex items-center justify-center bg-slate-100/40 dark:bg-slate-950/60 backdrop-blur-md overflow-hidden ${
-          viewMode === "preview" ? "p-1 sm:p-2" : "p-4 sm:p-6"
-        }`}
-      >
+      {/* Main Split Stage: Embedded Preview or Overview Card + Collapsible AI Insights Drawer */}
+      <div className="flex-1 w-full min-h-0 relative flex overflow-hidden">
+        {/* Document Canvas Stage */}
+        <div
+          className={`flex-1 h-full min-w-0 relative flex items-center justify-center bg-slate-100/40 dark:bg-slate-950/60 backdrop-blur-md overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+            viewMode === "preview" ? "p-1 sm:p-2" : "p-4 sm:p-6"
+          }`}
+        >
         {viewMode === "preview" && currentViewerUrl && !iframeError ? (
           <div className="w-full h-full relative rounded-2xl overflow-hidden border border-slate-200/80 dark:border-white/10 bg-white dark:bg-slate-900 shadow-inner flex flex-col">
             {iframeLoading && (
@@ -455,6 +477,17 @@ const DocumentStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
             </p>
           </div>
         )}
+        </div>
+
+        {/* Collapsible Executive AI Insights Right Drawer */}
+        <DocumentAiInsightsDrawer
+          file={file}
+          fileUrl={fileUrl}
+          fileName={fileName}
+          isOpen={showAiDrawer}
+          onClose={() => setShowAiDrawer(false)}
+          theme={theme}
+        />
       </div>
     </div>
   );

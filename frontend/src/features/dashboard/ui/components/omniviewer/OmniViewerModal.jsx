@@ -157,24 +157,24 @@ const OmniViewerModal = ({
   const downloadLink = currentFile.downloadUrl || currentFile.download_url || null;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-white/40 dark:bg-slate-950/85 backdrop-blur-3xl backdrop-saturate-150 select-none animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex flex-col bg-black/40 dark:bg-slate-950/85 backdrop-blur-3xl backdrop-saturate-150 select-none animate-in fade-in duration-300 ease-out">
       {/* Center Dynamic Cinema Viewport Stage */}
       <div className="relative flex-1 min-h-0 w-full overflow-hidden flex items-center justify-center p-2 sm:p-5">
         {/* Previous Navigation Floating Arrow */}
         {hasPrev && (
           <button
             onClick={handlePrev}
-            className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-40 w-11 h-11 rounded-full bg-white/80 dark:bg-slate-900/80 hover:bg-[#1a73e8] dark:hover:bg-[#1a73e8] border border-slate-200/80 dark:border-white/15 text-slate-700 dark:text-white hover:text-white dark:hover:text-white flex items-center justify-center backdrop-blur-xl shadow-2xl transition-all hover:scale-110 active:scale-95 group"
+            className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-40 w-11 h-11 rounded-full bg-white/85 dark:bg-slate-900/85 hover:bg-[#1a73e8] dark:hover:bg-[#1a73e8] border border-slate-200/80 dark:border-white/15 text-slate-700 dark:text-white hover:text-white dark:hover:text-white flex items-center justify-center backdrop-blur-xl shadow-2xl transition-all duration-200 hover:scale-110 active:scale-90 group"
             title="Previous File (←)"
           >
-            <ChevronLeft className="w-6 h-6 group-hover:-translate-x-0.5 transition-transform" />
+            <ChevronLeft className="w-6 h-6 group-hover:-translate-x-0.5 transition-transform duration-200" />
           </button>
         )}
 
-        {/* Dynamic Polymorphic Viewport Container with Smooth Cross-Fade */}
+        {/* Dynamic Polymorphic Viewport Container with Smooth Cross-Fade & Scale */}
         <div
           key={currentFile.id || currentFile.file_id || currentFile.name}
-          className="w-full h-full max-w-5xl flex items-center justify-center animate-in fade-in duration-200"
+          className="w-full h-full max-w-5xl flex items-center justify-center animate-in fade-in zoom-in-[0.98] duration-300 ease-out transition-all"
         >
           {category === "video" && (
             <VideoStudioViewport
@@ -254,10 +254,10 @@ const OmniViewerModal = ({
         {hasNext && (
           <button
             onClick={handleNext}
-            className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-40 w-11 h-11 rounded-full bg-white/80 dark:bg-slate-900/80 hover:bg-[#1a73e8] dark:hover:bg-[#1a73e8] border border-slate-200/80 dark:border-white/15 text-slate-700 dark:text-white hover:text-white dark:hover:text-white flex items-center justify-center backdrop-blur-xl shadow-2xl transition-all hover:scale-110 active:scale-95 group"
+            className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-40 w-11 h-11 rounded-full bg-white/85 dark:bg-slate-900/85 hover:bg-[#1a73e8] dark:hover:bg-[#1a73e8] border border-slate-200/80 dark:border-white/15 text-slate-700 dark:text-white hover:text-white dark:hover:text-white flex items-center justify-center backdrop-blur-xl shadow-2xl transition-all duration-200 hover:scale-110 active:scale-90 group"
             title="Next File (→)"
           >
-            <ChevronRight className="w-6 h-6 group-hover:translate-x-0.5 transition-transform" />
+            <ChevronRight className="w-6 h-6 group-hover:translate-x-0.5 transition-transform duration-200" />
           </button>
         )}
       </div>

@@ -98,10 +98,12 @@ def lambda_handler(event, context):
                 or any(lower_name.endswith(ext) for ext in image_exts)
                 or any(lower_key.endswith(ext) for ext in image_exts)
             )
-            is_pdf = (
+            doc_exts = [".pdf", ".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".xls", ".txt", ".md", ".csv"]
+            is_document = (
                 content_type == "application/pdf"
-                or lower_name.endswith(".pdf")
-                or lower_key.endswith(".pdf")
+                or any(t in content_type for t in ["wordprocessingml", "presentationml", "spreadsheetml", "msword", "powerpoint", "excel", "text/"])
+                or any(lower_name.endswith(ext) for ext in doc_exts)
+                or any(lower_key.endswith(ext) for ext in doc_exts)
             )
 
             is_violation, moderation_labels = check_safety_violation(bucket_name, s3_key, is_image)
@@ -152,8 +154,8 @@ def lambda_handler(event, context):
 
             if is_image and VISION_QUEUE_URL:
                 dispatch_sqs_message(VISION_QUEUE_URL, task_payload, "Vision AI Worker")
-            elif is_pdf and PDF_QUEUE_URL:
-                dispatch_sqs_message(PDF_QUEUE_URL, task_payload, "PDF Summarizer Worker")
+            elif is_document and PDF_QUEUE_URL:
+                dispatch_sqs_message(PDF_QUEUE_URL, task_payload, "Document Summarizer Worker")
             elif is_video and VIDEO_QUEUE_URL:
                 dispatch_sqs_message(VIDEO_QUEUE_URL, task_payload, "Video Transcoder Worker")
             else:

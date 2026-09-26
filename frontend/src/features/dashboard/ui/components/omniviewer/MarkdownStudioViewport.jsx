@@ -218,7 +218,7 @@ const MarkdownStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
   return (
     <div
       style={{ maxHeight: "calc(100vh - 105px)" }}
-      className="w-full h-full max-w-5xl flex flex-col rounded-3xl border border-slate-200/80 dark:border-white/10 bg-white/85 dark:bg-slate-900/80 backdrop-blur-3xl shadow-2xl overflow-hidden relative select-text"
+      className="w-full h-full max-w-5xl flex flex-col rounded-3xl border border-slate-200/80 dark:border-white/10 bg-white/85 dark:bg-slate-900/80 backdrop-blur-3xl shadow-2xl overflow-hidden relative select-text animate-in fade-in zoom-in-95 duration-200"
     >
       {/* Standardized Studio In-Stage Header Toolbar */}
       <div className="h-12 px-4 sm:px-5 bg-white/85 dark:bg-slate-900/85 border-b border-slate-200/80 dark:border-white/10 flex items-center justify-between text-slate-700 dark:text-slate-300 shrink-0 z-20 backdrop-blur-xl">
@@ -242,7 +242,7 @@ const MarkdownStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
           <div className="flex items-center bg-slate-100/90 dark:bg-black/40 border border-slate-200/80 dark:border-white/10 rounded-xl p-0.5">
             <button
               onClick={() => setMode("rendered")}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all hover:scale-[1.02] active:scale-95 cursor-pointer ${
                 mode === "rendered"
                   ? "bg-[#1a73e8] text-white shadow-xs"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
@@ -253,7 +253,7 @@ const MarkdownStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
             </button>
             <button
               onClick={() => setMode("raw")}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all hover:scale-[1.02] active:scale-95 cursor-pointer ${
                 mode === "raw"
                   ? "bg-[#1a73e8] text-white shadow-xs"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
@@ -267,7 +267,7 @@ const MarkdownStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
           {/* Copy Button */}
           <button
             onClick={handleCopy}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-white text-xs font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-white text-xs font-medium transition-all hover:scale-105 active:scale-90 cursor-pointer"
           >
             {copied ? (
               <>
@@ -289,7 +289,7 @@ const MarkdownStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                 e.stopPropagation();
                 onShare();
               }}
-              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
+              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all hover:scale-105 active:scale-90 cursor-pointer"
               title="Copy share link"
             >
               <Share2 className="w-3.5 h-3.5" />
@@ -304,7 +304,7 @@ const MarkdownStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
               target="_blank"
               rel="noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
+              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all hover:scale-105 active:scale-90"
               title="Download markdown file"
             >
               <Download className="w-3.5 h-3.5" />
@@ -318,7 +318,7 @@ const MarkdownStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                 e.stopPropagation();
                 onClose();
               }}
-              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-white/80 hover:text-slate-900 dark:hover:text-white transition-colors"
+              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-white/80 hover:text-slate-900 dark:hover:text-white transition-all hover:scale-105 active:scale-90 cursor-pointer"
               title="Close (Esc)"
             >
               <X className="w-4 h-4" />

@@ -183,7 +183,7 @@ const PhotoStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
   return (
     <div
       style={{ maxHeight: "calc(100vh - 105px)" }}
-      className="w-full h-full max-w-5xl flex flex-col rounded-3xl border border-slate-200/80 dark:border-white/10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-3xl shadow-2xl overflow-hidden relative"
+      className="w-full h-full max-w-5xl flex flex-col rounded-3xl border border-slate-200/80 dark:border-white/10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-3xl shadow-2xl overflow-hidden relative animate-in fade-in zoom-in-95 duration-200"
     >
       {/* Standardized Studio In-Stage Header Toolbar */}
       <div className="h-12 px-4 sm:px-5 bg-white/85 dark:bg-slate-900/85 border-b border-slate-200/80 dark:border-white/10 flex items-center justify-between text-slate-700 dark:text-slate-300 shrink-0 z-20 backdrop-blur-xl">
@@ -214,21 +214,21 @@ const PhotoStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
           <div className="flex items-center bg-slate-100/90 dark:bg-black/40 border border-slate-200/80 dark:border-white/10 rounded-xl p-0.5">
             <button
               onClick={zoomOut}
-              className="p-1.5 rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
+              className="p-1.5 rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all hover:scale-105 active:scale-90 cursor-pointer"
               title="Zoom Out (-)"
             >
               <ZoomOut className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={toggle100Percent}
-              className="px-2 py-0.5 text-[11px] font-mono text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+              className="px-2 py-0.5 text-[11px] font-mono text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-transform active:scale-95 cursor-pointer"
               title="Toggle 100% Zoom (z)"
             >
               {scale === 1 ? "100%" : `${Math.round(scale * 100)}%`}
             </button>
             <button
               onClick={zoomIn}
-              className="p-1.5 rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
+              className="p-1.5 rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all hover:scale-105 active:scale-90 cursor-pointer"
               title="Zoom In (+)"
             >
               <ZoomIn className="w-3.5 h-3.5" />
@@ -238,7 +238,7 @@ const PhotoStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
           {/* Rotate 90 deg */}
           <button
             onClick={() => setRotation((r) => (r + 90) % 360)}
-            className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
+            className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all hover:scale-105 active:scale-90 cursor-pointer"
             title="Rotate 90° (r)"
           >
             <RotateCw className="w-3.5 h-3.5" />
@@ -248,7 +248,7 @@ const PhotoStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
           {labelBoxes.length > 0 && (
             <button
               onClick={() => setShowBoundingBoxes((b) => !b)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-medium transition-all hover:scale-105 active:scale-95 cursor-pointer ${
                 showBoundingBoxes
                   ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/40 shadow-xs"
                   : "bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 text-slate-600 dark:text-slate-400 border-slate-200/70 dark:border-white/10"
@@ -264,7 +264,7 @@ const PhotoStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
           <div className="relative">
             <button
               onClick={() => setShowFilterMenu(!showFilterMenu)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-medium transition-all hover:scale-105 active:scale-95 cursor-pointer ${
                 activeFilter !== "normal"
                   ? "bg-[#1a73e8] text-white border-blue-500 shadow-xs"
                   : "bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 text-slate-700 dark:text-slate-300 border-slate-200/70 dark:border-white/10"
@@ -287,7 +287,7 @@ const PhotoStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                       setActiveFilter(f.id);
                       setShowFilterMenu(false);
                     }}
-                    className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-xs transition-colors ${
+                    className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-xs transition-all hover:scale-[1.02] active:scale-95 cursor-pointer ${
                       activeFilter === f.id
                         ? "bg-[#1a73e8] text-white font-medium shadow-xs"
                         : "hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300"
@@ -308,7 +308,7 @@ const PhotoStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                 e.stopPropagation();
                 onShare();
               }}
-              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
+              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all hover:scale-105 active:scale-90 cursor-pointer"
               title="Copy share link"
             >
               <Share2 className="w-3.5 h-3.5" />
@@ -323,7 +323,7 @@ const PhotoStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
               target="_blank"
               rel="noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
+              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all hover:scale-105 active:scale-90"
               title="Download image file"
             >
               <Download className="w-3.5 h-3.5" />
@@ -337,7 +337,7 @@ const PhotoStudioViewport = ({ file, onClose, onShare, downloadLink }) => {
                 e.stopPropagation();
                 onClose();
               }}
-              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-white/80 hover:text-slate-900 dark:hover:text-white transition-colors"
+              className="p-1.5 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/15 border border-slate-200/70 dark:border-white/10 text-slate-700 dark:text-white/80 hover:text-slate-900 dark:hover:text-white transition-all hover:scale-105 active:scale-90 cursor-pointer"
               title="Close viewer (Esc)"
             >
               <X className="w-4 h-4" />
